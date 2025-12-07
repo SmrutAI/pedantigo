@@ -14,10 +14,12 @@ type constraint interface {
 
 // Built-in constraint types
 type (
-	minConstraint     struct{ min int }
-	maxConstraint     struct{ max int }
-	emailConstraint   struct{}
-	defaultConstraint struct{ value string }
+	minConstraint       struct{ min int }
+	maxConstraint       struct{ max int }
+	minLengthConstraint struct{ minLength int }
+	maxLengthConstraint struct{ maxLength int }
+	emailConstraint     struct{}
+	defaultConstraint   struct{ value string }
 )
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
@@ -84,6 +86,62 @@ func (c maxConstraint) Validate(value any) error {
 	return nil
 }
 
+// minLengthConstraint validates that a string has at least minLength characters
+func (c minLengthConstraint) Validate(value any) error {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// Handle pointer types
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	// Ensure we have a string
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("min_length constraint requires string value")
+	}
+
+	str := v.String()
+	if len(str) < c.minLength {
+		return fmt.Errorf("must be at least %d characters", c.minLength)
+	}
+
+	return nil
+}
+
+// maxLengthConstraint validates that a string has at most maxLength characters
+func (c maxLengthConstraint) Validate(value any) error {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// Handle pointer types
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	// Ensure we have a string
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("max_length constraint requires string value")
+	}
+
+	str := v.String()
+	if len(str) > c.maxLength {
+		return fmt.Errorf("must be at most %d characters", c.maxLength)
+	}
+
+	return nil
+}
+
 // emailConstraint validates that a string is a valid email format
 func (c emailConstraint) Validate(value any) error {
 	str, ok := value.(string)
@@ -124,6 +182,14 @@ func buildConstraints(constraints map[string]string) []constraint {
 		case "max":
 			if max, err := strconv.Atoi(value); err == nil {
 				result = append(result, maxConstraint{max: max})
+			}
+		case "min_length":
+			if minLength, err := strconv.Atoi(value); err == nil {
+				result = append(result, minLengthConstraint{minLength: minLength})
+			}
+		case "max_length":
+			if maxLength, err := strconv.Atoi(value); err == nil {
+				result = append(result, maxLengthConstraint{maxLength: maxLength})
 			}
 		case "email":
 			result = append(result, emailConstraint{})
