@@ -25,6 +25,10 @@ if err != nil {
 }
 ```
 
+## Feature Coverage
+
+See [API_PARITY.md](API_PARITY.md) for detailed feature comparison with Pydantic v2 and go-playground/validator.
+
 ## Core Validation
 
 ### Creating a Validator
