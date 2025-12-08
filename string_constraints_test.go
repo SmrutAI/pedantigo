@@ -16,9 +16,9 @@ func TestMinLength_Valid(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"username":"alice"}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for username with 5 chars (min 3), got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for username with 5 chars (min 3), got %v", err)
 	}
 
 	if user.Username != "alice" {
@@ -34,9 +34,9 @@ func TestMinLength_ExactlyAtMinimum(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"username":"bob"}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for username with exactly 3 chars, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for username with exactly 3 chars, got %v", err)
 	}
 
 	if user.Username != "bob" {
@@ -52,21 +52,26 @@ func TestMinLength_BelowMinimum(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"username":"ab"}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for username with 2 chars (min 3)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for username with 2 chars (min 3)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	// Check error message
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Username" && err.Message == "must be at least 3 characters" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Username" && fieldErr.Message == "must be at least 3 characters" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be at least 3 characters' error, got %v", errs)
+		t.Errorf("expected 'must be at least 3 characters' error, got %v", ve.Errors)
 	}
 }
 
@@ -78,20 +83,25 @@ func TestMinLength_EmptyString(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"username":""}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for empty username (min 1)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for empty username (min 1)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Username" && err.Message == "must be at least 1 characters" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Username" && fieldErr.Message == "must be at least 1 characters" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be at least 1 characters' error, got %v", errs)
+		t.Errorf("expected 'must be at least 1 characters' error, got %v", ve.Errors)
 	}
 }
 
@@ -104,27 +114,32 @@ func TestMinLength_WithPointer(t *testing.T) {
 	shortBio := "short"
 	jsonData := []byte(`{"bio":"short"}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for bio with 5 chars (min 10)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for bio with 5 chars (min 10)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Bio" && err.Message == "must be at least 10 characters" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Bio" && fieldErr.Message == "must be at least 10 characters" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be at least 10 characters' error, got %v", errs)
+		t.Errorf("expected 'must be at least 10 characters' error, got %v", ve.Errors)
 	}
 
 	// Test with valid length
 	jsonData = []byte(`{"bio":"this is a longer bio"}`)
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for bio with 21 chars, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for bio with 21 chars, got %v", err)
 	}
 
 	if user.Bio == nil || *user.Bio != "this is a longer bio" {
@@ -142,9 +157,9 @@ func TestMinLength_NilPointer(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"bio":null}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for nil pointer (validation skips nil), got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for nil pointer (validation skips nil), got %v", err)
 	}
 
 	if user.Bio != nil {
@@ -164,9 +179,9 @@ func TestMaxLength_Valid(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"username":"alice"}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for username with 5 chars (max 10), got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for username with 5 chars (max 10), got %v", err)
 	}
 
 	if user.Username != "alice" {
@@ -182,9 +197,9 @@ func TestMaxLength_ExactlyAtMaximum(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"username":"alice"}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for username with exactly 5 chars, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for username with exactly 5 chars, got %v", err)
 	}
 
 	if user.Username != "alice" {
@@ -200,21 +215,26 @@ func TestMaxLength_AboveMaximum(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"username":"verylongusername"}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for username with 16 chars (max 5)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for username with 16 chars (max 5)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	// Check error message
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Username" && err.Message == "must be at most 5 characters" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Username" && fieldErr.Message == "must be at most 5 characters" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be at most 5 characters' error, got %v", errs)
+		t.Errorf("expected 'must be at most 5 characters' error, got %v", ve.Errors)
 	}
 }
 
@@ -226,9 +246,9 @@ func TestMaxLength_EmptyString(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"username":""}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for empty username (max 10), got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for empty username (max 10), got %v", err)
 	}
 
 	if user.Username != "" {
@@ -244,27 +264,32 @@ func TestMaxLength_WithPointer(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"bio":"this is a very long biography that exceeds the maximum"}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for bio with 58 chars (max 20)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for bio with 58 chars (max 20)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Bio" && err.Message == "must be at most 20 characters" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Bio" && fieldErr.Message == "must be at most 20 characters" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be at most 20 characters' error, got %v", errs)
+		t.Errorf("expected 'must be at most 20 characters' error, got %v", ve.Errors)
 	}
 
 	// Test with valid length
 	jsonData = []byte(`{"bio":"short bio"}`)
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for bio with 9 chars, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for bio with 9 chars, got %v", err)
 	}
 
 	if user.Bio == nil || *user.Bio != "short bio" {
@@ -280,9 +305,9 @@ func TestMaxLength_NilPointer(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"bio":null}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for nil pointer (validation skips nil), got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for nil pointer (validation skips nil), got %v", err)
 	}
 
 	if user.Bio != nil {
@@ -299,23 +324,23 @@ func TestMaxLength_Combined_MinMaxLength(t *testing.T) {
 
 	// Test too short
 	jsonData := []byte(`{"password":"short"}`)
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for password with 5 chars (min 8)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for password with 5 chars (min 8)")
 	}
 
 	// Test too long
 	jsonData = []byte(`{"password":"thispasswordiswaytoolongforourvalidation"}`)
-	_, errs = validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for password with 43 chars (max 20)")
+	_, err = validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for password with 43 chars (max 20)")
 	}
 
 	// Test in range
 	jsonData = []byte(`{"password":"goodpassword"}`)
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for password with 12 chars (8-20), got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for password with 12 chars (8-20), got %v", err)
 	}
 
 	if user.Password != "goodpassword" {

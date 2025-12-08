@@ -14,9 +14,9 @@ func TestPointer_ExplicitValue(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"name":"Alice","age":25}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors, got %v", err)
 	}
 
 	if user.Name == nil {
@@ -45,9 +45,9 @@ func TestPointer_ExplicitZero(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"port":0,"enabled":false,"name":""}`)
 
-	config, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	config, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors, got %v", err)
 	}
 
 	// Explicit zeros should create pointers to zero values
@@ -83,9 +83,9 @@ func TestPointer_ExplicitNull(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"name":null,"age":null}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors, got %v", err)
 	}
 
 	// Explicit null should result in nil pointers
@@ -108,9 +108,9 @@ func TestPointer_Missing(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{}`) // Both fields missing
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors, got %v", err)
 	}
 
 	// Missing fields should result in nil pointers
@@ -132,9 +132,9 @@ func TestPointer_RequiredWithValue(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"name":"Alice"}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors, got %v", err)
 	}
 
 	if user.Name == nil {
@@ -154,21 +154,26 @@ func TestPointer_RequiredMissing(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{}`) // Missing required field
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for missing required field")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for missing required field")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	// Check for required field error
 	foundRequiredError := false
-	for _, err := range errs {
-		if err.Field == "name" && err.Message == "is required" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "name" && fieldErr.Message == "is required" {
 			foundRequiredError = true
 		}
 	}
 
 	if !foundRequiredError {
-		t.Errorf("expected 'is required' error for name field, got %v", errs)
+		t.Errorf("expected 'is required' error for name field, got %v", ve.Errors)
 	}
 }
 
@@ -181,9 +186,9 @@ func TestPointer_RequiredWithNull(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"name":null}`) // Field present but null
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors (field is present), got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors (field is present), got %v", err)
 	}
 
 	// Required means "field must be present", not "value can't be nil"
@@ -201,9 +206,9 @@ func TestPointer_WithDefault(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{}`) // Missing port field
 
-	config, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	config, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors, got %v", err)
 	}
 
 	// Default should be applied to missing field
@@ -224,9 +229,9 @@ func TestPointer_ExplicitZeroWithDefault(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"port":0}`) // Explicit zero
 
-	config, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	config, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors, got %v", err)
 	}
 
 	// Explicit zero should be kept, not replaced with default
@@ -253,9 +258,9 @@ func TestPointer_NestedStruct(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"name":"Alice","address":{"street":"123 Main St","city":null}}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors, got %v", err)
 	}
 
 	if user.Address == nil {

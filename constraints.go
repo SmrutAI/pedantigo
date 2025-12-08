@@ -50,6 +50,14 @@ func (c minConstraint) Validate(value any) error {
 		return nil // Skip validation for invalid values
 	}
 
+	// Handle pointer types
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
 	switch v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if v.Int() < int64(c.min) {
@@ -79,6 +87,14 @@ func (c maxConstraint) Validate(value any) error {
 	v := reflect.ValueOf(value)
 	if !v.IsValid() {
 		return nil // Skip validation for invalid values
+	}
+
+	// Handle pointer types
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
 	}
 
 	switch v.Kind() {

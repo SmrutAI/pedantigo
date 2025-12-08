@@ -16,9 +16,9 @@ func TestSlice_ValidEmails(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"admins":["alice@example.com","bob@example.com"]}`)
 
-	config, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for valid emails, got %v", errs)
+	config, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for valid emails, got %v", err)
 	}
 
 	if len(config.Admins) != 2 {
@@ -34,20 +34,25 @@ func TestSlice_InvalidEmail_SingleElement(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"admins":["not-an-email"]}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
 		t.Error("expected validation error for invalid email in slice")
 	}
 
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Admins[0]" && err.Message == "must be a valid email address" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Admins[0]" && fieldErr.Message == "must be a valid email address" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected error at 'Admins[0]', got %v", errs)
+		t.Errorf("expected error at 'Admins[0]', got %v", ve.Errors)
 	}
 }
 
@@ -59,31 +64,39 @@ func TestSlice_InvalidEmail_MultipleElements(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"admins":["alice@example.com","invalid","bob@example.com","also-invalid"]}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 2 {
-		t.Errorf("expected 2 validation errors, got %d: %v", len(errs), errs)
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation errors, got nil")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+	if len(ve.Errors) != 2 {
+		t.Errorf("expected 2 validation errors, got %d: %v", len(ve.Errors), ve.Errors)
 	}
 
 	// Check first error at index 1
 	foundError1 := false
-	for _, err := range errs {
-		if err.Field == "Admins[1]" && err.Message == "must be a valid email address" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Admins[1]" && fieldErr.Message == "must be a valid email address" {
 			foundError1 = true
 		}
 	}
 	if !foundError1 {
-		t.Errorf("expected error at 'Admins[1]', got %v", errs)
+		t.Errorf("expected error at 'Admins[1]', got %v", ve.Errors)
 	}
 
 	// Check second error at index 3
 	foundError2 := false
-	for _, err := range errs {
-		if err.Field == "Admins[3]" && err.Message == "must be a valid email address" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Admins[3]" && fieldErr.Message == "must be a valid email address" {
 			foundError2 = true
 		}
 	}
 	if !foundError2 {
-		t.Errorf("expected error at 'Admins[3]', got %v", errs)
+		t.Errorf("expected error at 'Admins[3]', got %v", ve.Errors)
 	}
 }
 
@@ -95,20 +108,28 @@ func TestSlice_MinLength(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"tags":["abc","de","fgh"]}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 1 {
-		t.Errorf("expected 1 validation error, got %d: %v", len(errs), errs)
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+	if len(ve.Errors) != 1 {
+		t.Errorf("expected 1 validation error, got %d: %v", len(ve.Errors), ve.Errors)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Tags[1]" && err.Message == "must be at least 3 characters" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Tags[1]" && fieldErr.Message == "must be at least 3 characters" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected error at 'Tags[1]', got %v", errs)
+		t.Errorf("expected error at 'Tags[1]', got %v", ve.Errors)
 	}
 }
 
@@ -125,31 +146,39 @@ func TestSlice_NestedStructValidation(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"addresses":[{"city":"NYC","zip":"10001"},{"zip":"123"}]}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 2 {
-		t.Errorf("expected 2 validation errors, got %d: %v", len(errs), errs)
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation errors, got nil")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+	if len(ve.Errors) != 2 {
+		t.Errorf("expected 2 validation errors, got %d: %v", len(ve.Errors), ve.Errors)
 	}
 
 	// Check for missing city at index 1
 	foundError1 := false
-	for _, err := range errs {
-		if err.Field == "Addresses[1].City" && err.Message == "is required" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Addresses[1].City" && fieldErr.Message == "is required" {
 			foundError1 = true
 		}
 	}
 	if !foundError1 {
-		t.Errorf("expected error at 'Addresses[1].City', got %v", errs)
+		t.Errorf("expected error at 'Addresses[1].City', got %v", ve.Errors)
 	}
 
 	// Check for short zip at index 1
 	foundError2 := false
-	for _, err := range errs {
-		if err.Field == "Addresses[1].Zip" && err.Message == "must be at least 5 characters" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Addresses[1].Zip" && fieldErr.Message == "must be at least 5 characters" {
 			foundError2 = true
 		}
 	}
 	if !foundError2 {
-		t.Errorf("expected error at 'Addresses[1].Zip', got %v", errs)
+		t.Errorf("expected error at 'Addresses[1].Zip', got %v", ve.Errors)
 	}
 }
 
@@ -161,9 +190,9 @@ func TestSlice_EmptySlice(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"admins":[]}`)
 
-	config, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for empty slice, got %v", errs)
+	config, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for empty slice, got %v", err)
 	}
 
 	if len(config.Admins) != 0 {
@@ -179,9 +208,9 @@ func TestSlice_NilSlice(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"admins":null}`)
 
-	config, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for nil slice, got %v", errs)
+	config, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for nil slice, got %v", err)
 	}
 
 	if config.Admins != nil {

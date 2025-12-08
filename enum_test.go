@@ -16,9 +16,9 @@ func TestEnum_ValidString(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"role":"admin"}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for valid enum value, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for valid enum value, got %v", err)
 	}
 
 	if user.Role != "admin" {
@@ -34,20 +34,25 @@ func TestEnum_InvalidString(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"role":"superadmin"}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
 		t.Error("expected validation error for invalid enum value")
 	}
 
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Role" && err.Message == "must be one of: admin, user, guest" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Role" && fieldErr.Message == "must be one of: admin, user, guest" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be one of' error, got %v", errs)
+		t.Errorf("expected 'must be one of' error, got %v", ve.Errors)
 	}
 }
 
@@ -59,9 +64,9 @@ func TestEnum_ValidInteger(t *testing.T) {
 	validator := New[Status]()
 	jsonData := []byte(`{"code":200}`)
 
-	status, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for valid enum value, got %v", errs)
+	status, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for valid enum value, got %v", err)
 	}
 
 	if status.Code != 200 {
@@ -77,20 +82,25 @@ func TestEnum_InvalidInteger(t *testing.T) {
 	validator := New[Status]()
 	jsonData := []byte(`{"code":404}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
 		t.Error("expected validation error for invalid enum value")
 	}
 
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Code" && err.Message == "must be one of: 200, 201, 204" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Code" && fieldErr.Message == "must be one of: 200, 201, 204" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be one of' error, got %v", errs)
+		t.Errorf("expected 'must be one of' error, got %v", ve.Errors)
 	}
 }
 
@@ -102,20 +112,28 @@ func TestEnum_InSlice(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"roles":["admin","user","superadmin"]}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 1 {
-		t.Errorf("expected 1 validation error, got %d: %v", len(errs), errs)
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+	if len(ve.Errors) != 1 {
+		t.Errorf("expected 1 validation error, got %d: %v", len(ve.Errors), ve.Errors)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Roles[2]" && err.Message == "must be one of: admin, user, guest" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Roles[2]" && fieldErr.Message == "must be one of: admin, user, guest" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected error at 'Roles[2]', got %v", errs)
+		t.Errorf("expected error at 'Roles[2]', got %v", ve.Errors)
 	}
 }
 
@@ -127,20 +145,28 @@ func TestEnum_InMap(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"permissions":{"file":"read","script":"delete"}}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 1 {
-		t.Errorf("expected 1 validation error, got %d: %v", len(errs), errs)
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+	if len(ve.Errors) != 1 {
+		t.Errorf("expected 1 validation error, got %d: %v", len(ve.Errors), ve.Errors)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Permissions[script]" && err.Message == "must be one of: read, write, execute" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Permissions[script]" && fieldErr.Message == "must be one of: read, write, execute" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected error at 'Permissions[script]', got %v", errs)
+		t.Errorf("expected error at 'Permissions[script]', got %v", ve.Errors)
 	}
 }
 

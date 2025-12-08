@@ -97,6 +97,18 @@ func (v *Validator[T]) buildFieldDeserializers(typ reflect.Type) {
 		// Parse validation constraints
 		constraints := parseTag(field.Tag)
 
+		// Safety check: panic if default tags are used when StrictMissingFields is disabled
+		if constraints != nil && !v.options.StrictMissingFields {
+			if _, hasDefault := constraints["default"]; hasDefault {
+				panic(fmt.Sprintf("field %s.%s has 'default=' tag but StrictMissingFields is false. Remove the tag or enable StrictMissingFields.",
+					typ.Name(), field.Name))
+			}
+			if _, hasMethod := constraints["defaultUsingMethod"]; hasMethod {
+				panic(fmt.Sprintf("field %s.%s has 'defaultUsingMethod=' tag but StrictMissingFields is false. Remove the tag or enable StrictMissingFields.",
+					typ.Name(), field.Name))
+			}
+		}
+
 		// Get default value and defaultUsingMethod
 		var staticDefault *string
 		var methodName *string
@@ -438,12 +450,14 @@ func (v *Validator[T]) setFieldValue(fieldValue reflect.Value, inValue any, fiel
 
 // Validate validates a struct and returns any validation errors
 // NOTE: 'required' is NOT checked here - it's only checked during Unmarshal
-func (v *Validator[T]) Validate(obj *T) ValidationErrors {
+func (v *Validator[T]) Validate(obj *T) error {
 	if obj == nil {
-		return ValidationErrors{{Field: "root", Message: "cannot validate nil pointer"}}
+		return &ValidationError{
+			Errors: []FieldError{{Field: "root", Message: "cannot validate nil pointer"}},
+		}
 	}
 
-	var errors ValidationErrors
+	var errors []FieldError
 
 	// Validate all fields using struct tags (required is skipped via buildConstraints)
 	errors = append(errors, v.validateValue(reflect.ValueOf(obj).Elem(), "")...)
@@ -451,11 +465,12 @@ func (v *Validator[T]) Validate(obj *T) ValidationErrors {
 	// Then, check if struct implements Validatable for cross-field validation
 	if validatable, ok := any(obj).(Validatable); ok {
 		if err := validatable.Validate(); err != nil {
-			// Check if it's a ValidationError
-			if ve, ok := err.(ValidationError); ok {
-				errors = append(errors, ve)
+			// Check if it's a ValidationError with multiple errors
+			if ve, ok := err.(*ValidationError); ok {
+				errors = append(errors, ve.Errors...)
 			} else {
-				errors = append(errors, ValidationError{
+				// Single error or custom error type
+				errors = append(errors, FieldError{
 					Field:   "root",
 					Message: err.Error(),
 				})
@@ -463,13 +478,17 @@ func (v *Validator[T]) Validate(obj *T) ValidationErrors {
 		}
 	}
 
-	return errors
+	if len(errors) == 0 {
+		return nil
+	}
+
+	return &ValidationError{Errors: errors}
 }
 
 // validateValue recursively validates a reflected value
 // NOTE: 'required' constraint is skipped (not built in buildConstraints)
-func (v *Validator[T]) validateValue(val reflect.Value, path string) ValidationErrors {
-	var errors ValidationErrors
+func (v *Validator[T]) validateValue(val reflect.Value, path string) []FieldError {
+	var errors []FieldError
 
 	// Handle pointer indirection
 	for val.Kind() == reflect.Ptr {
@@ -539,7 +558,7 @@ func (v *Validator[T]) validateValue(val reflect.Value, path string) ValidationE
 			if _, hasRequired := constraints["required"]; hasRequired {
 				// Check if field is zero value (indicates it was missing from JSON)
 				if fieldValue.IsZero() {
-					errors = append(errors, ValidationError{
+					errors = append(errors, FieldError{
 						Field:   fieldPath,
 						Message: "is required",
 						Value:   fieldValue.Interface(),
@@ -562,7 +581,7 @@ func (v *Validator[T]) validateValue(val reflect.Value, path string) ValidationE
 				// Apply constraints to each element
 				for _, validator := range validators {
 					if err := validator.Validate(elemValue.Interface()); err != nil {
-						errors = append(errors, ValidationError{
+						errors = append(errors, FieldError{
 							Field:   elemPath,
 							Message: err.Error(),
 							Value:   elemValue.Interface(),
@@ -586,7 +605,7 @@ func (v *Validator[T]) validateValue(val reflect.Value, path string) ValidationE
 				// Apply constraints to each value
 				for _, validator := range validators {
 					if err := validator.Validate(mapValue.Interface()); err != nil {
-						errors = append(errors, ValidationError{
+						errors = append(errors, FieldError{
 							Field:   mapPath,
 							Message: err.Error(),
 							Value:   mapValue.Interface(),
@@ -603,7 +622,7 @@ func (v *Validator[T]) validateValue(val reflect.Value, path string) ValidationE
 			// For non-slice/map fields, apply constraints directly
 			for _, validator := range validators {
 				if err := validator.Validate(fieldValue.Interface()); err != nil {
-					errors = append(errors, ValidationError{
+					errors = append(errors, FieldError{
 						Field:   fieldPath,
 						Message: err.Error(),
 						Value:   fieldValue.Interface(),
@@ -622,14 +641,35 @@ func (v *Validator[T]) validateValue(val reflect.Value, path string) ValidationE
 }
 
 // Unmarshal unmarshals JSON data, applies defaults, and validates
-func (v *Validator[T]) Unmarshal(data []byte) (*T, ValidationErrors) {
+func (v *Validator[T]) Unmarshal(data []byte) (*T, error) {
+	// Fast path: skip 2-step flow if StrictMissingFields is disabled
+	if !v.options.StrictMissingFields {
+		var obj T
+		if err := json.Unmarshal(data, &obj); err != nil {
+			return nil, &ValidationError{
+				Errors: []FieldError{{
+					Field:   "root",
+					Message: fmt.Sprintf("JSON decode error: %v", err),
+				}},
+			}
+		}
+
+		// Only run validators (skip required checks and defaults)
+		if err := v.Validate(&obj); err != nil {
+			return &obj, err
+		}
+		return &obj, nil
+	}
+
 	// Step 1: Unmarshal to map[string]any to detect which fields exist
 	var jsonMap map[string]any
 	if err := json.Unmarshal(data, &jsonMap); err != nil {
-		return nil, ValidationErrors{{
-			Field:   "root",
-			Message: fmt.Sprintf("JSON decode error: %v", err),
-		}}
+		return nil, &ValidationError{
+			Errors: []FieldError{{
+				Field:   "root",
+				Message: fmt.Sprintf("JSON decode error: %v", err),
+			}},
+		}
 	}
 
 	// Step 2: Create new struct instance
@@ -637,7 +677,7 @@ func (v *Validator[T]) Unmarshal(data []byte) (*T, ValidationErrors) {
 	objValue := reflect.ValueOf(&obj).Elem()
 
 	// Step 3: Apply field deserializers
-	var errors ValidationErrors
+	var errors []FieldError
 	for fieldName, deserializer := range v.fieldDeserializers {
 		var inValue any
 		if val, exists := jsonMap[fieldName]; exists {
@@ -647,7 +687,7 @@ func (v *Validator[T]) Unmarshal(data []byte) (*T, ValidationErrors) {
 		}
 
 		if err := deserializer(&objValue, inValue); err != nil {
-			errors = append(errors, ValidationError{
+			errors = append(errors, FieldError{
 				Field:   fieldName,
 				Message: err.Error(),
 			})
@@ -656,14 +696,16 @@ func (v *Validator[T]) Unmarshal(data []byte) (*T, ValidationErrors) {
 
 	// Return early if deserialization errors
 	if len(errors) > 0 {
-		return &obj, errors
+		return &obj, &ValidationError{Errors: errors}
 	}
 
 	// Step 4: Run validation constraints (min, max, email, etc.)
 	// NOTE: 'required' is already skipped in Validate() via buildConstraints
-	errors = append(errors, v.Validate(&obj)...)
+	if err := v.Validate(&obj); err != nil {
+		return &obj, err
+	}
 
-	return &obj, errors
+	return &obj, nil
 }
 
 // setDefaultValue sets a default value on a field
@@ -709,7 +751,7 @@ func (v *Validator[T]) setDefaultValue(fieldValue reflect.Value, defaultValue st
 }
 
 // Marshal validates and marshals struct to JSON
-func (v *Validator[T]) Marshal(obj *T) ([]byte, ValidationErrors) {
+func (v *Validator[T]) Marshal(obj *T) ([]byte, error) {
 	// TODO: implement validate + marshal
 	return nil, nil
 }

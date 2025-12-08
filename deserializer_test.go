@@ -16,9 +16,9 @@ func TestDeserializer_MissingFieldWithDefault(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"name":"myapp"}`) // port and timeout are missing
 
-	config, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no validation errors, got %v", errs)
+	config, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no validation errors, got %v", err)
 	}
 
 	if config == nil {
@@ -50,9 +50,9 @@ func TestDeserializer_ExplicitZeroWithDefault(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"name":"myapp","port":0,"timeout":0}`) // explicit zeros
 
-	config, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no validation errors, got %v", errs)
+	config, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no validation errors, got %v", err)
 	}
 
 	if config == nil {
@@ -79,9 +79,9 @@ func TestDeserializer_RequiredWithExplicitFalse(t *testing.T) {
 	validator := New[Settings]()
 	jsonData := []byte(`{"name":"test","active":false}`) // explicit false
 
-	settings, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no validation errors for explicit false, got %v", errs)
+	settings, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no validation errors for explicit false, got %v", err)
 	}
 
 	if settings == nil {
@@ -104,24 +104,29 @@ func TestDeserializer_MissingRequiredField(t *testing.T) {
 	validator := New[Settings]()
 	jsonData := []byte(`{"name":"test"}`) // active is missing
 
-	settings, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
+	settings, err := validator.Unmarshal(jsonData)
+	if err == nil {
 		t.Error("expected validation error for missing required field")
 	}
 
 	// Should have error for active field
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "active" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "active" {
 			foundError = true
-			if err.Message != "is required" {
-				t.Errorf("expected error message 'is required', got %q", err.Message)
+			if fieldErr.Message != "is required" {
+				t.Errorf("expected error message 'is required', got %q", fieldErr.Message)
 			}
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected error for field 'active', got errors: %+v", errs)
+		t.Errorf("expected error for field 'active', got errors: %+v", ve.Errors)
 	}
 
 	if settings == nil {
@@ -147,9 +152,9 @@ func TestDeserializer_DefaultUsingMethod(t *testing.T) {
 	validator := New[UserWithTimestamp]()
 	jsonData := []byte(`{"email":"test@example.com"}`) // created_at is missing
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no validation errors, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no validation errors, got %v", err)
 	}
 
 	if user == nil {
@@ -174,9 +179,9 @@ func TestDeserializer_DefaultUsingMethod_NotCalledForExplicit(t *testing.T) {
 	explicitTime := time.Date(2023, 6, 15, 12, 30, 0, 0, time.UTC)
 	jsonData := []byte(`{"email":"test@example.com","created_at":"2023-06-15T12:30:00Z"}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no validation errors, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no validation errors, got %v", err)
 	}
 
 	if user == nil {
@@ -241,10 +246,10 @@ func TestDeserializer_RelaxedMode(t *testing.T) {
 	validator := New[Config](ValidatorOptions{StrictMissingFields: false})
 	jsonData := []byte(`{"name":"myapp"}`) // port is missing
 
-	config, errs := validator.Unmarshal(jsonData)
+	config, err := validator.Unmarshal(jsonData)
 	// In relaxed mode, missing required fields without defaults should NOT error
-	if len(errs) != 0 {
-		t.Errorf("expected no validation errors in relaxed mode, got %v", errs)
+	if err != nil {
+		t.Errorf("expected no validation errors in relaxed mode, got %v", err)
 	}
 
 	if config == nil {
@@ -268,22 +273,27 @@ func TestDeserializer_StrictMode(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"name":"myapp"}`) // port is missing
 
-	config, errs := validator.Unmarshal(jsonData)
+	config, err := validator.Unmarshal(jsonData)
 	// In strict mode, missing required fields should error
-	if len(errs) == 0 {
+	if err == nil {
 		t.Error("expected validation error for missing required field in strict mode")
 	}
 
 	// Should have error for port field
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "port" && err.Message == "is required" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "port" && fieldErr.Message == "is required" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'is required' error for field 'port', got errors: %v", errs)
+		t.Errorf("expected 'is required' error for field 'port', got errors: %v", ve.Errors)
 	}
 
 	if config == nil {

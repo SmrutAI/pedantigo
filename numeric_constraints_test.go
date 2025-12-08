@@ -16,9 +16,9 @@ func TestGt_Int_Valid(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"stock":5}`)
 
-	product, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for stock=5 (gt 0), got %v", errs)
+	product, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for stock=5 (gt 0), got %v", err)
 	}
 
 	if product.Stock != 5 {
@@ -34,20 +34,25 @@ func TestGt_Int_EqualToThreshold(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"stock":0}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for stock=0 (not > 0)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for stock=0 (not > 0)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Stock" && err.Message == "must be greater than 0" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Stock" && fieldErr.Message == "must be greater than 0" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be greater than 0' error, got %v", errs)
+		t.Errorf("expected 'must be greater than 0' error, got %v", ve.Errors)
 	}
 }
 
@@ -59,20 +64,25 @@ func TestGt_Int_BelowThreshold(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"stock":-5}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for stock=-5 (not > 0)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for stock=-5 (not > 0)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Stock" && err.Message == "must be greater than 0" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Stock" && fieldErr.Message == "must be greater than 0" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be greater than 0' error, got %v", errs)
+		t.Errorf("expected 'must be greater than 0' error, got %v", ve.Errors)
 	}
 }
 
@@ -84,9 +94,9 @@ func TestGt_Float_Valid(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"price":19.99}`)
 
-	product, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for price=19.99 (gt 0), got %v", errs)
+	product, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for price=19.99 (gt 0), got %v", err)
 	}
 
 	if product.Price != 19.99 {
@@ -102,20 +112,25 @@ func TestGt_Float_BelowThreshold(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"price":-1.5}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for price=-1.5 (not > 0)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for price=-1.5 (not > 0)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Price" && err.Message == "must be greater than 0" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Price" && fieldErr.Message == "must be greater than 0" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be greater than 0' error, got %v", errs)
+		t.Errorf("expected 'must be greater than 0' error, got %v", ve.Errors)
 	}
 }
 
@@ -127,9 +142,9 @@ func TestGt_Uint_Valid(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"port":8080}`)
 
-	config, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for port=8080 (gt 1024), got %v", errs)
+	config, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for port=8080 (gt 1024), got %v", err)
 	}
 
 	if config.Port != 8080 {
@@ -146,16 +161,16 @@ func TestGt_WithPointer(t *testing.T) {
 
 	// Test invalid value
 	jsonData := []byte(`{"stock":0}`)
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for stock=0 (not > 0)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for stock=0 (not > 0)")
 	}
 
 	// Test valid value
 	jsonData = []byte(`{"stock":10}`)
-	product, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for stock=10, got %v", errs)
+	product, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for stock=10, got %v", err)
 	}
 
 	if product.Stock == nil || *product.Stock != 10 {
@@ -171,9 +186,9 @@ func TestGt_NilPointer(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"stock":null}`)
 
-	product, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for nil pointer (validation skips nil), got %v", errs)
+	product, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for nil pointer (validation skips nil), got %v", err)
 	}
 
 	if product.Stock != nil {
@@ -193,9 +208,9 @@ func TestGe_Int_Valid(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"stock":5}`)
 
-	product, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for stock=5 (ge 0), got %v", errs)
+	product, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for stock=5 (ge 0), got %v", err)
 	}
 
 	if product.Stock != 5 {
@@ -211,9 +226,9 @@ func TestGe_Int_EqualToThreshold(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"stock":0}`)
 
-	product, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for stock=0 (ge 0), got %v", errs)
+	product, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for stock=0 (ge 0), got %v", err)
 	}
 
 	if product.Stock != 0 {
@@ -229,20 +244,25 @@ func TestGe_Int_BelowThreshold(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"stock":-1}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for stock=-1 (not >= 0)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for stock=-1 (not >= 0)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Stock" && err.Message == "must be at least 0" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Stock" && fieldErr.Message == "must be at least 0" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be at least 0' error, got %v", errs)
+		t.Errorf("expected 'must be at least 0' error, got %v", ve.Errors)
 	}
 }
 
@@ -258,9 +278,9 @@ func TestLt_Int_Valid(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"discount":50}`)
 
-	product, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for discount=50 (lt 100), got %v", errs)
+	product, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for discount=50 (lt 100), got %v", err)
 	}
 
 	if product.Discount != 50 {
@@ -276,20 +296,25 @@ func TestLt_Int_EqualToThreshold(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"discount":100}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for discount=100 (not < 100)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for discount=100 (not < 100)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Discount" && err.Message == "must be less than 100" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Discount" && fieldErr.Message == "must be less than 100" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be less than 100' error, got %v", errs)
+		t.Errorf("expected 'must be less than 100' error, got %v", ve.Errors)
 	}
 }
 
@@ -301,20 +326,25 @@ func TestLt_Int_AboveThreshold(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"discount":150}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for discount=150 (not < 100)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for discount=150 (not < 100)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Discount" && err.Message == "must be less than 100" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Discount" && fieldErr.Message == "must be less than 100" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be less than 100' error, got %v", errs)
+		t.Errorf("expected 'must be less than 100' error, got %v", ve.Errors)
 	}
 }
 
@@ -330,9 +360,9 @@ func TestLe_Int_Valid(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"discount":50}`)
 
-	product, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for discount=50 (le 100), got %v", errs)
+	product, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for discount=50 (le 100), got %v", err)
 	}
 
 	if product.Discount != 50 {
@@ -348,9 +378,9 @@ func TestLe_Int_EqualToThreshold(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"discount":100}`)
 
-	product, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for discount=100 (le 100), got %v", errs)
+	product, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for discount=100 (le 100), got %v", err)
 	}
 
 	if product.Discount != 100 {
@@ -366,19 +396,24 @@ func TestLe_Int_AboveThreshold(t *testing.T) {
 	validator := New[Product]()
 	jsonData := []byte(`{"discount":150}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for discount=150 (not <= 100)")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for discount=150 (not <= 100)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Discount" && err.Message == "must be at most 100" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Discount" && fieldErr.Message == "must be at most 100" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected 'must be at most 100' error, got %v", errs)
+		t.Errorf("expected 'must be at most 100' error, got %v", ve.Errors)
 	}
 }

@@ -13,9 +13,9 @@ func TestUnmarshal_ValidJSON(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"email":"test@example.com","age":25}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no validation errors, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no validation errors, got %v", err)
 	}
 
 	if user == nil {
@@ -39,8 +39,8 @@ func TestUnmarshal_InvalidJSON(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"email":}`) // Invalid JSON
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
+	user, err := validator.Unmarshal(jsonData)
+	if err == nil {
 		t.Error("expected JSON decode error")
 	}
 
@@ -60,15 +60,20 @@ func TestUnmarshal_ValidationError(t *testing.T) {
 	// email is present but invalid (not an email), age is below min
 	jsonData := []byte(`{"email":"notanemail","age":15}`)
 
-	user, errs := validator.Unmarshal(jsonData)
+	user, err := validator.Unmarshal(jsonData)
 
-	t.Logf("Got %d errors:", len(errs))
-	for _, err := range errs {
-		t.Logf("  - %s: %s", err.Field, err.Message)
+	if err == nil {
+		t.Fatal("expected validation errors, got nil")
 	}
 
-	if len(errs) == 0 {
-		t.Error("expected validation errors")
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+
+	t.Logf("Got %d errors:", len(ve.Errors))
+	for _, fieldErr := range ve.Errors {
+		t.Logf("  - %s: %s", fieldErr.Field, fieldErr.Message)
 	}
 
 	// Should still return the user struct even with validation errors
@@ -79,11 +84,11 @@ func TestUnmarshal_ValidationError(t *testing.T) {
 	// Check we have errors for both fields (use struct field names, not JSON names)
 	foundEmailError := false
 	foundAgeError := false
-	for _, err := range errs {
-		if err.Field == "Email" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Email" {
 			foundEmailError = true
 		}
-		if err.Field == "Age" {
+		if fieldErr.Field == "Age" {
 			foundAgeError = true
 		}
 	}
@@ -107,9 +112,9 @@ func TestUnmarshal_DefaultValues(t *testing.T) {
 	validator := New[User]()
 	jsonData := []byte(`{"email":"test@example.com"}`) // Missing role and status
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no validation errors, got %v", errs)
+	user, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no validation errors, got %v", err)
 	}
 
 	if user == nil {
@@ -140,21 +145,26 @@ func TestUnmarshal_NestedValidation(t *testing.T) {
 	// City is present but empty - should fail min=1 constraint
 	jsonData := []byte(`{"email":"test@example.com","address":{"city":""}}`)
 
-	user, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for empty city (min=1)")
+	user, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for empty city (min=1)")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	// Should have error for Address.City
 	foundNestedError := false
-	for _, err := range errs {
-		if err.Field == "Address.City" || err.Field == "City" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Address.City" || fieldErr.Field == "City" {
 			foundNestedError = true
 		}
 	}
 
 	if !foundNestedError {
-		t.Errorf("expected validation error for nested City field, got errors: %v", errs)
+		t.Errorf("expected validation error for nested City field, got errors: %v", ve.Errors)
 	}
 
 	if user == nil {

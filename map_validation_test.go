@@ -16,9 +16,9 @@ func TestMap_ValidEmails(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"contacts":{"admin":"alice@example.com","support":"bob@example.com"}}`)
 
-	config, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for valid emails, got %v", errs)
+	config, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for valid emails, got %v", err)
 	}
 
 	if len(config.Contacts) != 2 {
@@ -34,20 +34,25 @@ func TestMap_InvalidEmail_SingleValue(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"contacts":{"admin":"not-an-email"}}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) == 0 {
-		t.Error("expected validation error for invalid email in map")
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error for invalid email in map")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Contacts[admin]" && err.Message == "must be a valid email address" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Contacts[admin]" && fieldErr.Message == "must be a valid email address" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected error at 'Contacts[admin]', got %v", errs)
+		t.Errorf("expected error at 'Contacts[admin]', got %v", ve.Errors)
 	}
 }
 
@@ -59,16 +64,25 @@ func TestMap_InvalidEmail_MultipleValues(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"contacts":{"admin":"alice@example.com","support":"invalid","billing":"bob@example.com","sales":"also-invalid"}}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 2 {
-		t.Errorf("expected 2 validation errors, got %d: %v", len(errs), errs)
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation errors")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+
+	if len(ve.Errors) != 2 {
+		t.Errorf("expected 2 validation errors, got %d: %v", len(ve.Errors), ve.Errors)
 	}
 
 	// Check that we have errors for the invalid keys (exact keys may vary due to map iteration order)
 	invalidKeys := map[string]bool{"support": false, "sales": false}
-	for _, err := range errs {
-		if err.Message == "must be a valid email address" {
-			switch err.Field {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Message == "must be a valid email address" {
+			switch fieldErr.Field {
 			case "Contacts[support]":
 				invalidKeys["support"] = true
 			case "Contacts[sales]":
@@ -78,10 +92,10 @@ func TestMap_InvalidEmail_MultipleValues(t *testing.T) {
 	}
 
 	if !invalidKeys["support"] {
-		t.Errorf("expected error at 'Contacts[support]', got %v", errs)
+		t.Errorf("expected error at 'Contacts[support]', got %v", ve.Errors)
 	}
 	if !invalidKeys["sales"] {
-		t.Errorf("expected error at 'Contacts[sales]', got %v", errs)
+		t.Errorf("expected error at 'Contacts[sales]', got %v", ve.Errors)
 	}
 }
 
@@ -93,20 +107,29 @@ func TestMap_MinLength(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"tags":{"category":"abc","type":"de","status":"fgh"}}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 1 {
-		t.Errorf("expected 1 validation error, got %d: %v", len(errs), errs)
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+
+	if len(ve.Errors) != 1 {
+		t.Errorf("expected 1 validation error, got %d: %v", len(ve.Errors), ve.Errors)
 	}
 
 	foundError := false
-	for _, err := range errs {
-		if err.Field == "Tags[type]" && err.Message == "must be at least 3 characters" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Tags[type]" && fieldErr.Message == "must be at least 3 characters" {
 			foundError = true
 		}
 	}
 
 	if !foundError {
-		t.Errorf("expected error at 'Tags[type]', got %v", errs)
+		t.Errorf("expected error at 'Tags[type]', got %v", ve.Errors)
 	}
 }
 
@@ -123,31 +146,40 @@ func TestMap_NestedStructValidation(t *testing.T) {
 	validator := New[Company]()
 	jsonData := []byte(`{"offices":{"hq":{"city":"NYC","zip":"10001"},"branch":{"zip":"123"}}}`)
 
-	_, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 2 {
-		t.Errorf("expected 2 validation errors, got %d: %v", len(errs), errs)
+	_, err := validator.Unmarshal(jsonData)
+	if err == nil {
+		t.Fatal("expected validation errors")
+	}
+
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+
+	if len(ve.Errors) != 2 {
+		t.Errorf("expected 2 validation errors, got %d: %v", len(ve.Errors), ve.Errors)
 	}
 
 	// Check for missing city at branch office
 	foundError1 := false
-	for _, err := range errs {
-		if err.Field == "Offices[branch].City" && err.Message == "is required" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Offices[branch].City" && fieldErr.Message == "is required" {
 			foundError1 = true
 		}
 	}
 	if !foundError1 {
-		t.Errorf("expected error at 'Offices[branch].City', got %v", errs)
+		t.Errorf("expected error at 'Offices[branch].City', got %v", ve.Errors)
 	}
 
 	// Check for short zip at branch office
 	foundError2 := false
-	for _, err := range errs {
-		if err.Field == "Offices[branch].Zip" && err.Message == "must be at least 5 characters" {
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Offices[branch].Zip" && fieldErr.Message == "must be at least 5 characters" {
 			foundError2 = true
 		}
 	}
 	if !foundError2 {
-		t.Errorf("expected error at 'Offices[branch].Zip', got %v", errs)
+		t.Errorf("expected error at 'Offices[branch].Zip', got %v", ve.Errors)
 	}
 }
 
@@ -159,9 +191,9 @@ func TestMap_EmptyMap(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"contacts":{}}`)
 
-	config, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for empty map, got %v", errs)
+	config, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for empty map, got %v", err)
 	}
 
 	if len(config.Contacts) != 0 {
@@ -177,9 +209,9 @@ func TestMap_NilMap(t *testing.T) {
 	validator := New[Config]()
 	jsonData := []byte(`{"contacts":null}`)
 
-	config, errs := validator.Unmarshal(jsonData)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors for nil map, got %v", errs)
+	config, err := validator.Unmarshal(jsonData)
+	if err != nil {
+		t.Errorf("expected no errors for nil map, got %v", err)
 	}
 
 	if config.Contacts != nil {

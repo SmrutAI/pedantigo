@@ -15,9 +15,9 @@ func TestValidator_Required_Present(t *testing.T) {
 	validator := New[User]()
 	user := &User{Email: "test@example.com"}
 
-	errs := validator.Validate(user)
-	if len(errs) != 0 {
-		t.Errorf("expected no validation errors, got %v", errs)
+	err := validator.Validate(user)
+	if err != nil {
+		t.Errorf("expected no validation errors, got %v", err)
 	}
 }
 
@@ -29,8 +29,8 @@ func TestValidator_Min_BelowMinimum(t *testing.T) {
 	validator := New[User]()
 	user := &User{Age: 15}
 
-	errs := validator.Validate(user)
-	if len(errs) == 0 {
+	err := validator.Validate(user)
+	if err == nil {
 		t.Error("expected validation error for value below minimum")
 	}
 }
@@ -43,9 +43,9 @@ func TestValidator_Min_AtMinimum(t *testing.T) {
 	validator := New[User]()
 	user := &User{Age: 18}
 
-	errs := validator.Validate(user)
-	if len(errs) != 0 {
-		t.Errorf("expected no validation errors, got %v", errs)
+	err := validator.Validate(user)
+	if err != nil {
+		t.Errorf("expected no validation errors, got %v", err)
 	}
 }
 
@@ -57,8 +57,8 @@ func TestValidator_Max_AboveMaximum(t *testing.T) {
 	validator := New[User]()
 	user := &User{Age: 150}
 
-	errs := validator.Validate(user)
-	if len(errs) == 0 {
+	err := validator.Validate(user)
+	if err == nil {
 		t.Error("expected validation error for value above maximum")
 	}
 }
@@ -71,9 +71,9 @@ func TestValidator_Max_AtMaximum(t *testing.T) {
 	validator := New[User]()
 	user := &User{Age: 120}
 
-	errs := validator.Validate(user)
-	if len(errs) != 0 {
-		t.Errorf("expected no validation errors, got %v", errs)
+	err := validator.Validate(user)
+	if err != nil {
+		t.Errorf("expected no validation errors, got %v", err)
 	}
 }
 
@@ -85,9 +85,9 @@ func TestValidator_MinMax_InRange(t *testing.T) {
 	validator := New[User]()
 	user := &User{Age: 25}
 
-	errs := validator.Validate(user)
-	if len(errs) != 0 {
-		t.Errorf("expected no validation errors, got %v", errs)
+	err := validator.Validate(user)
+	if err != nil {
+		t.Errorf("expected no validation errors, got %v", err)
 	}
 }
 
@@ -99,7 +99,12 @@ type testPasswordChange struct {
 
 func (vpc *testPasswordChange) Validate() error {
 	if vpc.Password != vpc.Confirm {
-		return NewFieldError("Confirm", "passwords do not match")
+		return &ValidationError{
+			Errors: []FieldError{{
+				Field:   "Confirm",
+				Message: "passwords do not match",
+			}},
+		}
 	}
 	return nil
 }
@@ -111,15 +116,19 @@ func TestValidator_CrossField_PasswordConfirmation(t *testing.T) {
 		Confirm:  "different",
 	}
 
-	errs := validator.Validate(pwd)
-	if len(errs) == 0 {
+	err := validator.Validate(pwd)
+	if err == nil {
 		t.Error("expected validation error for password mismatch")
 	}
 
 	// Should have cross-field error
 	foundCrossFieldError := false
-	for _, err := range errs {
-		if err.Field == "Confirm" && err.Message == "passwords do not match" {
+	ve, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected *ValidationError, got %T", err)
+	}
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Confirm" && fieldErr.Message == "passwords do not match" {
 			foundCrossFieldError = true
 		}
 	}
