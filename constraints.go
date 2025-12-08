@@ -2,6 +2,8 @@ package pedantigo
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -23,10 +25,21 @@ type (
 	ltConstraint        struct{ threshold float64 }
 	leConstraint        struct{ threshold float64 }
 	emailConstraint     struct{}
-	defaultConstraint   struct{ value string }
+	urlConstraint       struct{}
+	uuidConstraint      struct{}
+	regexConstraint     struct {
+		pattern string
+		regex   *regexp.Regexp
+	}
+	ipv4Constraint    struct{}
+	ipv6Constraint    struct{}
+	defaultConstraint struct{ value string }
 )
 
-var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+var (
+	emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+	uuidRegex  = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+)
 
 // minConstraint validates that a numeric value is >= min
 func (c minConstraint) Validate(value any) error {
@@ -300,6 +313,196 @@ func (c emailConstraint) Validate(value any) error {
 	return nil
 }
 
+// urlConstraint validates that a string is a valid URL (http or https only)
+func (c urlConstraint) Validate(value any) error {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// Handle pointer types
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	// Ensure we have a string
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("url constraint requires string value")
+	}
+
+	str := v.String()
+	if str == "" {
+		return nil // Empty strings are handled by required constraint
+	}
+
+	// Parse the URL
+	parsedURL, err := url.Parse(str)
+	if err != nil {
+		return fmt.Errorf("must be a valid URL (http or https)")
+	}
+
+	// Check scheme is http or https
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("must be a valid URL (http or https)")
+	}
+
+	// Check host is non-empty
+	if parsedURL.Host == "" {
+		return fmt.Errorf("must be a valid URL (http or https)")
+	}
+
+	return nil
+}
+
+// uuidConstraint validates that a string is a valid UUID
+func (c uuidConstraint) Validate(value any) error {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// Handle pointer types
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	// Ensure we have a string
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("uuid constraint requires string value")
+	}
+
+	str := v.String()
+	if str == "" {
+		return nil // Empty strings are handled by required constraint
+	}
+
+	// Validate UUID format using regex
+	if !uuidRegex.MatchString(str) {
+		return fmt.Errorf("must be a valid UUID")
+	}
+
+	return nil
+}
+
+// regexConstraint validates that a string matches a custom regex pattern
+func (c regexConstraint) Validate(value any) error {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// Handle pointer types
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	// Ensure we have a string
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("regex constraint requires string value")
+	}
+
+	str := v.String()
+	if str == "" {
+		return nil // Empty strings are handled by required constraint
+	}
+
+	// Validate against the compiled regex
+	if !c.regex.MatchString(str) {
+		return fmt.Errorf("must match pattern '%s'", c.pattern)
+	}
+
+	return nil
+}
+
+// ipv4Constraint validates that a string is a valid IPv4 address
+func (c ipv4Constraint) Validate(value any) error {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// Handle pointer types
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	// Ensure we have a string
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("ipv4 constraint requires string value")
+	}
+
+	str := v.String()
+	if str == "" {
+		return nil // Empty strings are handled by required constraint
+	}
+
+	// Parse IP address
+	ip := net.ParseIP(str)
+	if ip == nil {
+		return fmt.Errorf("must be a valid IPv4 address")
+	}
+
+	// Check if it's IPv4 (not IPv6)
+	// IPv4 addresses return non-nil from To4()
+	if ip.To4() == nil {
+		return fmt.Errorf("must be a valid IPv4 address")
+	}
+
+	return nil
+}
+
+// ipv6Constraint validates that a string is a valid IPv6 address
+func (c ipv6Constraint) Validate(value any) error {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// Handle pointer types
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	// Ensure we have a string
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("ipv6 constraint requires string value")
+	}
+
+	str := v.String()
+	if str == "" {
+		return nil // Empty strings are handled by required constraint
+	}
+
+	// Parse IP address
+	ip := net.ParseIP(str)
+	if ip == nil {
+		return fmt.Errorf("must be a valid IPv6 address")
+	}
+
+	// Check if it's IPv6 (not IPv4)
+	// IPv6 addresses return nil from To4()
+	if ip.To4() != nil {
+		return fmt.Errorf("must be a valid IPv6 address")
+	}
+
+	return nil
+}
+
 // defaultConstraint is not a validator - it's handled during unmarshaling
 func (c defaultConstraint) Validate(value any) error {
 	return nil // No-op for validation
@@ -349,6 +552,21 @@ func buildConstraints(constraints map[string]string) []constraint {
 			}
 		case "email":
 			result = append(result, emailConstraint{})
+		case "url":
+			result = append(result, urlConstraint{})
+		case "uuid":
+			result = append(result, uuidConstraint{})
+		case "regex":
+			// Compile regex pattern (fail-fast on invalid regex)
+			compiledRegex, err := regexp.Compile(value)
+			if err != nil {
+				panic(fmt.Sprintf("invalid regex pattern '%s': %v", value, err))
+			}
+			result = append(result, regexConstraint{pattern: value, regex: compiledRegex})
+		case "ipv4":
+			result = append(result, ipv4Constraint{})
+		case "ipv6":
+			result = append(result, ipv6Constraint{})
 		case "default":
 			result = append(result, defaultConstraint{value: value})
 		}

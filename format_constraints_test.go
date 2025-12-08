@@ -1,0 +1,816 @@
+package pedantigo
+
+import (
+	"testing"
+)
+
+// ==================================================
+// url constraint tests
+// ==================================================
+
+func TestURL_Valid(t *testing.T) {
+	type Config struct {
+		Website string `json:"website" validate:"url"`
+	}
+
+	validator := New[Config]()
+	jsonData := []byte(`{"website":"https://example.com"}`)
+
+	config, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid URL, got %v", errs)
+	}
+
+	if config.Website != "https://example.com" {
+		t.Errorf("expected website 'https://example.com', got %q", config.Website)
+	}
+}
+
+func TestURL_ValidHTTP(t *testing.T) {
+	type Config struct {
+		Website string `json:"website" validate:"url"`
+	}
+
+	validator := New[Config]()
+	jsonData := []byte(`{"website":"http://example.com"}`)
+
+	config, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid HTTP URL, got %v", errs)
+	}
+
+	if config.Website != "http://example.com" {
+		t.Errorf("expected website 'http://example.com', got %q", config.Website)
+	}
+}
+
+func TestURL_InvalidFormat(t *testing.T) {
+	type Config struct {
+		Website string `json:"website" validate:"url"`
+	}
+
+	validator := New[Config]()
+	jsonData := []byte(`{"website":"not a url"}`)
+
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for invalid URL format")
+	}
+
+	foundError := false
+	for _, err := range errs {
+		if err.Field == "Website" && err.Message == "must be a valid URL (http or https)" {
+			foundError = true
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected 'must be a valid URL (http or https)' error, got %v", errs)
+	}
+}
+
+func TestURL_NoScheme(t *testing.T) {
+	type Config struct {
+		Website string `json:"website" validate:"url"`
+	}
+
+	validator := New[Config]()
+	jsonData := []byte(`{"website":"example.com"}`)
+
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for URL without scheme")
+	}
+
+	foundError := false
+	for _, err := range errs {
+		if err.Field == "Website" && err.Message == "must be a valid URL (http or https)" {
+			foundError = true
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected 'must be a valid URL (http or https)' error, got %v", errs)
+	}
+}
+
+func TestURL_FTPScheme(t *testing.T) {
+	type Config struct {
+		Website string `json:"website" validate:"url"`
+	}
+
+	validator := New[Config]()
+	jsonData := []byte(`{"website":"ftp://example.com"}`)
+
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for FTP URL (only http/https allowed)")
+	}
+
+	foundError := false
+	for _, err := range errs {
+		if err.Field == "Website" && err.Message == "must be a valid URL (http or https)" {
+			foundError = true
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected 'must be a valid URL (http or https)' error, got %v", errs)
+	}
+}
+
+func TestURL_EmptyString(t *testing.T) {
+	type Config struct {
+		Website string `json:"website" validate:"url"`
+	}
+
+	validator := New[Config]()
+	jsonData := []byte(`{"website":""}`)
+
+	config, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for empty URL (validation skips empty), got %v", errs)
+	}
+
+	if config.Website != "" {
+		t.Errorf("expected empty website, got %q", config.Website)
+	}
+}
+
+func TestURL_WithPointer(t *testing.T) {
+	type Config struct {
+		Website *string `json:"website" validate:"url"`
+	}
+
+	validator := New[Config]()
+
+	// Test invalid URL
+	jsonData := []byte(`{"website":"not a url"}`)
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for invalid URL with pointer")
+	}
+
+	// Test valid URL
+	jsonData = []byte(`{"website":"https://example.com"}`)
+	config, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid URL with pointer, got %v", errs)
+	}
+
+	if config.Website == nil || *config.Website != "https://example.com" {
+		t.Errorf("expected website 'https://example.com', got %v", config.Website)
+	}
+}
+
+func TestURL_NilPointer(t *testing.T) {
+	type Config struct {
+		Website *string `json:"website" validate:"url"`
+	}
+
+	validator := New[Config]()
+	jsonData := []byte(`{"website":null}`)
+
+	config, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for nil pointer (validation skips nil), got %v", errs)
+	}
+
+	if config.Website != nil {
+		t.Errorf("expected nil Website pointer, got %v", config.Website)
+	}
+}
+
+// ==================================================
+// uuid constraint tests
+// ==================================================
+
+func TestUUID_Valid_V4(t *testing.T) {
+	type Entity struct {
+		ID string `json:"id" validate:"uuid"`
+	}
+
+	validator := New[Entity]()
+	jsonData := []byte(`{"id":"550e8400-e29b-41d4-a716-446655440000"}`)
+
+	entity, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid UUID v4, got %v", errs)
+	}
+
+	if entity.ID != "550e8400-e29b-41d4-a716-446655440000" {
+		t.Errorf("expected id '550e8400-e29b-41d4-a716-446655440000', got %q", entity.ID)
+	}
+}
+
+func TestUUID_Valid_V5(t *testing.T) {
+	type Entity struct {
+		ID string `json:"id" validate:"uuid"`
+	}
+
+	validator := New[Entity]()
+	jsonData := []byte(`{"id":"886313e1-3b8a-5372-9b90-0c9aee199e5d"}`)
+
+	entity, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid UUID v5, got %v", errs)
+	}
+
+	if entity.ID != "886313e1-3b8a-5372-9b90-0c9aee199e5d" {
+		t.Errorf("expected id '886313e1-3b8a-5372-9b90-0c9aee199e5d', got %q", entity.ID)
+	}
+}
+
+func TestUUID_InvalidFormat(t *testing.T) {
+	type Entity struct {
+		ID string `json:"id" validate:"uuid"`
+	}
+
+	validator := New[Entity]()
+	jsonData := []byte(`{"id":"not-a-uuid"}`)
+
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for invalid UUID format")
+	}
+
+	foundError := false
+	for _, err := range errs {
+		if err.Field == "ID" && err.Message == "must be a valid UUID" {
+			foundError = true
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected 'must be a valid UUID' error, got %v", errs)
+	}
+}
+
+func TestUUID_InvalidFormat_WrongDashes(t *testing.T) {
+	type Entity struct {
+		ID string `json:"id" validate:"uuid"`
+	}
+
+	validator := New[Entity]()
+	jsonData := []byte(`{"id":"550e8400e29b41d4a716446655440000"}`)
+
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for UUID without dashes")
+	}
+
+	foundError := false
+	for _, err := range errs {
+		if err.Field == "ID" && err.Message == "must be a valid UUID" {
+			foundError = true
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected 'must be a valid UUID' error, got %v", errs)
+	}
+}
+
+func TestUUID_EmptyString(t *testing.T) {
+	type Entity struct {
+		ID string `json:"id" validate:"uuid"`
+	}
+
+	validator := New[Entity]()
+	jsonData := []byte(`{"id":""}`)
+
+	entity, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for empty UUID (validation skips empty), got %v", errs)
+	}
+
+	if entity.ID != "" {
+		t.Errorf("expected empty id, got %q", entity.ID)
+	}
+}
+
+func TestUUID_WithPointer(t *testing.T) {
+	type Entity struct {
+		ID *string `json:"id" validate:"uuid"`
+	}
+
+	validator := New[Entity]()
+
+	// Test invalid UUID
+	jsonData := []byte(`{"id":"not-a-uuid"}`)
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for invalid UUID with pointer")
+	}
+
+	// Test valid UUID
+	jsonData = []byte(`{"id":"550e8400-e29b-41d4-a716-446655440000"}`)
+	entity, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid UUID with pointer, got %v", errs)
+	}
+
+	if entity.ID == nil || *entity.ID != "550e8400-e29b-41d4-a716-446655440000" {
+		t.Errorf("expected id '550e8400-e29b-41d4-a716-446655440000', got %v", entity.ID)
+	}
+}
+
+func TestUUID_NilPointer(t *testing.T) {
+	type Entity struct {
+		ID *string `json:"id" validate:"uuid"`
+	}
+
+	validator := New[Entity]()
+	jsonData := []byte(`{"id":null}`)
+
+	entity, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for nil pointer (validation skips nil), got %v", errs)
+	}
+
+	if entity.ID != nil {
+		t.Errorf("expected nil ID pointer, got %v", entity.ID)
+	}
+}
+
+// ==================================================
+// regex constraint tests
+// ==================================================
+
+func TestRegex_ValidMatch(t *testing.T) {
+	type Code struct {
+		Value string `json:"value" validate:"regex=^[A-Z]{3}$"`
+	}
+
+	validator := New[Code]()
+	jsonData := []byte(`{"value":"ABC"}`)
+
+	code, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid regex match, got %v", errs)
+	}
+
+	if code.Value != "ABC" {
+		t.Errorf("expected value 'ABC', got %q", code.Value)
+	}
+}
+
+func TestRegex_InvalidMatch(t *testing.T) {
+	type Code struct {
+		Value string `json:"value" validate:"regex=^[A-Z]{3}$"`
+	}
+
+	validator := New[Code]()
+	jsonData := []byte(`{"value":"abc"}`)
+
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for invalid regex match")
+	}
+
+	foundError := false
+	for _, err := range errs {
+		if err.Field == "Value" && err.Message == "must match pattern '^[A-Z]{3}$'" {
+			foundError = true
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected 'must match pattern' error, got %v", errs)
+	}
+}
+
+func TestRegex_WrongLength(t *testing.T) {
+	type Code struct {
+		Value string `json:"value" validate:"regex=^[A-Z]{3}$"`
+	}
+
+	validator := New[Code]()
+	jsonData := []byte(`{"value":"ABCD"}`)
+
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for wrong length")
+	}
+
+	foundError := false
+	for _, err := range errs {
+		if err.Field == "Value" && err.Message == "must match pattern '^[A-Z]{3}$'" {
+			foundError = true
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected 'must match pattern' error, got %v", errs)
+	}
+}
+
+func TestRegex_DigitsPattern(t *testing.T) {
+	type Code struct {
+		Value string `json:"value" validate:"regex=^\\d{4}$"`
+	}
+
+	validator := New[Code]()
+
+	// Test valid digits
+	jsonData := []byte(`{"value":"1234"}`)
+	code, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid digits, got %v", errs)
+	}
+
+	if code.Value != "1234" {
+		t.Errorf("expected value '1234', got %q", code.Value)
+	}
+
+	// Test invalid non-digits
+	jsonData = []byte(`{"value":"abcd"}`)
+	_, errs = validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for non-digits")
+	}
+}
+
+func TestRegex_EmptyString(t *testing.T) {
+	type Code struct {
+		Value string `json:"value" validate:"regex=^[A-Z]{3}$"`
+	}
+
+	validator := New[Code]()
+	jsonData := []byte(`{"value":""}`)
+
+	code, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for empty string (validation skips empty), got %v", errs)
+	}
+
+	if code.Value != "" {
+		t.Errorf("expected empty value, got %q", code.Value)
+	}
+}
+
+func TestRegex_WithPointer(t *testing.T) {
+	type Code struct {
+		Value *string `json:"value" validate:"regex=^[A-Z]{3}$"`
+	}
+
+	validator := New[Code]()
+
+	// Test invalid match
+	jsonData := []byte(`{"value":"abc"}`)
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for invalid regex match with pointer")
+	}
+
+	// Test valid match
+	jsonData = []byte(`{"value":"ABC"}`)
+	code, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid regex match with pointer, got %v", errs)
+	}
+
+	if code.Value == nil || *code.Value != "ABC" {
+		t.Errorf("expected value 'ABC', got %v", code.Value)
+	}
+}
+
+func TestRegex_NilPointer(t *testing.T) {
+	type Code struct {
+		Value *string `json:"value" validate:"regex=^[A-Z]{3}$"`
+	}
+
+	validator := New[Code]()
+	jsonData := []byte(`{"value":null}`)
+
+	code, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for nil pointer (validation skips nil), got %v", errs)
+	}
+
+	if code.Value != nil {
+		t.Errorf("expected nil Value pointer, got %v", code.Value)
+	}
+}
+
+// ==================================================
+// ipv4 constraint tests
+// ==================================================
+
+func TestIPv4_Valid_Localhost(t *testing.T) {
+	type Server struct {
+		IP string `json:"ip" validate:"ipv4"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":"127.0.0.1"}`)
+
+	server, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid IPv4 localhost, got %v", errs)
+	}
+
+	if server.IP != "127.0.0.1" {
+		t.Errorf("expected ip '127.0.0.1', got %q", server.IP)
+	}
+}
+
+func TestIPv4_Valid_PrivateNetwork(t *testing.T) {
+	type Server struct {
+		IP string `json:"ip" validate:"ipv4"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":"192.168.1.1"}`)
+
+	server, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid private IPv4, got %v", errs)
+	}
+
+	if server.IP != "192.168.1.1" {
+		t.Errorf("expected ip '192.168.1.1', got %q", server.IP)
+	}
+}
+
+func TestIPv4_InvalidFormat(t *testing.T) {
+	type Server struct {
+		IP string `json:"ip" validate:"ipv4"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":"not-an-ip"}`)
+
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for invalid IPv4 format")
+	}
+
+	foundError := false
+	for _, err := range errs {
+		if err.Field == "IP" && err.Message == "must be a valid IPv4 address" {
+			foundError = true
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected 'must be a valid IPv4 address' error, got %v", errs)
+	}
+}
+
+func TestIPv4_InvalidIPv6(t *testing.T) {
+	type Server struct {
+		IP string `json:"ip" validate:"ipv4"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":"2001:0db8:85a3::8a2e:0370:7334"}`)
+
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for IPv6 (not IPv4)")
+	}
+
+	foundError := false
+	for _, err := range errs {
+		if err.Field == "IP" && err.Message == "must be a valid IPv4 address" {
+			foundError = true
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected 'must be a valid IPv4 address' error, got %v", errs)
+	}
+}
+
+func TestIPv4_EmptyString(t *testing.T) {
+	type Server struct {
+		IP string `json:"ip" validate:"ipv4"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":""}`)
+
+	server, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for empty IP (validation skips empty), got %v", errs)
+	}
+
+	if server.IP != "" {
+		t.Errorf("expected empty ip, got %q", server.IP)
+	}
+}
+
+func TestIPv4_WithPointer(t *testing.T) {
+	type Server struct {
+		IP *string `json:"ip" validate:"ipv4"`
+	}
+
+	validator := New[Server]()
+
+	// Test invalid IP
+	jsonData := []byte(`{"ip":"not-an-ip"}`)
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for invalid IPv4 with pointer")
+	}
+
+	// Test valid IP
+	jsonData = []byte(`{"ip":"10.0.0.1"}`)
+	server, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid IPv4 with pointer, got %v", errs)
+	}
+
+	if server.IP == nil || *server.IP != "10.0.0.1" {
+		t.Errorf("expected ip '10.0.0.1', got %v", server.IP)
+	}
+}
+
+func TestIPv4_NilPointer(t *testing.T) {
+	type Server struct {
+		IP *string `json:"ip" validate:"ipv4"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":null}`)
+
+	server, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for nil pointer (validation skips nil), got %v", errs)
+	}
+
+	if server.IP != nil {
+		t.Errorf("expected nil IP pointer, got %v", server.IP)
+	}
+}
+
+// ==================================================
+// ipv6 constraint tests
+// ==================================================
+
+func TestIPv6_Valid_Localhost(t *testing.T) {
+	type Server struct {
+		IP string `json:"ip" validate:"ipv6"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":"::1"}`)
+
+	server, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid IPv6 localhost, got %v", errs)
+	}
+
+	if server.IP != "::1" {
+		t.Errorf("expected ip '::1', got %q", server.IP)
+	}
+}
+
+func TestIPv6_Valid_FullFormat(t *testing.T) {
+	type Server struct {
+		IP string `json:"ip" validate:"ipv6"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":"2001:0db8:85a3:0000:0000:8a2e:0370:7334"}`)
+
+	server, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid IPv6 full format, got %v", errs)
+	}
+
+	if server.IP != "2001:0db8:85a3:0000:0000:8a2e:0370:7334" {
+		t.Errorf("expected ip '2001:0db8:85a3:0000:0000:8a2e:0370:7334', got %q", server.IP)
+	}
+}
+
+func TestIPv6_Valid_Compressed(t *testing.T) {
+	type Server struct {
+		IP string `json:"ip" validate:"ipv6"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":"2001:db8:85a3::8a2e:370:7334"}`)
+
+	server, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid IPv6 compressed format, got %v", errs)
+	}
+
+	if server.IP != "2001:db8:85a3::8a2e:370:7334" {
+		t.Errorf("expected ip '2001:db8:85a3::8a2e:370:7334', got %q", server.IP)
+	}
+}
+
+func TestIPv6_InvalidFormat(t *testing.T) {
+	type Server struct {
+		IP string `json:"ip" validate:"ipv6"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":"not-an-ip"}`)
+
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for invalid IPv6 format")
+	}
+
+	foundError := false
+	for _, err := range errs {
+		if err.Field == "IP" && err.Message == "must be a valid IPv6 address" {
+			foundError = true
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected 'must be a valid IPv6 address' error, got %v", errs)
+	}
+}
+
+func TestIPv6_InvalidIPv4(t *testing.T) {
+	type Server struct {
+		IP string `json:"ip" validate:"ipv6"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":"192.168.1.1"}`)
+
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for IPv4 (not IPv6)")
+	}
+
+	foundError := false
+	for _, err := range errs {
+		if err.Field == "IP" && err.Message == "must be a valid IPv6 address" {
+			foundError = true
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected 'must be a valid IPv6 address' error, got %v", errs)
+	}
+}
+
+func TestIPv6_EmptyString(t *testing.T) {
+	type Server struct {
+		IP string `json:"ip" validate:"ipv6"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":""}`)
+
+	server, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for empty IP (validation skips empty), got %v", errs)
+	}
+
+	if server.IP != "" {
+		t.Errorf("expected empty ip, got %q", server.IP)
+	}
+}
+
+func TestIPv6_WithPointer(t *testing.T) {
+	type Server struct {
+		IP *string `json:"ip" validate:"ipv6"`
+	}
+
+	validator := New[Server]()
+
+	// Test invalid IP
+	jsonData := []byte(`{"ip":"not-an-ip"}`)
+	_, errs := validator.Unmarshal(jsonData)
+	if len(errs) == 0 {
+		t.Error("expected validation error for invalid IPv6 with pointer")
+	}
+
+	// Test valid IP
+	jsonData = []byte(`{"ip":"fe80::1"}`)
+	server, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid IPv6 with pointer, got %v", errs)
+	}
+
+	if server.IP == nil || *server.IP != "fe80::1" {
+		t.Errorf("expected ip 'fe80::1', got %v", server.IP)
+	}
+}
+
+func TestIPv6_NilPointer(t *testing.T) {
+	type Server struct {
+		IP *string `json:"ip" validate:"ipv6"`
+	}
+
+	validator := New[Server]()
+	jsonData := []byte(`{"ip":null}`)
+
+	server, errs := validator.Unmarshal(jsonData)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for nil pointer (validation skips nil), got %v", errs)
+	}
+
+	if server.IP != nil {
+		t.Errorf("expected nil IP pointer, got %v", server.IP)
+	}
+}
