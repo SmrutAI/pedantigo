@@ -349,3 +349,10 @@ func parseDefaultValue(value string, typ reflect.Type) any {
 	}
 	return value
 }
+
+// SchemaJSON generates a JSON Schema as JSON bytes
+// This is the format required by LLM APIs (OpenAI, Anthropic, etc.)
+func (v *Validator[T]) SchemaJSON() ([]byte, error) {
+	schema := v.Schema()
+	return json.MarshalIndent(schema, "", "  ")
+}

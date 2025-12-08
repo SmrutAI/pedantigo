@@ -392,3 +392,51 @@ func TestSchema_DefaultValues(t *testing.T) {
 		t.Errorf("expected enabled default true, got %v", enabledProp.Default)
 	}
 }
+
+func TestSchemaJSON_ValidOutput(t *testing.T) {
+	type User struct {
+		Name  string `json:"name" pedantigo:"required,min=3"`
+		Email string `json:"email" pedantigo:"required,email"`
+		Age   int    `json:"age" pedantigo:"gte=18,lte=120"`
+	}
+
+	validator := New[User]()
+	jsonBytes, err := validator.SchemaJSON()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// Verify it's valid JSON by unmarshaling
+	var schemaMap map[string]any
+	if err := json.Unmarshal(jsonBytes, &schemaMap); err != nil {
+		t.Fatalf("expected valid JSON, got error: %v", err)
+	}
+
+	// Check basic structure
+	if schemaMap["type"] != "object" {
+		t.Errorf("expected type 'object', got %v", schemaMap["type"])
+	}
+
+	properties, ok := schemaMap["properties"].(map[string]any)
+	if !ok {
+		t.Fatal("expected properties to be an object")
+	}
+
+	// Verify name field has minLength
+	nameField, ok := properties["name"].(map[string]any)
+	if !ok {
+		t.Fatal("expected name field to exist")
+	}
+	if nameField["minLength"] != float64(3) {
+		t.Errorf("expected name minLength 3, got %v", nameField["minLength"])
+	}
+
+	// Verify email field has format
+	emailField, ok := properties["email"].(map[string]any)
+	if !ok {
+		t.Fatal("expected email field to exist")
+	}
+	if emailField["format"] != "email" {
+		t.Errorf("expected email format 'email', got %v", emailField["format"])
+	}
+}
