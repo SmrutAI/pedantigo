@@ -23,17 +23,17 @@ build:
 # Run all tests
 test:
 	@echo "Running tests..."
-	go test -v ./...
+	go test -v -race ./...
 
 # Run tests with verbose output
 test-verbose:
 	@echo "Running tests (verbose)..."
-	go test -v -count=1 ./...
+	go test -v -race -count=1 ./...
 
 # Run tests with coverage
 test-coverage:
 	@echo "Running tests with coverage..."
-	go test -v -cover -coverprofile=coverage.out ./...
+	go test -v -race -cover -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
