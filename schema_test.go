@@ -2,11 +2,12 @@ package pedantigo
 
 import (
 	"encoding/json"
-	"fmt"
 	"sync"
 	"testing"
 
 	"github.com/invopop/jsonschema"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ==================================================
@@ -32,22 +33,16 @@ func TestSchema_TypeMapping(t *testing.T) {
 				return v, nil
 			},
 			validate: func(t *testing.T, schema *jsonschema.Schema) {
-				if schema.Type != "object" {
-					t.Errorf("expected type 'object', got %s", schema.Type)
-				}
-				if schema.Properties == nil {
-					t.Fatal("expected properties to be non-nil")
-				}
+				assert.Equal(t, "object", schema.Type)
+				require.NotNil(t, schema.Properties)
 
 				nameProp, _ := schema.Properties.Get("name")
-				if nameProp == nil || nameProp.Type != "string" {
-					t.Errorf("expected 'name' type 'string', got %v", nameProp)
-				}
+				require.NotNil(t, nameProp)
+				assert.Equal(t, "string", nameProp.Type)
 
 				ageProp, _ := schema.Properties.Get("age")
-				if ageProp == nil || ageProp.Type != "integer" {
-					t.Errorf("expected 'age' type 'integer', got %v", ageProp)
-				}
+				require.NotNil(t, ageProp)
+				assert.Equal(t, "integer", ageProp.Type)
 			},
 		},
 		{
@@ -66,14 +61,11 @@ func TestSchema_TypeMapping(t *testing.T) {
 			},
 			validate: func(t *testing.T, schema *jsonschema.Schema) {
 				addressProp, _ := schema.Properties.Get("address")
-				if addressProp == nil || addressProp.Type != "object" {
-					t.Errorf("expected 'address' type 'object', got %v", addressProp)
-				}
+				require.NotNil(t, addressProp)
+				assert.Equal(t, "object", addressProp.Type)
 
 				cityProp, _ := addressProp.Properties.Get("city")
-				if cityProp == nil {
-					t.Fatal("expected nested 'city' property")
-				}
+				require.NotNil(t, cityProp)
 
 				hasRequiredCity := false
 				for _, req := range addressProp.Required {
@@ -82,9 +74,7 @@ func TestSchema_TypeMapping(t *testing.T) {
 						break
 					}
 				}
-				if !hasRequiredCity {
-					t.Error("expected 'city' to be required in nested struct")
-				}
+				assert.True(t, hasRequiredCity, "expected 'city' to be required in nested struct")
 			},
 		},
 		{
@@ -99,26 +89,17 @@ func TestSchema_TypeMapping(t *testing.T) {
 			},
 			validate: func(t *testing.T, schema *jsonschema.Schema) {
 				tagsProp, _ := schema.Properties.Get("tags")
-				if tagsProp == nil || tagsProp.Type != "array" {
-					t.Fatalf("expected 'tags' type 'array', got %v", tagsProp)
-				}
-				if tagsProp.Items == nil {
-					t.Fatal("expected tags items to be defined")
-				}
-				if tagsProp.Items.Type != "string" {
-					t.Errorf("expected tags items type 'string', got %s", tagsProp.Items.Type)
-				}
-				if tagsProp.Items.MinLength == nil || *tagsProp.Items.MinLength != 3 {
-					t.Errorf("expected tags items minLength 3, got %v", tagsProp.Items.MinLength)
-				}
+				require.NotNil(t, tagsProp)
+				assert.Equal(t, "array", tagsProp.Type)
+				require.NotNil(t, tagsProp.Items)
+				assert.Equal(t, "string", tagsProp.Items.Type)
+				require.NotNil(t, tagsProp.Items.MinLength)
+				assert.Equal(t, uint64(3), *tagsProp.Items.MinLength)
 
 				adminsProp, _ := schema.Properties.Get("admins")
-				if adminsProp == nil || adminsProp.Items == nil {
-					t.Fatal("expected 'admins' array with items")
-				}
-				if adminsProp.Items.Format != "email" {
-					t.Errorf("expected admins items format 'email', got %s", adminsProp.Items.Format)
-				}
+				require.NotNil(t, adminsProp)
+				require.NotNil(t, adminsProp.Items)
+				assert.Equal(t, "email", adminsProp.Items.Format)
 			},
 		},
 		{
@@ -133,23 +114,16 @@ func TestSchema_TypeMapping(t *testing.T) {
 			},
 			validate: func(t *testing.T, schema *jsonschema.Schema) {
 				settingsProp, _ := schema.Properties.Get("settings")
-				if settingsProp == nil || settingsProp.Type != "object" {
-					t.Fatalf("expected 'settings' type 'object', got %v", settingsProp)
-				}
-				if settingsProp.AdditionalProperties == nil {
-					t.Fatal("expected settings additionalProperties")
-				}
-				if settingsProp.AdditionalProperties.MinLength == nil || *settingsProp.AdditionalProperties.MinLength != 3 {
-					t.Errorf("expected settings values minLength 3, got %v", settingsProp.AdditionalProperties.MinLength)
-				}
+				require.NotNil(t, settingsProp)
+				assert.Equal(t, "object", settingsProp.Type)
+				require.NotNil(t, settingsProp.AdditionalProperties)
+				require.NotNil(t, settingsProp.AdditionalProperties.MinLength)
+				assert.Equal(t, uint64(3), *settingsProp.AdditionalProperties.MinLength)
 
 				contactsProp, _ := schema.Properties.Get("contacts")
-				if contactsProp == nil || contactsProp.AdditionalProperties == nil {
-					t.Fatal("expected 'contacts' map with additionalProperties")
-				}
-				if contactsProp.AdditionalProperties.Format != "email" {
-					t.Errorf("expected contacts values format 'email', got %s", contactsProp.AdditionalProperties.Format)
-				}
+				require.NotNil(t, contactsProp)
+				require.NotNil(t, contactsProp.AdditionalProperties)
+				assert.Equal(t, "email", contactsProp.AdditionalProperties.Format)
 			},
 		},
 	}
@@ -161,12 +135,10 @@ func TestSchema_TypeMapping(t *testing.T) {
 			switch v := setup.(type) {
 			case interface{ Schema() *jsonschema.Schema }:
 				schema := v.Schema()
-				if schema == nil {
-					t.Fatal("expected schema to be non-nil")
-				}
+				require.NotNil(t, schema)
 				tt.validate(t, schema)
 			default:
-				t.Fatal("invalid validator type")
+				require.Fail(t, "invalid validator type")
 			}
 		})
 	}
@@ -190,16 +162,13 @@ func TestSchema_Constraints(t *testing.T) {
 				return New[User]()
 			},
 			validate: func(t *testing.T, schema *jsonschema.Schema) {
-				if len(schema.Required) != 2 {
-					t.Errorf("expected 2 required fields, got %d", len(schema.Required))
-				}
+				assert.Len(t, schema.Required, 2)
 				requiredMap := make(map[string]bool)
 				for _, field := range schema.Required {
 					requiredMap[field] = true
 				}
-				if !requiredMap["name"] || !requiredMap["email"] {
-					t.Errorf("expected 'name' and 'email' to be required, got %v", schema.Required)
-				}
+				assert.True(t, requiredMap["name"], "expected 'name' to be required")
+				assert.True(t, requiredMap["email"], "expected 'email' to be required")
 			},
 		},
 		{
@@ -214,19 +183,16 @@ func TestSchema_Constraints(t *testing.T) {
 			},
 			validate: func(t *testing.T, schema *jsonschema.Schema) {
 				priceProp, _ := schema.Properties.Get("price")
-				if string(priceProp.ExclusiveMinimum) != "0" || string(priceProp.ExclusiveMaximum) != "10000" {
-					t.Errorf("price: expected exclusive min/max 0/10000, got %v/%v", priceProp.ExclusiveMinimum, priceProp.ExclusiveMaximum)
-				}
+				assert.Equal(t, "0", string(priceProp.ExclusiveMinimum))
+				assert.Equal(t, "10000", string(priceProp.ExclusiveMaximum))
 
 				stockProp, _ := schema.Properties.Get("stock")
-				if string(stockProp.Minimum) != "0" || string(stockProp.Maximum) != "1000" {
-					t.Errorf("stock: expected min/max 0/1000, got %v/%v", stockProp.Minimum, stockProp.Maximum)
-				}
+				assert.Equal(t, "0", string(stockProp.Minimum))
+				assert.Equal(t, "1000", string(stockProp.Maximum))
 
 				discountProp, _ := schema.Properties.Get("discount")
-				if string(discountProp.Minimum) != "0" || string(discountProp.Maximum) != "100" {
-					t.Errorf("discount: expected min/max 0/100, got %v/%v", discountProp.Minimum, discountProp.Maximum)
-				}
+				assert.Equal(t, "0", string(discountProp.Minimum))
+				assert.Equal(t, "100", string(discountProp.Maximum))
 			},
 		},
 		{
@@ -240,17 +206,14 @@ func TestSchema_Constraints(t *testing.T) {
 			},
 			validate: func(t *testing.T, schema *jsonschema.Schema) {
 				usernameProp, _ := schema.Properties.Get("username")
-				if usernameProp.MinLength == nil || *usernameProp.MinLength != 3 {
-					t.Errorf("expected username minLength 3, got %v", usernameProp.MinLength)
-				}
-				if usernameProp.MaxLength == nil || *usernameProp.MaxLength != 20 {
-					t.Errorf("expected username maxLength 20, got %v", usernameProp.MaxLength)
-				}
+				require.NotNil(t, usernameProp.MinLength)
+				assert.Equal(t, uint64(3), *usernameProp.MinLength)
+				require.NotNil(t, usernameProp.MaxLength)
+				assert.Equal(t, uint64(20), *usernameProp.MaxLength)
 
 				bioProp, _ := schema.Properties.Get("bio")
-				if bioProp.MaxLength == nil || *bioProp.MaxLength != 500 {
-					t.Errorf("expected bio maxLength 500, got %v", bioProp.MaxLength)
-				}
+				require.NotNil(t, bioProp.MaxLength)
+				assert.Equal(t, uint64(500), *bioProp.MaxLength)
 			},
 		},
 		{
@@ -278,12 +241,8 @@ func TestSchema_Constraints(t *testing.T) {
 				}
 				for _, tt := range tests {
 					prop, _ := schema.Properties.Get(tt.field)
-					if prop == nil {
-						t.Fatalf("expected field '%s' to exist", tt.field)
-					}
-					if prop.Format != tt.expectedFmt {
-						t.Errorf("field '%s': expected format '%s', got '%s'", tt.field, tt.expectedFmt, prop.Format)
-					}
+					require.NotNil(t, prop, "expected field '%s' to exist", tt.field)
+					assert.Equal(t, tt.expectedFmt, prop.Format, "field '%s'", tt.field)
 				}
 			},
 		},
@@ -297,9 +256,7 @@ func TestSchema_Constraints(t *testing.T) {
 			},
 			validate: func(t *testing.T, schema *jsonschema.Schema) {
 				zipProp, _ := schema.Properties.Get("zipCode")
-				if zipProp.Pattern != "^[0-9]{5}$" {
-					t.Errorf("expected pattern '^[0-9]{5}$', got '%s'", zipProp.Pattern)
-				}
+				assert.Equal(t, "^[0-9]{5}$", zipProp.Pattern)
 			},
 		},
 		{
@@ -315,20 +272,14 @@ func TestSchema_Constraints(t *testing.T) {
 			validate: func(t *testing.T, schema *jsonschema.Schema) {
 				portProp, _ := schema.Properties.Get("port")
 				portDefault, _ := json.Marshal(portProp.Default)
-				if string(portDefault) != "8080" {
-					t.Errorf("expected port default 8080, got %v", portProp.Default)
-				}
+				assert.Equal(t, "8080", string(portDefault))
 
 				hostProp, _ := schema.Properties.Get("host")
-				if hostProp.Default != "localhost" {
-					t.Errorf("expected host default 'localhost', got %v", hostProp.Default)
-				}
+				assert.Equal(t, "localhost", hostProp.Default)
 
 				enabledProp, _ := schema.Properties.Get("enabled")
 				enabledDefault, _ := json.Marshal(enabledProp.Default)
-				if string(enabledDefault) != "true" {
-					t.Errorf("expected enabled default true, got %v", enabledProp.Default)
-				}
+				assert.Equal(t, "true", string(enabledDefault))
 			},
 		},
 	}
@@ -339,12 +290,10 @@ func TestSchema_Constraints(t *testing.T) {
 			switch validator := v.(type) {
 			case interface{ Schema() *jsonschema.Schema }:
 				schema := validator.Schema()
-				if schema == nil {
-					t.Fatal("expected schema to be non-nil")
-				}
+				require.NotNil(t, schema)
 				tt.validate(t, schema)
 			default:
-				t.Fatal("invalid validator type")
+				require.Fail(t, "invalid validator type")
 			}
 		})
 	}
@@ -373,40 +322,29 @@ func TestSchemaJSON_Serialization(t *testing.T) {
 			},
 			validate: func(t *testing.T, v interface{}) {
 				validator, ok := v.(interface{ SchemaJSON() ([]byte, error) })
-				if !ok {
-					t.Fatal("validator missing SchemaJSON method")
-				}
+				require.True(t, ok, "validator missing SchemaJSON method")
 
 				jsonBytes, err := validator.SchemaJSON()
-				if err != nil {
-					t.Fatalf("expected no error, got %v", err)
-				}
+				require.NoError(t, err)
 
 				var schemaMap map[string]any
-				if err := json.Unmarshal(jsonBytes, &schemaMap); err != nil {
-					t.Fatalf("expected valid JSON, got error: %v", err)
-				}
+				err = json.Unmarshal(jsonBytes, &schemaMap)
+				require.NoError(t, err)
 
-				if schemaMap["type"] != "object" {
-					t.Errorf("expected type 'object', got %v", schemaMap["type"])
-				}
+				assert.Equal(t, "object", schemaMap["type"])
 
 				properties, ok := schemaMap["properties"].(map[string]any)
-				if !ok {
-					t.Fatal("expected properties to be an object")
-				}
+				require.True(t, ok, "expected properties to be an object")
 
 				// Check name field has minLength
 				nameField, ok := properties["name"].(map[string]any)
-				if !ok || nameField["minLength"] != float64(3) {
-					t.Errorf("expected name minLength 3, got %v", nameField)
-				}
+				require.True(t, ok)
+				assert.Equal(t, float64(3), nameField["minLength"])
 
 				// Check email field has format
 				emailField, ok := properties["email"].(map[string]any)
-				if !ok || emailField["format"] != "email" {
-					t.Errorf("expected email format 'email', got %v", emailField)
-				}
+				require.True(t, ok)
+				assert.Equal(t, "email", emailField["format"])
 			},
 		},
 		{
@@ -424,37 +362,26 @@ func TestSchemaJSON_Serialization(t *testing.T) {
 			},
 			validate: func(t *testing.T, v interface{}) {
 				validator, ok := v.(interface{ SchemaJSONOpenAPI() ([]byte, error) })
-				if !ok {
-					t.Fatal("validator missing SchemaJSONOpenAPI method")
-				}
+				require.True(t, ok, "validator missing SchemaJSONOpenAPI method")
 
 				jsonBytes, err := validator.SchemaJSONOpenAPI()
-				if err != nil {
-					t.Fatalf("expected no error, got %v", err)
-				}
+				require.NoError(t, err)
 
 				var schemaMap map[string]any
-				if err := json.Unmarshal(jsonBytes, &schemaMap); err != nil {
-					t.Fatalf("expected valid JSON, got error: %v", err)
-				}
+				err = json.Unmarshal(jsonBytes, &schemaMap)
+				require.NoError(t, err)
 
 				// Check that $defs exists
 				defs, hasDefs := schemaMap["$defs"].(map[string]any)
-				if !hasDefs {
-					t.Fatal("expected $defs to exist in OpenAPI schema")
-				}
+				require.True(t, hasDefs, "expected $defs to exist in OpenAPI schema")
 
 				// Check Address definition exists
 				addressDef, ok := defs["Address"].(map[string]any)
-				if !ok {
-					t.Fatal("expected Address definition in $defs")
-				}
+				require.True(t, ok, "expected Address definition in $defs")
 
 				// Check Address has required city
 				addressRequired, ok := addressDef["required"].([]any)
-				if !ok {
-					t.Fatal("expected 'required' array in Address definition")
-				}
+				require.True(t, ok, "expected 'required' array in Address definition")
 				hasCity := false
 				for _, req := range addressRequired {
 					if req == "city" {
@@ -462,33 +389,23 @@ func TestSchemaJSON_Serialization(t *testing.T) {
 						break
 					}
 				}
-				if !hasCity {
-					t.Error("expected 'city' to be required in Address definition")
-				}
+				assert.True(t, hasCity, "expected 'city' to be required in Address definition")
 
 				// Check zip constraint in Address definition
 				addressProps, ok := addressDef["properties"].(map[string]any)
-				if !ok {
-					t.Fatal("expected 'properties' in Address definition")
-				}
+				require.True(t, ok, "expected 'properties' in Address definition")
 				zipProp, ok := addressProps["zip"].(map[string]any)
-				if !ok || zipProp["minLength"] != float64(5) {
-					t.Errorf("expected zip minLength 5 in Address, got %v", zipProp)
-				}
+				require.True(t, ok)
+				assert.Equal(t, float64(5), zipProp["minLength"])
 
 				// Check root schema has $ref to Address
 				properties, ok := schemaMap["properties"].(map[string]any)
-				if !ok {
-					t.Fatal("expected 'properties' in root schema")
-				}
+				require.True(t, ok, "expected 'properties' in root schema")
 				addressProp, ok := properties["address"].(map[string]any)
-				if !ok {
-					t.Fatal("expected 'address' property in root schema")
-				}
+				require.True(t, ok, "expected 'address' property in root schema")
 				ref, hasRef := addressProp["$ref"].(string)
-				if !hasRef || ref != "#/$defs/Address" {
-					t.Errorf("expected $ref '#/$defs/Address', got %s", ref)
-				}
+				require.True(t, hasRef)
+				assert.Equal(t, "#/$defs/Address", ref)
 			},
 		},
 		{
@@ -506,19 +423,13 @@ func TestSchemaJSON_Serialization(t *testing.T) {
 			},
 			validate: func(t *testing.T, v interface{}) {
 				validator, ok := v.(interface{ SchemaOpenAPI() *jsonschema.Schema })
-				if !ok {
-					t.Fatal("validator missing SchemaOpenAPI method")
-				}
+				require.True(t, ok, "validator missing SchemaOpenAPI method")
 
 				schema := validator.SchemaOpenAPI()
-				if len(schema.Definitions) == 0 {
-					t.Fatal("expected schema to have definitions")
-				}
+				require.Greater(t, len(schema.Definitions), 0, "expected schema to have definitions")
 
 				contactDef, ok := schema.Definitions["Contact"]
-				if !ok {
-					t.Fatal("expected Contact definition")
-				}
+				require.True(t, ok, "expected Contact definition")
 
 				// Check Contact has required email
 				hasEmail := false
@@ -528,20 +439,17 @@ func TestSchemaJSON_Serialization(t *testing.T) {
 						break
 					}
 				}
-				if !hasEmail {
-					t.Error("expected 'email' to be required in Contact definition")
-				}
+				assert.True(t, hasEmail, "expected 'email' to be required in Contact definition")
 
 				// Check constraints in Contact definition
 				emailProp, _ := contactDef.Properties.Get("email")
-				if emailProp == nil || emailProp.Format != "email" {
-					t.Errorf("expected email format in Contact definition, got %v", emailProp)
-				}
+				require.NotNil(t, emailProp)
+				assert.Equal(t, "email", emailProp.Format)
 
 				phoneProp, _ := contactDef.Properties.Get("phone")
-				if phoneProp == nil || phoneProp.MinLength == nil || *phoneProp.MinLength != 10 {
-					t.Errorf("expected phone minLength 10 in Contact definition, got %v", phoneProp)
-				}
+				require.NotNil(t, phoneProp)
+				require.NotNil(t, phoneProp.MinLength)
+				assert.Equal(t, uint64(10), *phoneProp.MinLength)
 			},
 		},
 	}
@@ -578,12 +486,9 @@ func TestSchema_Caching(t *testing.T) {
 				validator := v.(interface{ Schema() *jsonschema.Schema })
 				schema1 := validator.Schema()
 				schema2 := validator.Schema()
-				if schema1 == nil || schema2 == nil {
-					t.Fatal("expected non-nil schemas")
-				}
-				if schema1 != schema2 {
-					t.Error("expected Schema() to return same cached pointer")
-				}
+				require.NotNil(t, schema1)
+				require.NotNil(t, schema2)
+				assert.Same(t, schema1, schema2)
 			},
 		},
 		{
@@ -600,15 +505,10 @@ func TestSchema_Caching(t *testing.T) {
 				json1, err1 := validator.SchemaJSON()
 				json2, err2 := validator.SchemaJSON()
 
-				if err1 != nil || err2 != nil {
-					t.Fatalf("unexpected errors: %v, %v", err1, err2)
-				}
-				if len(json1) != len(json2) {
-					t.Errorf("expected same cached length, got %d vs %d", len(json1), len(json2))
-				}
-				if !bytesEqual(json1, json2) {
-					t.Error("expected SchemaJSON() to return identical cached bytes")
-				}
+				require.NoError(t, err1)
+				require.NoError(t, err2)
+				assert.Len(t, json1, len(json2))
+				assert.True(t, bytesEqual(json1, json2), "expected SchemaJSON() to return identical cached bytes")
 			},
 		},
 		{
@@ -624,12 +524,9 @@ func TestSchema_Caching(t *testing.T) {
 				validator := v.(interface{ SchemaOpenAPI() *jsonschema.Schema })
 				openapi1 := validator.SchemaOpenAPI()
 				openapi2 := validator.SchemaOpenAPI()
-				if openapi1 == nil || openapi2 == nil {
-					t.Fatal("expected non-nil schemas")
-				}
-				if openapi1 != openapi2 {
-					t.Error("expected SchemaOpenAPI() to return same cached pointer")
-				}
+				require.NotNil(t, openapi1)
+				require.NotNil(t, openapi2)
+				assert.Same(t, openapi1, openapi2)
 			},
 		},
 		{
@@ -646,15 +543,10 @@ func TestSchema_Caching(t *testing.T) {
 				json1, err1 := validator.SchemaJSONOpenAPI()
 				json2, err2 := validator.SchemaJSONOpenAPI()
 
-				if err1 != nil || err2 != nil {
-					t.Fatalf("unexpected errors: %v, %v", err1, err2)
-				}
-				if len(json1) != len(json2) {
-					t.Errorf("expected same cached length, got %d vs %d", len(json1), len(json2))
-				}
-				if !bytesEqual(json1, json2) {
-					t.Error("expected SchemaJSONOpenAPI() to return identical cached bytes")
-				}
+				require.NoError(t, err1)
+				require.NoError(t, err2)
+				assert.Len(t, json1, len(json2))
+				assert.True(t, bytesEqual(json1, json2), "expected SchemaJSONOpenAPI() to return identical cached bytes")
 			},
 		},
 		{
@@ -683,16 +575,10 @@ func TestSchema_Caching(t *testing.T) {
 				dogSchema2 := pair.dog.Schema()
 
 				// Each validator caches its own
-				if catSchema1 != catSchema2 {
-					t.Error("expected Cat validator to cache same pointer")
-				}
-				if dogSchema1 != dogSchema2 {
-					t.Error("expected Dog validator to cache same pointer")
-				}
+				assert.Same(t, catSchema1, catSchema2)
+				assert.Same(t, dogSchema1, dogSchema2)
 				// But different validators have different caches
-				if catSchema1 == dogSchema1 {
-					t.Error("expected different validators to have independent caches")
-				}
+				assert.NotSame(t, catSchema1, dogSchema1)
 			},
 		},
 	}
@@ -742,17 +628,13 @@ func TestSchema_ConcurrencySafe(t *testing.T) {
 				// Verify all concurrent calls returned same cached pointer
 				pointers := make([]*jsonschema.Schema, 0, numGoroutines)
 				for schema := range schemaChan {
-					if schema == nil {
-						t.Fatal("expected non-nil schema from concurrent call")
-					}
+					require.NotNil(t, schema)
 					pointers = append(pointers, schema)
 				}
 
 				firstPtr := pointers[0]
 				for i, ptr := range pointers {
-					if ptr != firstPtr {
-						t.Errorf("goroutine %d got different pointer than first call", i)
-					}
+					assert.Same(t, firstPtr, ptr, "goroutine %d", i)
 				}
 			},
 		},
@@ -777,9 +659,7 @@ func TestSchema_ConcurrencySafe(t *testing.T) {
 					go func() {
 						defer wg.Done()
 						jsonBytes, err := validator.SchemaJSON()
-						if err != nil {
-							panic(fmt.Sprintf("concurrent error: %v", err))
-						}
+						require.NoError(t, err)
 						jsonChan <- jsonBytes
 					}()
 				}
@@ -790,17 +670,13 @@ func TestSchema_ConcurrencySafe(t *testing.T) {
 				// Verify all concurrent calls returned same cached bytes
 				allBytes := make([][]byte, 0, numGoroutines)
 				for jsonBytes := range jsonChan {
-					if jsonBytes == nil {
-						t.Fatal("expected non-nil bytes from concurrent call")
-					}
+					require.NotNil(t, jsonBytes)
 					allBytes = append(allBytes, jsonBytes)
 				}
 
 				firstBytes := allBytes[0]
 				for i, jsonBytes := range allBytes {
-					if !bytesEqual(jsonBytes, firstBytes) {
-						t.Errorf("goroutine %d got different cached bytes than first call", i)
-					}
+					assert.True(t, bytesEqual(jsonBytes, firstBytes), "goroutine %d", i)
 				}
 			},
 		},
@@ -849,9 +725,7 @@ func TestSchemaOpenAPI_SliceOfStructs(t *testing.T) {
 
 	// Should have Author in definitions
 	authorDef, hasAuthor := schema.Definitions["Author"]
-	if !hasAuthor {
-		t.Fatal("expected Author definition in $defs")
-	}
+	require.True(t, hasAuthor, "expected Author definition in $defs")
 
 	// Verify Author definition has constraints from pedantigo tags
 	hasNameRequired := false
@@ -861,19 +735,16 @@ func TestSchemaOpenAPI_SliceOfStructs(t *testing.T) {
 			break
 		}
 	}
-	if !hasNameRequired {
-		t.Error("expected 'name' to be required in Author definition")
-	}
+	assert.True(t, hasNameRequired, "expected 'name' to be required in Author definition")
 
 	nameProp, _ := authorDef.Properties.Get("name")
-	if nameProp == nil || nameProp.MinLength == nil || *nameProp.MinLength != 2 {
-		t.Errorf("expected name minLength 2 in Author, got %v", nameProp)
-	}
+	require.NotNil(t, nameProp)
+	require.NotNil(t, nameProp.MinLength)
+	assert.Equal(t, uint64(2), *nameProp.MinLength)
 
 	emailProp, _ := authorDef.Properties.Get("email")
-	if emailProp == nil || emailProp.Format != "email" {
-		t.Errorf("expected email format 'email' in Author, got %v", emailProp)
-	}
+	require.NotNil(t, emailProp)
+	assert.Equal(t, "email", emailProp.Format)
 }
 
 // TestSchemaOpenAPI_PointerSliceOfStructs tests schema with pointer slices
@@ -894,15 +765,12 @@ func TestSchemaOpenAPI_PointerSliceOfStructs(t *testing.T) {
 
 	// Should have Tag in definitions even though it's []*Tag
 	tagDef, hasTag := schema.Definitions["Tag"]
-	if !hasTag {
-		t.Fatal("expected Tag definition in $defs (pointer slice)")
-	}
+	require.True(t, hasTag, "expected Tag definition in $defs (pointer slice)")
 
 	// Verify Tag constraints are applied
 	colorProp, _ := tagDef.Properties.Get("color")
-	if colorProp == nil || colorProp.Pattern != "^#[0-9a-fA-F]{6}$" {
-		t.Errorf("expected color pattern in Tag definition, got %v", colorProp)
-	}
+	require.NotNil(t, colorProp)
+	assert.Equal(t, "^#[0-9a-fA-F]{6}$", colorProp.Pattern)
 }
 
 // TestSchemaOpenAPI_MapOfStructs tests schema generation with maps of structs
@@ -923,9 +791,7 @@ func TestSchemaOpenAPI_MapOfStructs(t *testing.T) {
 
 	// Should have Contact in definitions
 	contactDef, hasContact := schema.Definitions["Contact"]
-	if !hasContact {
-		t.Fatal("expected Contact definition in $defs")
-	}
+	require.True(t, hasContact, "expected Contact definition in $defs")
 
 	// Verify Contact definition has constraints
 	hasEmailRequired := false
@@ -935,19 +801,16 @@ func TestSchemaOpenAPI_MapOfStructs(t *testing.T) {
 			break
 		}
 	}
-	if !hasEmailRequired {
-		t.Error("expected 'email' to be required in Contact definition")
-	}
+	assert.True(t, hasEmailRequired, "expected 'email' to be required in Contact definition")
 
 	emailProp, _ := contactDef.Properties.Get("email")
-	if emailProp == nil || emailProp.Format != "email" {
-		t.Errorf("expected email format 'email' in Contact, got %v", emailProp)
-	}
+	require.NotNil(t, emailProp)
+	assert.Equal(t, "email", emailProp.Format)
 
 	phoneProp, _ := contactDef.Properties.Get("phone")
-	if phoneProp == nil || phoneProp.MinLength == nil || *phoneProp.MinLength != 10 {
-		t.Errorf("expected phone minLength 10 in Contact, got %v", phoneProp)
-	}
+	require.NotNil(t, phoneProp)
+	require.NotNil(t, phoneProp.MinLength)
+	assert.Equal(t, uint64(10), *phoneProp.MinLength)
 }
 
 // TestSchemaOpenAPI_PointerMapOfStructs tests schema with pointer map values
@@ -969,20 +832,17 @@ func TestSchemaOpenAPI_PointerMapOfStructs(t *testing.T) {
 
 	// Should have Address in definitions even though it's map[string]*Address
 	addressDef, hasAddress := schema.Definitions["Address"]
-	if !hasAddress {
-		t.Fatal("expected Address definition in $defs (pointer map values)")
-	}
+	require.True(t, hasAddress, "expected Address definition in $defs (pointer map values)")
 
 	// Verify Address constraints are applied
 	zipProp, _ := addressDef.Properties.Get("zipCode")
-	if zipProp == nil || zipProp.Pattern != "^[0-9]{5}$" {
-		t.Errorf("expected zipCode pattern in Address definition, got %v", zipProp)
-	}
+	require.NotNil(t, zipProp)
+	assert.Equal(t, "^[0-9]{5}$", zipProp.Pattern)
 
 	cityProp, _ := addressDef.Properties.Get("city")
-	if cityProp == nil || cityProp.MinLength == nil || *cityProp.MinLength != 2 {
-		t.Errorf("expected city minLength 2 in Address, got %v", cityProp)
-	}
+	require.NotNil(t, cityProp)
+	require.NotNil(t, cityProp.MinLength)
+	assert.Equal(t, uint64(2), *cityProp.MinLength)
 }
 
 // TestSchemaOpenAPI_NestedStructInSlice tests deeply nested struct in slice
@@ -1007,26 +867,22 @@ func TestSchemaOpenAPI_NestedStructInSlice(t *testing.T) {
 
 	// Should have both Role and Permission in definitions
 	roleDef, hasRole := schema.Definitions["Role"]
-	if !hasRole {
-		t.Fatal("expected Role definition in $defs")
-	}
+	require.True(t, hasRole, "expected Role definition in $defs")
 
 	permDef, hasPerm := schema.Definitions["Permission"]
-	if !hasPerm {
-		t.Fatal("expected Permission definition in $defs (nested in slice)")
-	}
+	require.True(t, hasPerm, "expected Permission definition in $defs (nested in slice)")
 
 	// Verify Permission constraints applied
 	nameProp, _ := permDef.Properties.Get("name")
-	if nameProp == nil || nameProp.MinLength == nil || *nameProp.MinLength != 1 {
-		t.Errorf("expected name minLength 1 in Permission, got %v", nameProp)
-	}
+	require.NotNil(t, nameProp)
+	require.NotNil(t, nameProp.MinLength)
+	assert.Equal(t, uint64(1), *nameProp.MinLength)
 
 	// Verify Role constraints applied
 	titleProp, _ := roleDef.Properties.Get("title")
-	if titleProp == nil || titleProp.MinLength == nil || *titleProp.MinLength != 1 {
-		t.Errorf("expected title minLength 1 in Role, got %v", titleProp)
-	}
+	require.NotNil(t, titleProp)
+	require.NotNil(t, titleProp.MinLength)
+	assert.Equal(t, uint64(1), *titleProp.MinLength)
 }
 
 // TestSchemaOpenAPI_NestedStructInMap tests deeply nested struct in map
@@ -1052,26 +908,22 @@ func TestSchemaOpenAPI_NestedStructInMap(t *testing.T) {
 
 	// Should have Resource and Metadata in definitions
 	resourceDef, hasResource := schema.Definitions["Resource"]
-	if !hasResource {
-		t.Fatal("expected Resource definition in $defs")
-	}
+	require.True(t, hasResource, "expected Resource definition in $defs")
 
 	metadataDef, hasMetadata := schema.Definitions["Metadata"]
-	if !hasMetadata {
-		t.Fatal("expected Metadata definition in $defs (nested in map)")
-	}
+	require.True(t, hasMetadata, "expected Metadata definition in $defs (nested in map)")
 
 	// Verify Metadata constraints applied
 	keyProp, _ := metadataDef.Properties.Get("key")
-	if keyProp == nil || keyProp.MinLength == nil || *keyProp.MinLength != 1 {
-		t.Errorf("expected key minLength 1 in Metadata, got %v", keyProp)
-	}
+	require.NotNil(t, keyProp)
+	require.NotNil(t, keyProp.MinLength)
+	assert.Equal(t, uint64(1), *keyProp.MinLength)
 
 	// Verify Resource constraints applied
 	nameProp, _ := resourceDef.Properties.Get("name")
-	if nameProp == nil || nameProp.MinLength == nil || *nameProp.MinLength != 1 {
-		t.Errorf("expected name minLength 1 in Resource, got %v", nameProp)
-	}
+	require.NotNil(t, nameProp)
+	require.NotNil(t, nameProp.MinLength)
+	assert.Equal(t, uint64(1), *nameProp.MinLength)
 }
 
 // TestSchemaOpenAPI_DirectTypeMatch tests findTypeForDefinition direct name matching
@@ -1091,20 +943,16 @@ func TestSchemaOpenAPI_DirectTypeMatch(t *testing.T) {
 
 	// Should have Address in definitions
 	addressDef, hasAddress := schema.Definitions["Address"]
-	if !hasAddress {
-		t.Fatal("expected Address definition in $defs")
-	}
+	require.True(t, hasAddress, "expected Address definition in $defs")
 
 	// Verify Address definition has constraints
 	streetProp, _ := addressDef.Properties.Get("street")
-	if streetProp == nil {
-		t.Error("expected 'street' property in Address definition")
-	}
+	require.NotNil(t, streetProp)
 
 	cityProp, _ := addressDef.Properties.Get("city")
-	if cityProp == nil || cityProp.MinLength == nil || *cityProp.MinLength != 2 {
-		t.Errorf("expected city minLength 2 in Address, got %v", cityProp)
-	}
+	require.NotNil(t, cityProp)
+	require.NotNil(t, cityProp.MinLength)
+	assert.Equal(t, uint64(2), *cityProp.MinLength)
 }
 
 // TestSchemaOpenAPI_PointerFieldType tests findTypeForDefinition with pointer field types
@@ -1124,20 +972,16 @@ func TestSchemaOpenAPI_PointerFieldType(t *testing.T) {
 
 	// Should have Config in definitions (pointer should be unwrapped)
 	configDef, hasConfig := schema.Definitions["Config"]
-	if !hasConfig {
-		t.Fatal("expected Config definition in $defs (pointer should be unwrapped)")
-	}
+	require.True(t, hasConfig, "expected Config definition in $defs (pointer should be unwrapped)")
 
 	// Verify Config definition has constraints
 	keyProp, _ := configDef.Properties.Get("key")
-	if keyProp == nil {
-		t.Error("expected 'key' property in Config definition")
-	}
+	require.NotNil(t, keyProp)
 
 	valueProp, _ := configDef.Properties.Get("value")
-	if valueProp == nil || valueProp.MinLength == nil || *valueProp.MinLength != 1 {
-		t.Errorf("expected value minLength 1 in Config, got %v", valueProp)
-	}
+	require.NotNil(t, valueProp)
+	require.NotNil(t, valueProp.MinLength)
+	assert.Equal(t, uint64(1), *valueProp.MinLength)
 }
 
 // TestSchemaOpenAPI_DeeplyNestedStruct tests findTypeForDefinition recursive search
@@ -1161,20 +1005,16 @@ func TestSchemaOpenAPI_DeeplyNestedStruct(t *testing.T) {
 
 	// Should have all levels in definitions
 	_, hasLevel2 := schema.Definitions["Level2"]
-	if !hasLevel2 {
-		t.Error("expected Level2 definition in $defs")
-	}
+	assert.True(t, hasLevel2, "expected Level2 definition in $defs")
 
 	level3Def, hasLevel3 := schema.Definitions["Level3"]
-	if !hasLevel3 {
-		t.Fatal("expected Level3 definition in $defs (deeply nested)")
-	}
+	require.True(t, hasLevel3, "expected Level3 definition in $defs (deeply nested)")
 
 	// Verify Level3 definition has constraints
 	dataProp, _ := level3Def.Properties.Get("data")
-	if dataProp == nil || dataProp.MinLength == nil || *dataProp.MinLength != 5 {
-		t.Errorf("expected data minLength 5 in Level3, got %v", dataProp)
-	}
+	require.NotNil(t, dataProp)
+	require.NotNil(t, dataProp.MinLength)
+	assert.Equal(t, uint64(5), *dataProp.MinLength)
 }
 
 // TestSchemaOpenAPI_MixedNestedTypes tests all search paths together
@@ -1204,31 +1044,21 @@ func TestSchemaOpenAPI_MixedNestedTypes(t *testing.T) {
 
 	// Should have all nested types in definitions
 	tagDef, hasTag := schema.Definitions["Tag"]
-	if !hasTag {
-		t.Error("expected Tag definition")
-	}
-	if tagDef.Properties.Len() == 0 {
-		t.Error("expected Tag definition to have properties")
-	}
+	assert.True(t, hasTag, "expected Tag definition")
+	assert.Greater(t, tagDef.Properties.Len(), 0, "expected Tag definition to have properties")
 
 	metaDef, hasMeta := schema.Definitions["Metadata"]
-	if !hasMeta {
-		t.Error("expected Metadata definition from map values")
-	}
-	if metaDef.Properties.Len() == 0 {
-		t.Error("expected Metadata definition to have properties")
-	}
+	assert.True(t, hasMeta, "expected Metadata definition from map values")
+	assert.Greater(t, metaDef.Properties.Len(), 0, "expected Metadata definition to have properties")
 
 	commentDef, hasComment := schema.Definitions["Comment"]
-	if !hasComment {
-		t.Error("expected Comment definition from slice")
-	}
+	assert.True(t, hasComment, "expected Comment definition from slice")
 
 	// Verify Comment definition has constraints
 	textProp, _ := commentDef.Properties.Get("text")
-	if textProp == nil || textProp.MinLength == nil || *textProp.MinLength != 3 {
-		t.Errorf("expected text minLength 3 in Comment, got %v", textProp)
-	}
+	require.NotNil(t, textProp)
+	require.NotNil(t, textProp.MinLength)
+	assert.Equal(t, uint64(3), *textProp.MinLength)
 }
 
 // TestSchemaJSON_Caching tests all caching paths in SchemaJSON
@@ -1243,19 +1073,13 @@ func TestSchemaJSON_Caching(t *testing.T) {
 
 		// First call should generate schema and JSON
 		jsonBytes1, err := validator.SchemaJSON()
-		if err != nil {
-			t.Fatalf("expected no error on first call, got %v", err)
-		}
-
-		if len(jsonBytes1) == 0 {
-			t.Error("expected non-empty JSON bytes")
-		}
+		require.NoError(t, err)
+		assert.Greater(t, len(jsonBytes1), 0, "expected non-empty JSON bytes")
 
 		// Verify it's valid JSON
 		var schema1 map[string]any
-		if err := json.Unmarshal(jsonBytes1, &schema1); err != nil {
-			t.Fatalf("expected valid JSON, got error: %v", err)
-		}
+		err = json.Unmarshal(jsonBytes1, &schema1)
+		require.NoError(t, err)
 	})
 
 	t.Run("second call returns cached JSON", func(t *testing.T) {
@@ -1263,20 +1087,14 @@ func TestSchemaJSON_Caching(t *testing.T) {
 
 		// First call
 		jsonBytes1, err1 := validator.SchemaJSON()
-		if err1 != nil {
-			t.Fatalf("first call error: %v", err1)
-		}
+		require.NoError(t, err1)
 
 		// Second call should return cached JSON (same pointer)
 		jsonBytes2, err2 := validator.SchemaJSON()
-		if err2 != nil {
-			t.Fatalf("second call error: %v", err2)
-		}
+		require.NoError(t, err2)
 
 		// Should return exact same cached bytes
-		if string(jsonBytes1) != string(jsonBytes2) {
-			t.Error("expected cached JSON to match")
-		}
+		assert.Equal(t, string(jsonBytes1), string(jsonBytes2))
 	})
 
 	t.Run("Schema called first then SchemaJSON uses cached schema", func(t *testing.T) {
@@ -1284,40 +1102,28 @@ func TestSchemaJSON_Caching(t *testing.T) {
 
 		// Call Schema() first to cache schema object
 		schema1 := validator.Schema()
-		if schema1 == nil {
-			t.Fatal("expected schema to be generated")
-		}
+		require.NotNil(t, schema1)
 
 		// Call SchemaJSON() - should use cached schema but generate JSON
 		jsonBytes, err := validator.SchemaJSON()
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-
-		if len(jsonBytes) == 0 {
-			t.Error("expected non-empty JSON bytes")
-		}
+		require.NoError(t, err)
+		assert.Greater(t, len(jsonBytes), 0, "expected non-empty JSON bytes")
 
 		// Verify constraints are in the JSON
 		var schemaMap map[string]any
-		if err := json.Unmarshal(jsonBytes, &schemaMap); err != nil {
-			t.Fatalf("expected valid JSON, got error: %v", err)
-		}
+		err = json.Unmarshal(jsonBytes, &schemaMap)
+		require.NoError(t, err)
 
 		properties, ok := schemaMap["properties"].(map[string]any)
-		if !ok {
-			t.Fatal("expected properties object")
-		}
+		require.True(t, ok, "expected properties object")
 
 		nameProp, ok := properties["name"].(map[string]any)
-		if !ok {
-			t.Fatal("expected name property")
-		}
+		require.True(t, ok, "expected name property")
 
 		// Check min length constraint
-		if minLen, ok := nameProp["minLength"].(float64); !ok || minLen != 1 {
-			t.Errorf("expected name minLength 1, got %v", nameProp["minLength"])
-		}
+		minLen, ok := nameProp["minLength"].(float64)
+		require.True(t, ok)
+		assert.Equal(t, 1.0, minLen)
 	})
 }
 
@@ -1332,28 +1138,21 @@ func TestSchemaJSON_DefinitionUnwrapping(t *testing.T) {
 
 	validator := New[Config]()
 	jsonBytes, err := validator.SchemaJSON()
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	require.NoError(t, err)
 
 	var schemaMap map[string]any
-	if err := json.Unmarshal(jsonBytes, &schemaMap); err != nil {
-		t.Fatalf("expected valid JSON, got error: %v", err)
-	}
+	err = json.Unmarshal(jsonBytes, &schemaMap)
+	require.NoError(t, err)
 
 	// Should have properties (unwrapped from definition if needed)
 	properties, ok := schemaMap["properties"].(map[string]any)
-	if !ok {
-		t.Fatal("expected properties object after unwrapping")
-	}
+	require.True(t, ok, "expected properties object after unwrapping")
 
 	// Verify constraints are applied
 	hostProp, ok := properties["host"].(map[string]any)
-	if !ok {
-		t.Fatal("expected host property")
-	}
+	require.True(t, ok, "expected host property")
 
-	if format, ok := hostProp["format"].(string); !ok || format != "uri" {
-		t.Errorf("expected host format 'uri', got %v", hostProp["format"])
-	}
+	format, ok := hostProp["format"].(string)
+	require.True(t, ok)
+	assert.Equal(t, "uri", format)
 }

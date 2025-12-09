@@ -5,6 +5,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ==================== Core Validation Tests ====================
@@ -20,9 +23,7 @@ func TestValidator_Required_Present(t *testing.T) {
 	user := &User{Email: "test@example.com"}
 
 	err := validator.Validate(user)
-	if err != nil {
-		t.Errorf("expected no validation errors, got %v", err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestValidator_Min_BelowMinimum(t *testing.T) {
@@ -34,9 +35,7 @@ func TestValidator_Min_BelowMinimum(t *testing.T) {
 	user := &User{Age: 15}
 
 	err := validator.Validate(user)
-	if err == nil {
-		t.Error("expected validation error for value below minimum")
-	}
+	assert.Error(t, err)
 }
 
 func TestValidator_Min_AtMinimum(t *testing.T) {
@@ -48,9 +47,7 @@ func TestValidator_Min_AtMinimum(t *testing.T) {
 	user := &User{Age: 18}
 
 	err := validator.Validate(user)
-	if err != nil {
-		t.Errorf("expected no validation errors, got %v", err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestValidator_Max_AboveMaximum(t *testing.T) {
@@ -62,9 +59,7 @@ func TestValidator_Max_AboveMaximum(t *testing.T) {
 	user := &User{Age: 150}
 
 	err := validator.Validate(user)
-	if err == nil {
-		t.Error("expected validation error for value above maximum")
-	}
+	assert.Error(t, err)
 }
 
 func TestValidator_Max_AtMaximum(t *testing.T) {
@@ -76,9 +71,7 @@ func TestValidator_Max_AtMaximum(t *testing.T) {
 	user := &User{Age: 120}
 
 	err := validator.Validate(user)
-	if err != nil {
-		t.Errorf("expected no validation errors, got %v", err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestValidator_MinMax_InRange(t *testing.T) {
@@ -90,9 +83,7 @@ func TestValidator_MinMax_InRange(t *testing.T) {
 	user := &User{Age: 25}
 
 	err := validator.Validate(user)
-	if err != nil {
-		t.Errorf("expected no validation errors, got %v", err)
-	}
+	assert.NoError(t, err)
 }
 
 // Test type for cross-field validation
@@ -121,25 +112,20 @@ func TestValidator_CrossField_PasswordConfirmation(t *testing.T) {
 	}
 
 	err := validator.Validate(pwd)
-	if err == nil {
-		t.Error("expected validation error for password mismatch")
-	}
+	assert.Error(t, err)
 
 	// Should have cross-field error
-	foundCrossFieldError := false
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
+
+	foundCrossFieldError := false
 	for _, fieldErr := range ve.Errors {
 		if fieldErr.Field == "Confirm" && fieldErr.Message == "passwords do not match" {
 			foundCrossFieldError = true
 		}
 	}
 
-	if !foundCrossFieldError {
-		t.Error("expected cross-field validation error")
-	}
+	assert.True(t, foundCrossFieldError, "expected cross-field validation error")
 }
 
 // TestMarshal_Valid verifies that Marshal returns JSON for valid structs
@@ -158,25 +144,15 @@ func TestMarshal_Valid(t *testing.T) {
 	}
 
 	data, err := validator.Marshal(user)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	require.NoError(t, err)
 
 	// Verify JSON is valid and contains expected fields
 	var result map[string]interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		t.Fatalf("Marshal returned invalid JSON: %v", err)
-	}
+	require.NoError(t, json.Unmarshal(data, &result))
 
-	if result["name"] != "John Doe" {
-		t.Errorf("expected name='John Doe', got %v", result["name"])
-	}
-	if result["email"] != "john@example.com" {
-		t.Errorf("expected email='john@example.com', got %v", result["email"])
-	}
-	if result["age"] != float64(25) {
-		t.Errorf("expected age=25, got %v", result["age"])
-	}
+	assert.Equal(t, "John Doe", result["name"])
+	assert.Equal(t, "john@example.com", result["email"])
+	assert.Equal(t, float64(25), result["age"])
 }
 
 // TestMarshal_Invalid verifies that Marshal returns validation errors for invalid structs
@@ -197,22 +173,14 @@ func TestMarshal_Invalid(t *testing.T) {
 	data, err := validator.Marshal(user)
 
 	// Should return validation error, not JSON
-	if err == nil {
-		t.Fatal("expected validation error, got nil")
-	}
-	if data != nil {
-		t.Errorf("expected nil data when validation fails, got %d bytes", len(data))
-	}
+	require.Error(t, err)
+	assert.Nil(t, data)
 
 	// Verify it's a ValidationError with multiple field errors
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
 
-	if len(ve.Errors) != 3 {
-		t.Errorf("expected 3 validation errors, got %d: %v", len(ve.Errors), ve.Errors)
-	}
+	assert.Len(t, ve.Errors, 3)
 
 	// Check that errors are for the expected fields
 	errorFields := make(map[string]bool)
@@ -220,15 +188,9 @@ func TestMarshal_Invalid(t *testing.T) {
 		errorFields[fieldErr.Field] = true
 	}
 
-	if !errorFields["Name"] {
-		t.Error("expected validation error for Name field")
-	}
-	if !errorFields["Email"] {
-		t.Error("expected validation error for Email field")
-	}
-	if !errorFields["Age"] {
-		t.Error("expected validation error for Age field")
-	}
+	assert.True(t, errorFields["Name"], "expected validation error for Name field")
+	assert.True(t, errorFields["Email"], "expected validation error for Email field")
+	assert.True(t, errorFields["Age"], "expected validation error for Age field")
 }
 
 // TestMarshal_Nil verifies that Marshal handles nil pointer appropriately
@@ -248,8 +210,8 @@ func TestMarshal_Nil(t *testing.T) {
 	if err != nil {
 		// Validation error is acceptable for nil
 		t.Logf("Marshal(nil) returned error: %v", err)
-	} else if string(data) != "null" {
-		t.Errorf("expected Marshal(nil) to return 'null', got %q", string(data))
+	} else {
+		assert.Equal(t, "null", string(data))
 	}
 }
 
@@ -265,21 +227,11 @@ func TestUnmarshal_ValidJSON(t *testing.T) {
 	jsonData := []byte(`{"email":"test@example.com","age":25}`)
 
 	user, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no validation errors, got %v", err)
-	}
+	assert.NoError(t, err)
+	require.NotNil(t, user)
 
-	if user == nil {
-		t.Fatal("expected non-nil user")
-	}
-
-	if user.Email != "test@example.com" {
-		t.Errorf("expected email 'test@example.com', got %q", user.Email)
-	}
-
-	if user.Age != 25 {
-		t.Errorf("expected age 25, got %d", user.Age)
-	}
+	assert.Equal(t, "test@example.com", user.Email)
+	assert.Equal(t, 25, user.Age)
 }
 
 func TestUnmarshal_InvalidJSON(t *testing.T) {
@@ -291,14 +243,8 @@ func TestUnmarshal_InvalidJSON(t *testing.T) {
 	jsonData := []byte(`{"email":}`) // Invalid JSON
 
 	user, err := validator.Unmarshal(jsonData)
-	if err == nil {
-		t.Error("expected JSON decode error")
-	}
-
-	// Should return nil user on JSON decode errors
-	if user != nil {
-		t.Error("expected nil user on JSON decode error")
-	}
+	assert.Error(t, err)
+	assert.Nil(t, user)
 }
 
 func TestUnmarshal_ValidationError(t *testing.T) {
@@ -313,14 +259,10 @@ func TestUnmarshal_ValidationError(t *testing.T) {
 
 	user, err := validator.Unmarshal(jsonData)
 
-	if err == nil {
-		t.Fatal("expected validation errors, got nil")
-	}
+	require.Error(t, err)
 
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
 
 	t.Logf("Got %d errors:", len(ve.Errors))
 	for _, fieldErr := range ve.Errors {
@@ -328,9 +270,7 @@ func TestUnmarshal_ValidationError(t *testing.T) {
 	}
 
 	// Should still return the user struct even with validation errors
-	if user == nil {
-		t.Error("expected non-nil user even with validation errors")
-	}
+	assert.NotNil(t, user)
 
 	// Check we have errors for both fields (use struct field names, not JSON names)
 	foundEmailError := false
@@ -344,13 +284,8 @@ func TestUnmarshal_ValidationError(t *testing.T) {
 		}
 	}
 
-	if !foundEmailError {
-		t.Error("expected validation error for Email field")
-	}
-
-	if !foundAgeError {
-		t.Error("expected validation error for Age field")
-	}
+	assert.True(t, foundEmailError, "expected validation error for Email field")
+	assert.True(t, foundAgeError, "expected validation error for Age field")
 }
 
 func TestUnmarshal_DefaultValues(t *testing.T) {
@@ -364,22 +299,12 @@ func TestUnmarshal_DefaultValues(t *testing.T) {
 	jsonData := []byte(`{"email":"test@example.com"}`) // Missing role and status
 
 	user, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no validation errors, got %v", err)
-	}
-
-	if user == nil {
-		t.Fatal("expected non-nil user")
-	}
+	assert.NoError(t, err)
+	require.NotNil(t, user)
 
 	// Defaults should be applied
-	if user.Role != "user" {
-		t.Errorf("expected default role 'user', got %q", user.Role)
-	}
-
-	if user.Status != "active" {
-		t.Errorf("expected default status 'active', got %q", user.Status)
-	}
+	assert.Equal(t, "user", user.Role)
+	assert.Equal(t, "active", user.Status)
 }
 
 func TestUnmarshal_NestedValidation(t *testing.T) {
@@ -397,14 +322,10 @@ func TestUnmarshal_NestedValidation(t *testing.T) {
 	jsonData := []byte(`{"email":"test@example.com","address":{"city":""}}`)
 
 	user, err := validator.Unmarshal(jsonData)
-	if err == nil {
-		t.Fatal("expected validation error for empty city (min=1)")
-	}
+	require.Error(t, err)
 
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
 
 	// Should have error for Address.City
 	foundNestedError := false
@@ -414,13 +335,8 @@ func TestUnmarshal_NestedValidation(t *testing.T) {
 		}
 	}
 
-	if !foundNestedError {
-		t.Errorf("expected validation error for nested City field, got errors: %v", ve.Errors)
-	}
-
-	if user == nil {
-		t.Error("expected non-nil user even with validation errors")
-	}
+	assert.True(t, foundNestedError, "expected validation error for nested City field")
+	assert.NotNil(t, user)
 }
 
 // ==================== Pointer Tests ====================
@@ -436,23 +352,13 @@ func TestPointer_ExplicitValue(t *testing.T) {
 	jsonData := []byte(`{"name":"Alice","age":25}`)
 
 	user, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors, got %v", err)
-	}
+	assert.NoError(t, err)
 
-	if user.Name == nil {
-		t.Fatal("expected non-nil Name pointer")
-	}
-	if *user.Name != "Alice" {
-		t.Errorf("expected name 'Alice', got %q", *user.Name)
-	}
+	require.NotNil(t, user.Name)
+	assert.Equal(t, "Alice", *user.Name)
 
-	if user.Age == nil {
-		t.Fatal("expected non-nil Age pointer")
-	}
-	if *user.Age != 25 {
-		t.Errorf("expected age 25, got %d", *user.Age)
-	}
+	require.NotNil(t, user.Age)
+	assert.Equal(t, 25, *user.Age)
 }
 
 // Test pointer field with explicit zero value (should create pointer to zero)
@@ -467,31 +373,17 @@ func TestPointer_ExplicitZero(t *testing.T) {
 	jsonData := []byte(`{"port":0,"enabled":false,"name":""}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors, got %v", err)
-	}
+	assert.NoError(t, err)
 
 	// Explicit zeros should create pointers to zero values
-	if config.Port == nil {
-		t.Fatal("expected non-nil Port pointer for explicit 0")
-	}
-	if *config.Port != 0 {
-		t.Errorf("expected port 0, got %d", *config.Port)
-	}
+	require.NotNil(t, config.Port)
+	assert.Equal(t, 0, *config.Port)
 
-	if config.Enabled == nil {
-		t.Fatal("expected non-nil Enabled pointer for explicit false")
-	}
-	if *config.Enabled != false {
-		t.Errorf("expected enabled false, got %v", *config.Enabled)
-	}
+	require.NotNil(t, config.Enabled)
+	assert.Equal(t, false, *config.Enabled)
 
-	if config.Name == nil {
-		t.Fatal("expected non-nil Name pointer for explicit empty string")
-	}
-	if *config.Name != "" {
-		t.Errorf("expected name empty string, got %q", *config.Name)
-	}
+	require.NotNil(t, config.Name)
+	assert.Equal(t, "", *config.Name)
 }
 
 // Test pointer field with explicit null (should be nil pointer)
@@ -505,18 +397,11 @@ func TestPointer_ExplicitNull(t *testing.T) {
 	jsonData := []byte(`{"name":null,"age":null}`)
 
 	user, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors, got %v", err)
-	}
+	assert.NoError(t, err)
 
 	// Explicit null should result in nil pointers
-	if user.Name != nil {
-		t.Errorf("expected nil Name pointer for explicit null, got %v", *user.Name)
-	}
-
-	if user.Age != nil {
-		t.Errorf("expected nil Age pointer for explicit null, got %v", *user.Age)
-	}
+	assert.Nil(t, user.Name)
+	assert.Nil(t, user.Age)
 }
 
 // Test pointer field missing from JSON (should be nil pointer)
@@ -530,18 +415,11 @@ func TestPointer_Missing(t *testing.T) {
 	jsonData := []byte(`{}`) // Both fields missing
 
 	user, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors, got %v", err)
-	}
+	assert.NoError(t, err)
 
 	// Missing fields should result in nil pointers
-	if user.Name != nil {
-		t.Errorf("expected nil Name pointer for missing field, got %v", *user.Name)
-	}
-
-	if user.Age != nil {
-		t.Errorf("expected nil Age pointer for missing field, got %v", *user.Age)
-	}
+	assert.Nil(t, user.Name)
+	assert.Nil(t, user.Age)
 }
 
 // Test required pointer field with explicit value
@@ -554,16 +432,10 @@ func TestPointer_RequiredWithValue(t *testing.T) {
 	jsonData := []byte(`{"name":"Alice"}`)
 
 	user, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors, got %v", err)
-	}
+	assert.NoError(t, err)
 
-	if user.Name == nil {
-		t.Fatal("expected non-nil Name pointer")
-	}
-	if *user.Name != "Alice" {
-		t.Errorf("expected name 'Alice', got %q", *user.Name)
-	}
+	require.NotNil(t, user.Name)
+	assert.Equal(t, "Alice", *user.Name)
 }
 
 // Test required pointer field missing (should fail)
@@ -576,14 +448,10 @@ func TestPointer_RequiredMissing(t *testing.T) {
 	jsonData := []byte(`{}`) // Missing required field
 
 	_, err := validator.Unmarshal(jsonData)
-	if err == nil {
-		t.Fatal("expected validation error for missing required field")
-	}
+	require.Error(t, err)
 
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
 
 	// Check for required field error
 	foundRequiredError := false
@@ -593,9 +461,7 @@ func TestPointer_RequiredMissing(t *testing.T) {
 		}
 	}
 
-	if !foundRequiredError {
-		t.Errorf("expected 'is required' error for name field, got %v", ve.Errors)
-	}
+	assert.True(t, foundRequiredError, "expected 'is required' error for name field")
 }
 
 // Test required pointer field with explicit null (should pass - field is present)
@@ -608,14 +474,10 @@ func TestPointer_RequiredWithNull(t *testing.T) {
 	jsonData := []byte(`{"name":null}`) // Field present but null
 
 	user, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors (field is present), got %v", err)
-	}
+	assert.NoError(t, err)
 
 	// Required means "field must be present", not "value can't be nil"
-	if user.Name != nil {
-		t.Errorf("expected nil Name pointer for explicit null, got %v", *user.Name)
-	}
+	assert.Nil(t, user.Name)
 }
 
 // Test pointer field with default value
@@ -628,17 +490,11 @@ func TestPointer_WithDefault(t *testing.T) {
 	jsonData := []byte(`{}`) // Missing port field
 
 	config, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors, got %v", err)
-	}
+	assert.NoError(t, err)
 
 	// Default should be applied to missing field
-	if config.Port == nil {
-		t.Fatal("expected non-nil Port pointer with default")
-	}
-	if *config.Port != 8080 {
-		t.Errorf("expected default port 8080, got %d", *config.Port)
-	}
+	require.NotNil(t, config.Port)
+	assert.Equal(t, 8080, *config.Port)
 }
 
 // Test pointer field with explicit zero and default (should keep zero)
@@ -651,17 +507,11 @@ func TestPointer_ExplicitZeroWithDefault(t *testing.T) {
 	jsonData := []byte(`{"port":0}`) // Explicit zero
 
 	config, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors, got %v", err)
-	}
+	assert.NoError(t, err)
 
 	// Explicit zero should be kept, not replaced with default
-	if config.Port == nil {
-		t.Fatal("expected non-nil Port pointer for explicit 0")
-	}
-	if *config.Port != 0 {
-		t.Errorf("expected port 0 (not default), got %d", *config.Port)
-	}
+	require.NotNil(t, config.Port)
+	assert.Equal(t, 0, *config.Port)
 }
 
 // Test nested struct with pointer fields
@@ -680,25 +530,15 @@ func TestPointer_NestedStruct(t *testing.T) {
 	jsonData := []byte(`{"name":"Alice","address":{"street":"123 Main St","city":null}}`)
 
 	user, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors, got %v", err)
-	}
+	assert.NoError(t, err)
 
-	if user.Address == nil {
-		t.Fatal("expected non-nil Address pointer")
-	}
+	require.NotNil(t, user.Address)
 
-	if user.Address.Street == nil {
-		t.Fatal("expected non-nil Street pointer")
-	}
-	if *user.Address.Street != "123 Main St" {
-		t.Errorf("expected street '123 Main St', got %q", *user.Address.Street)
-	}
+	require.NotNil(t, user.Address.Street)
+	assert.Equal(t, "123 Main St", *user.Address.Street)
 
 	// City was explicitly null
-	if user.Address.City != nil {
-		t.Errorf("expected nil City pointer for explicit null, got %v", *user.Address.City)
-	}
+	assert.Nil(t, user.Address.City)
 }
 
 // ==================== Deserializer Tests ====================
@@ -912,9 +752,10 @@ func TestDeserializer_UnmarshalBehavior(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := tt.validatorFn()
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Unmarshal() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			if result != nil || !tt.wantErr {
@@ -959,17 +800,15 @@ func TestDeserializer_ValidatorSetup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.expectPanic {
 				defer func() {
-					if r := recover(); r == nil {
-						t.Errorf("expected panic but none occurred")
-					}
+					r := recover()
+					assert.NotNil(t, r, "expected panic but none occurred")
 				}()
 				tt.setup()
 			} else {
 				// Should not panic
 				defer func() {
-					if r := recover(); r != nil {
-						t.Errorf("unexpected panic: %v", r)
-					}
+					r := recover()
+					assert.Nil(t, r, "unexpected panic: %v", r)
 				}()
 				tt.setup()
 			}
@@ -1044,18 +883,16 @@ func TestValidatorOptions_StrictMissingFields(t *testing.T) {
 			})
 			user, err := validator.Unmarshal([]byte(tt.jsonInput))
 
-			if (err != nil) != tt.expectErr {
-				t.Errorf("expectErr=%v, got err=%v", tt.expectErr, err)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			if err != nil && tt.expectErrFields != nil {
 				ve, ok := err.(*ValidationError)
-				if !ok {
-					t.Fatalf("expected *ValidationError, got %T", err)
-				}
-				if len(ve.Errors) != len(tt.expectErrFields) {
-					t.Errorf("expected %d errors, got %d: %v", len(tt.expectErrFields), len(ve.Errors), ve.Errors)
-				}
+				require.True(t, ok, "expected *ValidationError, got %T", err)
+				assert.Len(t, ve.Errors, len(tt.expectErrFields))
 			}
 
 			if !tt.expectErr && tt.checkValues != nil {
@@ -1154,18 +991,16 @@ func TestValidatorOptions_PointerFields(t *testing.T) {
 
 			settings, err := validator.Unmarshal([]byte(tt.jsonInput))
 
-			if (err != nil) != tt.expectErr {
-				t.Errorf("expectErr=%v, got err=%v", tt.expectErr, err)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			if err != nil && tt.expectErr {
 				ve, ok := err.(*ValidationError)
-				if !ok {
-					t.Fatalf("expected *ValidationError, got %T", err)
-				}
-				if len(ve.Errors) != len(tt.expectErrFields) {
-					t.Errorf("expected %d errors, got %d: %v", len(tt.expectErrFields), len(ve.Errors), ve.Errors)
-				}
+				require.True(t, ok, "expected *ValidationError, got %T", err)
+				assert.Len(t, ve.Errors, len(tt.expectErrFields))
 			}
 
 			if tt.checkValues != nil {
