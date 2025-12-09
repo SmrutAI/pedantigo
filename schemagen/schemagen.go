@@ -167,42 +167,10 @@ func ApplyConstraints(schema *jsonschema.Schema, constraintsMap map[string]strin
 			continue
 
 		case "min":
-			// Context-aware: numeric min for numbers, length min for strings/arrays
-			// Handle pointer types
-			checkType := fieldType
-			if checkType.Kind() == reflect.Ptr {
-				checkType = checkType.Elem()
-			}
-			kind := checkType.Kind()
-			if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
-				// min → minLength for strings/arrays
-				if minLength, err := strconv.Atoi(value); err == nil {
-					ml := uint64(minLength)
-					schema.MinLength = &ml
-				}
-			} else {
-				// min → minimum for numbers
-				schema.Minimum = json.Number(value)
-			}
+			applyMinConstraint(schema, value, fieldType)
 
 		case "max":
-			// Context-aware: numeric max for numbers, length max for strings/arrays
-			// Handle pointer types
-			checkType := fieldType
-			if checkType.Kind() == reflect.Ptr {
-				checkType = checkType.Elem()
-			}
-			kind := checkType.Kind()
-			if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
-				// max → maxLength for strings/arrays
-				if maxLength, err := strconv.Atoi(value); err == nil {
-					ml := uint64(maxLength)
-					schema.MaxLength = &ml
-				}
-			} else {
-				// max → maximum for numbers
-				schema.Maximum = json.Number(value)
-			}
+			applyMaxConstraint(schema, value, fieldType)
 
 		case "gt":
 			// gt → exclusiveMinimum (exclusive)
@@ -220,25 +188,8 @@ func ApplyConstraints(schema *jsonschema.Schema, constraintsMap map[string]strin
 			// lte → maximum (inclusive)
 			schema.Maximum = json.Number(value)
 
-		case "email":
-			// email → format: email
-			schema.Format = "email"
-
-		case "url":
-			// url → format: uri
-			schema.Format = "uri"
-
-		case "uuid":
-			// uuid → format: uuid
-			schema.Format = "uuid"
-
-		case "ipv4":
-			// ipv4 → format: ipv4
-			schema.Format = "ipv4"
-
-		case "ipv6":
-			// ipv6 → format: ipv6
-			schema.Format = "ipv6"
+		case "email", "url", "uuid", "ipv4", "ipv6":
+			applyFormatConstraint(schema, name)
 
 		case "regexp":
 			// regexp → pattern
@@ -355,4 +306,60 @@ func ParseDefaultValue(value string, typ reflect.Type) any {
 		}
 	}
 	return value
+}
+
+// applyMinConstraint applies min constraint context-aware to field type
+// For strings/arrays: sets minLength, for numbers: sets minimum
+func applyMinConstraint(schema *jsonschema.Schema, value string, fieldType reflect.Type) {
+	checkType := fieldType
+	if checkType.Kind() == reflect.Ptr {
+		checkType = checkType.Elem()
+	}
+	kind := checkType.Kind()
+	if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
+		// min → minLength for strings/arrays
+		if minLength, err := strconv.Atoi(value); err == nil {
+			ml := uint64(minLength)
+			schema.MinLength = &ml
+		}
+	} else {
+		// min → minimum for numbers
+		schema.Minimum = json.Number(value)
+	}
+}
+
+// applyMaxConstraint applies max constraint context-aware to field type
+// For strings/arrays: sets maxLength, for numbers: sets maximum
+func applyMaxConstraint(schema *jsonschema.Schema, value string, fieldType reflect.Type) {
+	checkType := fieldType
+	if checkType.Kind() == reflect.Ptr {
+		checkType = checkType.Elem()
+	}
+	kind := checkType.Kind()
+	if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
+		// max → maxLength for strings/arrays
+		if maxLength, err := strconv.Atoi(value); err == nil {
+			ml := uint64(maxLength)
+			schema.MaxLength = &ml
+		}
+	} else {
+		// max → maximum for numbers
+		schema.Maximum = json.Number(value)
+	}
+}
+
+// applyFormatConstraint maps constraint names to JSON Schema format values
+func applyFormatConstraint(schema *jsonschema.Schema, constraintName string) {
+	switch constraintName {
+	case "email":
+		schema.Format = "email"
+	case "url":
+		schema.Format = "uri"
+	case "uuid":
+		schema.Format = "uuid"
+	case "ipv4":
+		schema.Format = "ipv4"
+	case "ipv6":
+		schema.Format = "ipv6"
+	}
 }

@@ -92,163 +92,217 @@ func SetFieldValue(
 
 	// Handle slices: if inValue is []any and target is slice
 	if inVal.Kind() == reflect.Slice && fieldType.Kind() == reflect.Slice {
-		elemType := fieldType.Elem()
-		newSlice := reflect.MakeSlice(fieldType, inVal.Len(), inVal.Len())
-
-		for i := 0; i < inVal.Len(); i++ {
-			elemValue := newSlice.Index(i)
-			elemInput := inVal.Index(i).Interface()
-
-			// For structs in slices, manually deserialize fields to track which are present
-			if elemType.Kind() == reflect.Struct && reflect.TypeOf(elemInput).Kind() == reflect.Map {
-				inputMap, ok := elemInput.(map[string]any)
-				if !ok {
-					return fmt.Errorf("expected map for struct element")
-				}
-
-				// Create new struct instance
-				newStruct := reflect.New(elemType).Elem()
-
-				// Iterate through struct fields and set values
-				for j := 0; j < elemType.NumField(); j++ {
-					field := elemType.Field(j)
-
-					// Skip unexported fields
-					if !field.IsExported() {
-						continue
-					}
-
-					// Get JSON field name
-					jsonTag := field.Tag.Get("json")
-					jsonFieldName := field.Name
-					if jsonTag != "" && jsonTag != "-" {
-						if name, _, found := strings.Cut(jsonTag, ","); found {
-							jsonFieldName = name
-						} else {
-							jsonFieldName = jsonTag
-						}
-					}
-
-					// Check if field exists in JSON
-					val, exists := inputMap[jsonFieldName]
-					if !exists {
-						// Field missing from JSON - leave as zero value
-						// Will be checked for 'required' later in validateValue()
-						continue
-					}
-
-					// Set the field value
-					fieldVal := newStruct.Field(j)
-					if err := recursiveSetFunc(fieldVal, val, field.Type); err != nil {
-						return err
-					}
-				}
-
-				elemValue.Set(newStruct)
-			} else {
-				if err := recursiveSetFunc(elemValue, elemInput, elemType); err != nil {
-					return err
-				}
-			}
-		}
-
-		fieldValue.Set(newSlice)
-		return nil
+		return setSliceField(fieldValue, inVal, fieldType, recursiveSetFunc)
 	}
 
 	// Handle maps: if inValue is map[string]any and target is map
 	if inVal.Kind() == reflect.Map && fieldType.Kind() == reflect.Map {
-		keyType := fieldType.Key()
-		valueType := fieldType.Elem()
-
-		// Create new map
-		newMap := reflect.MakeMap(fieldType)
-
-		// Iterate through map entries
-		iter := inVal.MapRange()
-		for iter.Next() {
-			key := iter.Key()
-			val := iter.Value().Interface()
-
-			// Convert key if needed
-			var convertedKey reflect.Value
-			if key.Type().AssignableTo(keyType) {
-				convertedKey = key
-			} else if key.Type().ConvertibleTo(keyType) {
-				convertedKey = key.Convert(keyType)
-			} else {
-				return fmt.Errorf("cannot convert map key %v to %v", key.Type(), keyType)
-			}
-
-			// For struct values in maps, manually deserialize fields to track which are present
-			if valueType.Kind() == reflect.Struct && reflect.TypeOf(val).Kind() == reflect.Map {
-				inputMap, ok := val.(map[string]any)
-				if !ok {
-					return fmt.Errorf("expected map for struct value")
-				}
-
-				// Create new struct instance
-				newStruct := reflect.New(valueType).Elem()
-
-				// Iterate through struct fields and set values
-				for j := 0; j < valueType.NumField(); j++ {
-					field := valueType.Field(j)
-
-					// Skip unexported fields
-					if !field.IsExported() {
-						continue
-					}
-
-					// Get JSON field name
-					jsonTag := field.Tag.Get("json")
-					jsonFieldName := field.Name
-					if jsonTag != "" && jsonTag != "-" {
-						if name, _, found := strings.Cut(jsonTag, ","); found {
-							jsonFieldName = name
-						} else {
-							jsonFieldName = jsonTag
-						}
-					}
-
-					// Check if field exists in JSON
-					fieldVal, exists := inputMap[jsonFieldName]
-					if !exists {
-						// Field missing from JSON - leave as zero value
-						// Will be checked for 'required' later in validateValue()
-						continue
-					}
-
-					// Set the field value
-					structFieldVal := newStruct.Field(j)
-					if err := recursiveSetFunc(structFieldVal, fieldVal, field.Type); err != nil {
-						return err
-					}
-				}
-
-				newMap.SetMapIndex(convertedKey, newStruct)
-			} else {
-				// For non-struct values, convert normally
-				newValue := reflect.New(valueType).Elem()
-				if err := recursiveSetFunc(newValue, val, valueType); err != nil {
-					return err
-				}
-				newMap.SetMapIndex(convertedKey, newValue)
-			}
-		}
-
-		fieldValue.Set(newMap)
-		return nil
+		return setMapField(fieldValue, inVal, fieldType, recursiveSetFunc)
 	}
 
 	// Handle type conversion
 	if inVal.Type().AssignableTo(fieldType) {
 		fieldValue.Set(inVal)
 	} else if inVal.Type().ConvertibleTo(fieldType) {
-		fieldValue.Set(inVal.Convert(fieldType))
+		// Block nonsensical conversions (e.g., int→string which converts to rune)
+		// Allow only meaningful conversions between numeric types or within same kind
+		if isValidConversion(inVal.Type(), fieldType) {
+			fieldValue.Set(inVal.Convert(fieldType))
+		} else {
+			return fmt.Errorf("cannot convert %v to %v", inVal.Type(), fieldType)
+		}
 	} else {
 		return fmt.Errorf("cannot convert %v to %v", inVal.Type(), fieldType)
 	}
 
+	return nil
+}
+
+// isValidConversion checks if a type conversion is semantically valid for JSON deserialization
+// Blocks nonsensical conversions like int→string (which would convert to rune)
+func isValidConversion(from, to reflect.Type) bool {
+	fromKind := from.Kind()
+	toKind := to.Kind()
+
+	// Allow conversions between numeric types
+	if isNumericKind(fromKind) && isNumericKind(toKind) {
+		return true
+	}
+
+	// Block int/uint→string conversions (would convert to rune)
+	if isNumericKind(fromKind) && toKind == reflect.String {
+		return false
+	}
+
+	// Block string→int/uint conversions (ConvertibleTo returns true but panics at runtime)
+	if fromKind == reflect.String && isNumericKind(toKind) {
+		return false
+	}
+
+	// Allow same-kind conversions (e.g., custom string types)
+	if fromKind == toKind {
+		return true
+	}
+
+	return false
+}
+
+// isNumericKind checks if a kind is a numeric type
+func isNumericKind(k reflect.Kind) bool {
+	switch k {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return true
+	}
+	return false
+}
+
+// deserializeStructFields iterates through struct fields and sets their values from a map.
+// It handles JSON field name resolution and checks for field presence in the input map.
+func deserializeStructFields(
+	structValue reflect.Value,
+	structType reflect.Type,
+	inputMap map[string]any,
+	recursiveSetFunc func(fieldValue reflect.Value, inValue any, fieldType reflect.Type) error,
+) error {
+	// Iterate through struct fields and set values
+	for j := 0; j < structType.NumField(); j++ {
+		field := structType.Field(j)
+
+		// Skip unexported fields
+		if !field.IsExported() {
+			continue
+		}
+
+		// Get JSON field name
+		jsonTag := field.Tag.Get("json")
+		jsonFieldName := field.Name
+		if jsonTag != "" && jsonTag != "-" {
+			if name, _, found := strings.Cut(jsonTag, ","); found {
+				jsonFieldName = name
+			} else {
+				jsonFieldName = jsonTag
+			}
+		}
+
+		// Check if field exists in JSON
+		val, exists := inputMap[jsonFieldName]
+		if !exists {
+			// Field missing from JSON - leave as zero value
+			// Will be checked for 'required' later in validateValue()
+			continue
+		}
+
+		// Set the field value
+		fieldVal := structValue.Field(j)
+		if err := recursiveSetFunc(fieldVal, val, field.Type); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// setSliceField handles deserialization of slice types.
+// For slices containing structs, it uses deserializeStructFields to track field presence.
+func setSliceField(
+	fieldValue reflect.Value,
+	inVal reflect.Value,
+	fieldType reflect.Type,
+	recursiveSetFunc func(fieldValue reflect.Value, inValue any, fieldType reflect.Type) error,
+) error {
+	elemType := fieldType.Elem()
+	newSlice := reflect.MakeSlice(fieldType, inVal.Len(), inVal.Len())
+
+	for i := 0; i < inVal.Len(); i++ {
+		elemValue := newSlice.Index(i)
+		elemInput := inVal.Index(i).Interface()
+
+		// For structs in slices, manually deserialize fields to track which are present
+		if elemType.Kind() == reflect.Struct && reflect.TypeOf(elemInput).Kind() == reflect.Map {
+			inputMap, ok := elemInput.(map[string]any)
+			if !ok {
+				return fmt.Errorf("expected map for struct element")
+			}
+
+			// Create new struct instance
+			newStruct := reflect.New(elemType).Elem()
+
+			// Deserialize struct fields using helper
+			if err := deserializeStructFields(newStruct, elemType, inputMap, recursiveSetFunc); err != nil {
+				return err
+			}
+
+			elemValue.Set(newStruct)
+		} else {
+			if err := recursiveSetFunc(elemValue, elemInput, elemType); err != nil {
+				return err
+			}
+		}
+	}
+
+	fieldValue.Set(newSlice)
+	return nil
+}
+
+// setMapField handles deserialization of map types.
+// For maps with struct values, it uses deserializeStructFields to track field presence.
+func setMapField(
+	fieldValue reflect.Value,
+	inVal reflect.Value,
+	fieldType reflect.Type,
+	recursiveSetFunc func(fieldValue reflect.Value, inValue any, fieldType reflect.Type) error,
+) error {
+	keyType := fieldType.Key()
+	valueType := fieldType.Elem()
+
+	// Create new map
+	newMap := reflect.MakeMap(fieldType)
+
+	// Iterate through map entries
+	iter := inVal.MapRange()
+	for iter.Next() {
+		key := iter.Key()
+		val := iter.Value().Interface()
+
+		// Convert key if needed
+		var convertedKey reflect.Value
+		if key.Type().AssignableTo(keyType) {
+			convertedKey = key
+		} else if key.Type().ConvertibleTo(keyType) {
+			convertedKey = key.Convert(keyType)
+		} else {
+			return fmt.Errorf("cannot convert map key %v to %v", key.Type(), keyType)
+		}
+
+		// For struct values in maps, manually deserialize fields to track which are present
+		if valueType.Kind() == reflect.Struct && reflect.TypeOf(val).Kind() == reflect.Map {
+			inputMap, ok := val.(map[string]any)
+			if !ok {
+				return fmt.Errorf("expected map for struct value")
+			}
+
+			// Create new struct instance
+			newStruct := reflect.New(valueType).Elem()
+
+			// Deserialize struct fields using helper
+			if err := deserializeStructFields(newStruct, valueType, inputMap, recursiveSetFunc); err != nil {
+				return err
+			}
+
+			newMap.SetMapIndex(convertedKey, newStruct)
+		} else {
+			// For non-struct values, convert normally
+			newValue := reflect.New(valueType).Elem()
+			if err := recursiveSetFunc(newValue, val, valueType); err != nil {
+				return err
+			}
+			newMap.SetMapIndex(convertedKey, newValue)
+		}
+	}
+
+	fieldValue.Set(newMap)
 	return nil
 }
 

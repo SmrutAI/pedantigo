@@ -274,36 +274,52 @@ func (v *Validator[T]) findTypeForDefinition(typ reflect.Type, defName string) r
 
 		// Search in slice element types
 		if fieldType.Kind() == reflect.Slice {
-			elemType := fieldType.Elem()
-			if elemType.Kind() == reflect.Ptr {
-				elemType = elemType.Elem()
-			}
-			if elemType.Name() == defName {
-				return elemType
-			}
-			if elemType.Kind() == reflect.Struct {
-				if found := v.findTypeForDefinition(elemType, defName); found != nil {
-					return found
-				}
+			if found := v.searchSliceType(fieldType, defName); found != nil {
+				return found
 			}
 		}
 
 		// Search in map value types
 		if fieldType.Kind() == reflect.Map {
-			valueType := fieldType.Elem()
-			if valueType.Kind() == reflect.Ptr {
-				valueType = valueType.Elem()
-			}
-			if valueType.Name() == defName {
-				return valueType
-			}
-			if valueType.Kind() == reflect.Struct {
-				if found := v.findTypeForDefinition(valueType, defName); found != nil {
-					return found
-				}
+			if found := v.searchMapType(fieldType, defName); found != nil {
+				return found
 			}
 		}
 	}
 
+	return nil
+}
+
+// searchSliceType searches for a type within slice element types
+func (v *Validator[T]) searchSliceType(fieldType reflect.Type, defName string) reflect.Type {
+	elemType := fieldType.Elem()
+	if elemType.Kind() == reflect.Ptr {
+		elemType = elemType.Elem()
+	}
+	if elemType.Name() == defName {
+		return elemType
+	}
+	if elemType.Kind() == reflect.Struct {
+		if found := v.findTypeForDefinition(elemType, defName); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+// searchMapType searches for a type within map value types
+func (v *Validator[T]) searchMapType(fieldType reflect.Type, defName string) reflect.Type {
+	valueType := fieldType.Elem()
+	if valueType.Kind() == reflect.Ptr {
+		valueType = valueType.Elem()
+	}
+	if valueType.Name() == defName {
+		return valueType
+	}
+	if valueType.Kind() == reflect.Struct {
+		if found := v.findTypeForDefinition(valueType, defName); found != nil {
+			return found
+		}
+	}
 	return nil
 }

@@ -580,34 +580,12 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			// It doesn't apply to Validate() on manually created structs
 			continue
 		case "min":
-			// Context-aware: numeric min for numbers, length min for strings/slices
-			if min, err := strconv.Atoi(value); err == nil {
-				// Handle pointer types - check underlying type
-				checkType := fieldType
-				if checkType.Kind() == reflect.Ptr {
-					checkType = checkType.Elem()
-				}
-				kind := checkType.Kind()
-				if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
-					result = append(result, minLengthConstraint{minLength: min})
-				} else {
-					result = append(result, minConstraint{min: min})
-				}
+			if constraint, ok := buildMinConstraint(value, fieldType); ok {
+				result = append(result, constraint)
 			}
 		case "max":
-			// Context-aware: numeric max for numbers, length max for strings/slices
-			if max, err := strconv.Atoi(value); err == nil {
-				// Handle pointer types - check underlying type
-				checkType := fieldType
-				if checkType.Kind() == reflect.Ptr {
-					checkType = checkType.Elem()
-				}
-				kind := checkType.Kind()
-				if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
-					result = append(result, maxLengthConstraint{maxLength: max})
-				} else {
-					result = append(result, maxConstraint{max: max})
-				}
+			if constraint, ok := buildMaxConstraint(value, fieldType); ok {
+				result = append(result, constraint)
 			}
 		case "gt":
 			if threshold, err := strconv.ParseFloat(value, 64); err == nil {
@@ -632,24 +610,73 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 		case "uuid":
 			result = append(result, uuidConstraint{})
 		case "regexp":
-			// Compile regex pattern (fail-fast on invalid regex)
-			compiledRegex, err := regexp.Compile(value)
-			if err != nil {
-				panic(fmt.Sprintf("invalid regex pattern '%s': %v", value, err))
-			}
-			result = append(result, regexConstraint{pattern: value, regex: compiledRegex})
+			result = append(result, buildRegexConstraint(value))
 		case "ipv4":
 			result = append(result, ipv4Constraint{})
 		case "ipv6":
 			result = append(result, ipv6Constraint{})
 		case "oneof":
-			// Split oneof values by space (validator compatible)
-			values := strings.Fields(value)
-			result = append(result, enumConstraint{values: values})
+			result = append(result, buildEnumConstraint(value))
 		case "default":
 			result = append(result, defaultConstraint{value: value})
 		}
 	}
 
 	return result
+}
+
+// buildMinConstraint creates a min constraint, handling context-aware type checking.
+// Returns (constraint, true) on success or (nil, false) if parsing fails.
+func buildMinConstraint(value string, fieldType reflect.Type) (Constraint, bool) {
+	min, err := strconv.Atoi(value)
+	if err != nil {
+		return nil, false
+	}
+
+	// Handle pointer types - check underlying type
+	checkType := fieldType
+	if checkType.Kind() == reflect.Ptr {
+		checkType = checkType.Elem()
+	}
+	kind := checkType.Kind()
+	if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
+		return minLengthConstraint{minLength: min}, true
+	}
+	return minConstraint{min: min}, true
+}
+
+// buildMaxConstraint creates a max constraint, handling context-aware type checking.
+// Returns (constraint, true) on success or (nil, false) if parsing fails.
+func buildMaxConstraint(value string, fieldType reflect.Type) (Constraint, bool) {
+	max, err := strconv.Atoi(value)
+	if err != nil {
+		return nil, false
+	}
+
+	// Handle pointer types - check underlying type
+	checkType := fieldType
+	if checkType.Kind() == reflect.Ptr {
+		checkType = checkType.Elem()
+	}
+	kind := checkType.Kind()
+	if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
+		return maxLengthConstraint{maxLength: max}, true
+	}
+	return maxConstraint{max: max}, true
+}
+
+// buildRegexConstraint compiles a regex pattern constraint.
+// Panics on invalid regex pattern (fail-fast approach).
+func buildRegexConstraint(pattern string) Constraint {
+	compiledRegex, err := regexp.Compile(pattern)
+	if err != nil {
+		panic(fmt.Sprintf("invalid regex pattern '%s': %v", pattern, err))
+	}
+	return regexConstraint{pattern: pattern, regex: compiledRegex}
+}
+
+// buildEnumConstraint parses space-separated enum values.
+func buildEnumConstraint(value string) Constraint {
+	values := strings.Fields(value)
+	return enumConstraint{values: values}
 }

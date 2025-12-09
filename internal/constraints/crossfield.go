@@ -86,73 +86,33 @@ func BuildCrossFieldConstraintsForField(constraints map[string]string, structTyp
 	for name, value := range constraints {
 		switch name {
 		case "eqfield":
-			targetIdx := resolveFieldIndexSilent(structType, value)
-			if targetIdx == -1 {
-				panic(fmt.Sprintf("field %s references non-existent field %s in eqfield constraint", fieldName, value))
-			}
-			if targetIdx == fieldIndex {
-				panic(fmt.Sprintf("field %s cannot reference itself in eqfield constraint", fieldName))
-			}
+			targetIdx := resolveAndValidateField(structType, value, fieldIndex, fieldName, "eqfield")
 			result = append(result, eqFieldConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
 		case "nefield":
-			targetIdx := resolveFieldIndexSilent(structType, value)
-			if targetIdx == -1 {
-				panic(fmt.Sprintf("field %s references non-existent field %s in nefield constraint", fieldName, value))
-			}
-			if targetIdx == fieldIndex {
-				panic(fmt.Sprintf("field %s cannot reference itself in nefield constraint", fieldName))
-			}
+			targetIdx := resolveAndValidateField(structType, value, fieldIndex, fieldName, "nefield")
 			result = append(result, neFieldConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
 		case "gtfield":
-			targetIdx := resolveFieldIndexSilent(structType, value)
-			if targetIdx == -1 {
-				panic(fmt.Sprintf("field %s references non-existent field %s in gtfield constraint", fieldName, value))
-			}
-			if targetIdx == fieldIndex {
-				panic(fmt.Sprintf("field %s cannot reference itself in gtfield constraint", fieldName))
-			}
+			targetIdx := resolveAndValidateField(structType, value, fieldIndex, fieldName, "gtfield")
 			result = append(result, gtFieldConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
 		case "gtefield":
-			targetIdx := resolveFieldIndexSilent(structType, value)
-			if targetIdx == -1 {
-				panic(fmt.Sprintf("field %s references non-existent field %s in gtefield constraint", fieldName, value))
-			}
-			if targetIdx == fieldIndex {
-				panic(fmt.Sprintf("field %s cannot reference itself in gtefield constraint", fieldName))
-			}
+			targetIdx := resolveAndValidateField(structType, value, fieldIndex, fieldName, "gtefield")
 			result = append(result, gteFieldConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
 		case "ltfield":
-			targetIdx := resolveFieldIndexSilent(structType, value)
-			if targetIdx == -1 {
-				panic(fmt.Sprintf("field %s references non-existent field %s in ltfield constraint", fieldName, value))
-			}
-			if targetIdx == fieldIndex {
-				panic(fmt.Sprintf("field %s cannot reference itself in ltfield constraint", fieldName))
-			}
+			targetIdx := resolveAndValidateField(structType, value, fieldIndex, fieldName, "ltfield")
 			result = append(result, ltFieldConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
 		case "ltefield":
-			targetIdx := resolveFieldIndexSilent(structType, value)
-			if targetIdx == -1 {
-				panic(fmt.Sprintf("field %s references non-existent field %s in ltefield constraint", fieldName, value))
-			}
-			if targetIdx == fieldIndex {
-				panic(fmt.Sprintf("field %s cannot reference itself in ltefield constraint", fieldName))
-			}
+			targetIdx := resolveAndValidateField(structType, value, fieldIndex, fieldName, "ltefield")
 			result = append(result, lteFieldConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
 		case "required_if":
-			parts := strings.SplitN(value, ":", 2)
-			if len(parts) != 2 {
-				continue // Skip malformed tags
+			if fieldName, compareValue, ok := parseConditionalConstraint(value, ":"); ok {
+				targetIdx := resolveFieldIndexSilent(structType, fieldName)
+				result = append(result, requiredIfConstraint{targetFieldName: fieldName, targetFieldIndex: targetIdx, compareValue: compareValue})
 			}
-			targetIdx := resolveFieldIndexSilent(structType, parts[0])
-			result = append(result, requiredIfConstraint{targetFieldName: parts[0], targetFieldIndex: targetIdx, compareValue: parts[1]})
 		case "required_unless":
-			parts := strings.SplitN(value, ":", 2)
-			if len(parts) != 2 {
-				continue // Skip malformed tags
+			if fieldName, compareValue, ok := parseConditionalConstraint(value, ":"); ok {
+				targetIdx := resolveFieldIndexSilent(structType, fieldName)
+				result = append(result, requiredUnlessConstraint{targetFieldName: fieldName, targetFieldIndex: targetIdx, compareValue: compareValue})
 			}
-			targetIdx := resolveFieldIndexSilent(structType, parts[0])
-			result = append(result, requiredUnlessConstraint{targetFieldName: parts[0], targetFieldIndex: targetIdx, compareValue: parts[1]})
 		case "required_with":
 			targetIdx := resolveFieldIndexSilent(structType, value)
 			result = append(result, requiredWithConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
@@ -160,19 +120,15 @@ func BuildCrossFieldConstraintsForField(constraints map[string]string, structTyp
 			targetIdx := resolveFieldIndexSilent(structType, value)
 			result = append(result, requiredWithoutConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
 		case "excluded_if":
-			parts := strings.SplitN(value, " ", 2)
-			if len(parts) != 2 {
-				continue // Skip malformed tags
+			if fieldName, compareValue, ok := parseConditionalConstraint(value, " "); ok {
+				targetIdx := resolveFieldIndexSilent(structType, fieldName)
+				result = append(result, excludedIfConstraint{targetFieldName: fieldName, targetFieldIndex: targetIdx, compareValue: compareValue})
 			}
-			targetIdx := resolveFieldIndexSilent(structType, parts[0])
-			result = append(result, excludedIfConstraint{targetFieldName: parts[0], targetFieldIndex: targetIdx, compareValue: parts[1]})
 		case "excluded_unless":
-			parts := strings.SplitN(value, " ", 2)
-			if len(parts) != 2 {
-				continue // Skip malformed tags
+			if fieldName, compareValue, ok := parseConditionalConstraint(value, " "); ok {
+				targetIdx := resolveFieldIndexSilent(structType, fieldName)
+				result = append(result, excludedUnlessConstraint{targetFieldName: fieldName, targetFieldIndex: targetIdx, compareValue: compareValue})
 			}
-			targetIdx := resolveFieldIndexSilent(structType, parts[0])
-			result = append(result, excludedUnlessConstraint{targetFieldName: parts[0], targetFieldIndex: targetIdx, compareValue: parts[1]})
 		case "excluded_with":
 			targetIdx := resolveFieldIndexSilent(structType, value)
 			result = append(result, excludedWithConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
@@ -365,4 +321,26 @@ func CompareToString(value any) string {
 	default:
 		return fmt.Sprintf("%v", value)
 	}
+}
+
+// resolveAndValidateField resolves a field, validates it exists and is not self-referencing, panics on error
+func resolveAndValidateField(structType reflect.Type, targetFieldName string, currentFieldIndex int, currentFieldName string, constraintName string) int {
+	targetIdx := resolveFieldIndexSilent(structType, targetFieldName)
+	if targetIdx == -1 {
+		panic(fmt.Sprintf("field %s references non-existent field %s in %s constraint", currentFieldName, targetFieldName, constraintName))
+	}
+	if targetIdx == currentFieldIndex {
+		panic(fmt.Sprintf("field %s cannot reference itself in %s constraint", currentFieldName, constraintName))
+	}
+	return targetIdx
+}
+
+// parseConditionalConstraint parses "field:value" or "field value" syntax
+// Returns (fieldName, compareValue, true) on success, ("", "", false) on failure
+func parseConditionalConstraint(value string, separator string) (string, string, bool) {
+	parts := strings.SplitN(value, separator, 2)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	return parts[0], parts[1], true
 }
