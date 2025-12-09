@@ -4,6 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	. "github.com/SmrutAI/Pedantigo"
 )
 
@@ -32,9 +35,7 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for equal passwords, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for equal passwords")
 			},
 			expectErr: false,
 		},
@@ -53,14 +54,10 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for non-equal passwords")
-				}
+				require.Error(t, err, "expected validation error for non-equal passwords")
 
 				ve, ok := err.(*ValidationError)
-				if !ok {
-					t.Fatalf("expected *ValidationError, got %T", err)
-				}
+				require.True(t, ok, "expected *ValidationError, got %T", err)
 
 				foundError := false
 				for _, fieldErr := range ve.Errors {
@@ -69,9 +66,7 @@ func TestEqField(t *testing.T) {
 					}
 				}
 
-				if !foundError {
-					t.Errorf("expected error on Confirm field, got %v", ve.Errors)
-				}
+				assert.True(t, foundError, "expected error on Confirm field, got %v", ve.Errors)
 			},
 			expectErr: true,
 		},
@@ -90,9 +85,7 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for equal emails, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for equal emails")
 			},
 			expectErr: false,
 		},
@@ -111,9 +104,7 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for non-equal emails")
-				}
+				require.Error(t, err, "expected validation error for non-equal emails")
 			},
 			expectErr: true,
 		},
@@ -132,9 +123,7 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for equal amounts, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for equal amounts")
 			},
 			expectErr: false,
 		},
@@ -153,9 +142,7 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for non-equal amounts")
-				}
+				require.Error(t, err, "expected validation error for non-equal amounts")
 			},
 			expectErr: true,
 		},
@@ -174,9 +161,7 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for equal prices, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for equal prices")
 			},
 			expectErr: false,
 		},
@@ -195,9 +180,7 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for non-equal prices")
-				}
+				require.Error(t, err, "expected validation error for non-equal prices")
 			},
 			expectErr: true,
 		},
@@ -216,9 +199,7 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for equal zero values, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for equal zero values")
 			},
 			expectErr: false,
 		},
@@ -256,9 +237,7 @@ func TestNeField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for unequal prices, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for unequal prices")
 			},
 			expectErr: false,
 		},
@@ -277,9 +256,7 @@ func TestNeField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for equal prices (should not be equal)")
-				}
+				require.Error(t, err, "expected validation error for equal prices (should not be equal)")
 			},
 			expectErr: true,
 		},
@@ -298,9 +275,7 @@ func TestNeField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for unequal strings, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for unequal strings")
 			},
 			expectErr: false,
 		},
@@ -319,9 +294,7 @@ func TestNeField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for equal strings (should not be equal)")
-				}
+				require.Error(t, err, "expected validation error for equal strings (should not be equal)")
 			},
 			expectErr: true,
 		},
@@ -340,9 +313,7 @@ func TestNeField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for equal zero values (should not be equal)")
-				}
+				require.Error(t, err, "expected validation error for equal zero values (should not be equal)")
 			},
 			expectErr: true,
 		},
@@ -361,9 +332,7 @@ func TestNeField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for unequal values, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for unequal values")
 			},
 			expectErr: false,
 		},
@@ -401,9 +370,7 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for EndYear > StartYear, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for EndYear > StartYear")
 			},
 			expectErr: false,
 		},
@@ -422,9 +389,7 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for EndYear == StartYear (not greater)")
-				}
+				require.Error(t, err, "expected validation error for EndYear == StartYear (not greater)")
 			},
 			expectErr: true,
 		},
@@ -443,9 +408,7 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for EndYear < StartYear")
-				}
+				require.Error(t, err, "expected validation error for EndYear < StartYear")
 			},
 			expectErr: true,
 		},
@@ -464,9 +427,7 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for MaxPrice > MinPrice, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for MaxPrice > MinPrice")
 			},
 			expectErr: false,
 		},
@@ -485,9 +446,7 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for MaxPrice < MinPrice")
-				}
+				require.Error(t, err, "expected validation error for MaxPrice < MinPrice")
 			},
 			expectErr: true,
 		},
@@ -506,9 +465,7 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for 'Bob' > 'Alice' lexicographically, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for 'Bob' > 'Alice' lexicographically")
 			},
 			expectErr: false,
 		},
@@ -527,9 +484,7 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for 'Apple' < 'Zebra' lexicographically")
-				}
+				require.Error(t, err, "expected validation error for 'Apple' < 'Zebra' lexicographically")
 			},
 			expectErr: true,
 		},
@@ -548,9 +503,7 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for 0 not > 0")
-				}
+				require.Error(t, err, "expected validation error for 0 not > 0")
 			},
 			expectErr: true,
 		},
@@ -569,9 +522,7 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for -5 > -10, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for -5 > -10")
 			},
 			expectErr: false,
 		},
@@ -609,9 +560,7 @@ func TestGteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for MaxVersion > MinVersion, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for MaxVersion > MinVersion")
 			},
 			expectErr: false,
 		},
@@ -630,9 +579,7 @@ func TestGteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for MaxVersion == MinVersion, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for MaxVersion == MinVersion")
 			},
 			expectErr: false,
 		},
@@ -651,9 +598,7 @@ func TestGteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for MaxVersion < MinVersion")
-				}
+				require.Error(t, err, "expected validation error for MaxVersion < MinVersion")
 			},
 			expectErr: true,
 		},
@@ -672,9 +617,7 @@ func TestGteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for equal scores, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for equal scores")
 			},
 			expectErr: false,
 		},
@@ -693,9 +636,7 @@ func TestGteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for equal strings, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for equal strings")
 			},
 			expectErr: false,
 		},
@@ -714,9 +655,7 @@ func TestGteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for 0 >= 0, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for 0 >= 0")
 			},
 			expectErr: false,
 		},
@@ -754,9 +693,7 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for MinAge < MaxAge, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for MinAge < MaxAge")
 			},
 			expectErr: false,
 		},
@@ -775,9 +712,7 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for MinAge == MaxAge (not less)")
-				}
+				require.Error(t, err, "expected validation error for MinAge == MaxAge (not less)")
 			},
 			expectErr: true,
 		},
@@ -796,9 +731,7 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for MinAge > MaxAge")
-				}
+				require.Error(t, err, "expected validation error for MinAge > MaxAge")
 			},
 			expectErr: true,
 		},
@@ -817,9 +750,7 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for MinTemp < MaxTemp, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for MinTemp < MaxTemp")
 			},
 			expectErr: false,
 		},
@@ -838,9 +769,7 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for MinTemp > MaxTemp")
-				}
+				require.Error(t, err, "expected validation error for MinTemp > MaxTemp")
 			},
 			expectErr: true,
 		},
@@ -859,9 +788,7 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for 'Apple' < 'Zebra' lexicographically, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for 'Apple' < 'Zebra' lexicographically")
 			},
 			expectErr: false,
 		},
@@ -880,9 +807,7 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for 'Zebra' > 'Apple' lexicographically")
-				}
+				require.Error(t, err, "expected validation error for 'Zebra' > 'Apple' lexicographically")
 			},
 			expectErr: true,
 		},
@@ -901,9 +826,7 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for 0 not < 0")
-				}
+				require.Error(t, err, "expected validation error for 0 not < 0")
 			},
 			expectErr: true,
 		},
@@ -922,9 +845,7 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for -10 < -5, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for -10 < -5")
 			},
 			expectErr: false,
 		},
@@ -962,9 +883,7 @@ func TestLteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for StartRank < EndRank, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for StartRank < EndRank")
 			},
 			expectErr: false,
 		},
@@ -983,9 +902,7 @@ func TestLteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for StartRank == EndRank, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for StartRank == EndRank")
 			},
 			expectErr: false,
 		},
@@ -1004,9 +921,7 @@ func TestLteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for StartRank > EndRank")
-				}
+				require.Error(t, err, "expected validation error for StartRank > EndRank")
 			},
 			expectErr: true,
 		},
@@ -1025,9 +940,7 @@ func TestLteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for equal prices, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for equal prices")
 			},
 			expectErr: false,
 		},
@@ -1046,9 +959,7 @@ func TestLteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for equal strings, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for equal strings")
 			},
 			expectErr: false,
 		},
@@ -1067,9 +978,7 @@ func TestLteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for 0 <= 0, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for 0 <= 0")
 			},
 			expectErr: false,
 		},
@@ -1109,9 +1018,7 @@ func TestCrossFieldComparison(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for ActualAmount within bounds, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for ActualAmount within bounds")
 			},
 			expectErr: false,
 		},
@@ -1132,9 +1039,7 @@ func TestCrossFieldComparison(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for ActualAmount > MaxAmount")
-				}
+				require.Error(t, err, "expected validation error for ActualAmount > MaxAmount")
 			},
 			expectErr: true,
 		},
@@ -1155,9 +1060,7 @@ func TestCrossFieldComparison(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for valid order calculation, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for valid order calculation")
 			},
 			expectErr: false,
 		},
@@ -1179,6 +1082,7 @@ func TestCrossFieldComparison(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
+				// Test just validates that no panic occurs
 				_ = err
 			},
 			expectErr: false,
@@ -1198,9 +1102,7 @@ func TestCrossFieldComparison(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for MinPort < MaxPort, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for MinPort < MaxPort")
 			},
 			expectErr: false,
 		},
@@ -1219,9 +1121,7 @@ func TestCrossFieldComparison(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err == nil {
-					t.Fatal("expected validation error for MinPort > MaxPort")
-				}
+				require.Error(t, err, "expected validation error for MinPort > MaxPort")
 			},
 			expectErr: true,
 		},
@@ -1240,9 +1140,7 @@ func TestCrossFieldComparison(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for Start < End, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for Start < End")
 			},
 			expectErr: false,
 		},
@@ -1261,9 +1159,7 @@ func TestCrossFieldComparison(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				if err != nil {
-					t.Errorf("expected no validation errors for MinVal < MaxVal, got %v", err)
-				}
+				assert.NoError(t, err, "expected no validation errors for MinVal < MaxVal")
 			},
 			expectErr: false,
 		},

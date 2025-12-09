@@ -3,7 +3,9 @@ package constraints_test
 import (
 	"testing"
 
-	. "github.com/SmrutAI/Pedantigo"
+	"github.com/SmrutAI/Pedantigo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ============================================================================
@@ -34,164 +36,129 @@ func TestRequiredIf(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		testFunc func(*testing.T)
+		name      string
+		form      interface{}
+		validator interface{}
+		wantErr   bool
+		wantField string
 	}{
 		{
 			name: "string condition - met with field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{Country: "US", State: "CA"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormStringCondition{Country: "US", State: "CA"},
 		},
 		{
-			name: "string condition - met without field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{Country: "US", State: ""})
-				if err == nil {
-					t.Error("expected validation error")
-				}
-				ve, ok := err.(*ValidationError)
-				if !ok {
-					t.Fatalf("expected ValidationError, got %T", err)
-				}
-				if len(ve.Errors) == 0 || ve.Errors[0].Field != "State" {
-					t.Errorf("expected error for State field")
-				}
-			},
+			name:      "string condition - met without field",
+			form:      &FormStringCondition{Country: "US", State: ""},
+			wantErr:   true,
+			wantField: "State",
 		},
 		{
 			name: "string condition - not met without field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{Country: "CA", State: ""})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormStringCondition{Country: "CA", State: ""},
 		},
 		{
 			name: "string condition - not met with field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{Country: "Canada", State: "Ontario"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormStringCondition{Country: "Canada", State: "Ontario"},
 		},
 		{
 			name: "boolean condition - true with field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormBoolCondition]()
-				err := validator.Validate(&FormBoolCondition{IsPremium: true, PremiumFeature: "advanced_analytics"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormBoolCondition{IsPremium: true, PremiumFeature: "advanced_analytics"},
 		},
 		{
-			name: "boolean condition - true without field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormBoolCondition]()
-				err := validator.Validate(&FormBoolCondition{IsPremium: true, PremiumFeature: ""})
-				if err == nil {
-					t.Error("expected validation error")
-				}
-				ve, ok := err.(*ValidationError)
-				if !ok {
-					t.Fatalf("expected ValidationError, got %T", err)
-				}
-				if len(ve.Errors) == 0 || ve.Errors[0].Field != "PremiumFeature" {
-					t.Errorf("expected error for PremiumFeature field")
-				}
-			},
+			name:      "boolean condition - true without field",
+			form:      &FormBoolCondition{IsPremium: true, PremiumFeature: ""},
+			wantErr:   true,
+			wantField: "PremiumFeature",
 		},
 		{
 			name: "boolean condition - false",
-			testFunc: func(t *testing.T) {
-				validator := New[FormBoolCondition]()
-				err := validator.Validate(&FormBoolCondition{IsPremium: false, PremiumFeature: ""})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormBoolCondition{IsPremium: false, PremiumFeature: ""},
 		},
 		{
 			name: "integer condition - match with field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormIntCondition]()
-				err := validator.Validate(&FormIntCondition{Status: 2, TrackingCode: "TRACK123"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormIntCondition{Status: 2, TrackingCode: "TRACK123"},
 		},
 		{
-			name: "integer condition - match without field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormIntCondition]()
-				err := validator.Validate(&FormIntCondition{Status: 2, TrackingCode: ""})
-				if err == nil {
-					t.Error("expected validation error")
-				}
-				ve, ok := err.(*ValidationError)
-				if !ok {
-					t.Fatalf("expected ValidationError, got %T", err)
-				}
-				if len(ve.Errors) == 0 || ve.Errors[0].Field != "TrackingCode" {
-					t.Errorf("expected error for TrackingCode field")
-				}
-			},
+			name:      "integer condition - match without field",
+			form:      &FormIntCondition{Status: 2, TrackingCode: ""},
+			wantErr:   true,
+			wantField: "TrackingCode",
 		},
 		{
 			name: "integer condition - no match",
-			testFunc: func(t *testing.T) {
-				validator := New[FormIntCondition]()
-				err := validator.Validate(&FormIntCondition{Status: 0, TrackingCode: ""})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormIntCondition{Status: 0, TrackingCode: ""},
 		},
 		{
 			name: "multiple conditions - all satisfied",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{Country: "US", Domestic: true, State: "CA", TaxID: "123456"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormMultiple{Country: "US", Domestic: true, State: "CA", TaxID: "123456"},
 		},
 		{
-			name: "multiple conditions - State missing",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{Country: "US", Domestic: true, State: "", TaxID: "123456"})
-				if err == nil {
-					t.Error("expected validation error for State")
-				}
-			},
+			name:    "multiple conditions - State missing",
+			form:    &FormMultiple{Country: "US", Domestic: true, State: "", TaxID: "123456"},
+			wantErr: true,
 		},
 		{
-			name: "multiple conditions - TaxID missing",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{Country: "US", Domestic: true, State: "CA", TaxID: ""})
-				if err == nil {
-					t.Error("expected validation error for TaxID")
-				}
-			},
+			name:    "multiple conditions - TaxID missing",
+			form:    &FormMultiple{Country: "US", Domestic: true, State: "CA", TaxID: ""},
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, tt.testFunc)
+		t.Run(tt.name, func(t *testing.T) {
+			switch form := tt.form.(type) {
+			case *FormStringCondition:
+				validator := pedantigo.New[FormStringCondition]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected ValidationError, got %T", err)
+					require.NotEmpty(t, ve.Errors, "expected errors list")
+					if tt.wantField != "" {
+						assert.Equal(t, tt.wantField, ve.Errors[0].Field)
+					}
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			case *FormBoolCondition:
+				validator := pedantigo.New[FormBoolCondition]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected ValidationError, got %T", err)
+					require.NotEmpty(t, ve.Errors, "expected errors list")
+					if tt.wantField != "" {
+						assert.Equal(t, tt.wantField, ve.Errors[0].Field)
+					}
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			case *FormIntCondition:
+				validator := pedantigo.New[FormIntCondition]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected ValidationError, got %T", err)
+					require.NotEmpty(t, ve.Errors, "expected errors list")
+					if tt.wantField != "" {
+						assert.Equal(t, tt.wantField, ve.Errors[0].Field)
+					}
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			case *FormMultiple:
+				validator := pedantigo.New[FormMultiple]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			}
+		})
 	}
 }
 
@@ -218,130 +185,97 @@ func TestRequiredUnless(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		testFunc func(*testing.T)
+		name      string
+		form      interface{}
+		wantErr   bool
+		wantField string
 	}{
 		{
 			name: "string condition - not met with field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{Status: "active", Password: "securepass123"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormStringCondition{Status: "active", Password: "securepass123"},
 		},
 		{
-			name: "string condition - not met without field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{Status: "active", Password: ""})
-				if err == nil {
-					t.Error("expected validation error")
-				}
-				ve, ok := err.(*ValidationError)
-				if !ok {
-					t.Fatalf("expected ValidationError, got %T", err)
-				}
-				if len(ve.Errors) == 0 || ve.Errors[0].Field != "Password" {
-					t.Errorf("expected error for Password field")
-				}
-			},
+			name:      "string condition - not met without field",
+			form:      &FormStringCondition{Status: "active", Password: ""},
+			wantErr:   true,
+			wantField: "Password",
 		},
 		{
 			name: "string condition - met without field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{Status: "guest", Password: ""})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormStringCondition{Status: "guest", Password: ""},
 		},
 		{
 			name: "string condition - met with field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{Status: "guest", Password: "anypassword"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormStringCondition{Status: "guest", Password: "anypassword"},
 		},
 		{
 			name: "boolean condition - false with field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormBoolCondition]()
-				err := validator.Validate(&FormBoolCondition{Automated: false, CaptchaCode: "abc123xyz"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormBoolCondition{Automated: false, CaptchaCode: "abc123xyz"},
 		},
 		{
-			name: "boolean condition - false without field",
-			testFunc: func(t *testing.T) {
-				validator := New[FormBoolCondition]()
-				err := validator.Validate(&FormBoolCondition{Automated: false, CaptchaCode: ""})
-				if err == nil {
-					t.Error("expected validation error")
-				}
-			},
+			name:    "boolean condition - false without field",
+			form:    &FormBoolCondition{Automated: false, CaptchaCode: ""},
+			wantErr: true,
 		},
 		{
 			name: "boolean condition - true",
-			testFunc: func(t *testing.T) {
-				validator := New[FormBoolCondition]()
-				err := validator.Validate(&FormBoolCondition{Automated: true, CaptchaCode: ""})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormBoolCondition{Automated: true, CaptchaCode: ""},
 		},
 		{
 			name: "multiple conditions - all satisfied",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{UserType: "user", IsBot: false, Email: "user@example.com", Verification: "code123"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormMultiple{UserType: "user", IsBot: false, Email: "user@example.com", Verification: "code123"},
 		},
 		{
-			name: "multiple conditions - Email missing",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{UserType: "user", IsBot: false, Email: "", Verification: "code123"})
-				if err == nil {
-					t.Error("expected validation error for Email")
-				}
-			},
+			name:    "multiple conditions - Email missing",
+			form:    &FormMultiple{UserType: "user", IsBot: false, Email: "", Verification: "code123"},
+			wantErr: true,
 		},
 		{
-			name: "multiple conditions - Verification missing",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{UserType: "user", IsBot: false, Email: "user@example.com", Verification: ""})
-				if err == nil {
-					t.Error("expected validation error for Verification")
-				}
-			},
+			name:    "multiple conditions - Verification missing",
+			form:    &FormMultiple{UserType: "user", IsBot: false, Email: "user@example.com", Verification: ""},
+			wantErr: true,
 		},
 		{
 			name: "multiple conditions - both exceptions",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{UserType: "anonymous", IsBot: true, Email: "", Verification: ""})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormMultiple{UserType: "anonymous", IsBot: true, Email: "", Verification: ""},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, tt.testFunc)
+		t.Run(tt.name, func(t *testing.T) {
+			switch form := tt.form.(type) {
+			case *FormStringCondition:
+				validator := pedantigo.New[FormStringCondition]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected ValidationError, got %T", err)
+					require.NotEmpty(t, ve.Errors, "expected errors list")
+					if tt.wantField != "" {
+						assert.Equal(t, tt.wantField, ve.Errors[0].Field)
+					}
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			case *FormBoolCondition:
+				validator := pedantigo.New[FormBoolCondition]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			case *FormMultiple:
+				validator := pedantigo.New[FormMultiple]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			}
+		})
 	}
 }
 
@@ -373,165 +307,129 @@ func TestRequiredWith(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		testFunc func(*testing.T)
+		name      string
+		form      interface{}
+		wantErr   bool
+		wantField string
 	}{
 		{
 			name: "string field - present with dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{Method: "credit_card", Token: "tok_123"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormStringCondition{Method: "credit_card", Token: "tok_123"},
 		},
 		{
-			name: "string field - present without dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{Method: "credit_card", Token: ""})
-				if err == nil {
-					t.Error("expected validation error")
-				}
-				ve, ok := err.(*ValidationError)
-				if !ok {
-					t.Fatalf("expected ValidationError, got %T", err)
-				}
-				if len(ve.Errors) == 0 || ve.Errors[0].Field != "Token" {
-					t.Errorf("expected error for Token field")
-				}
-			},
+			name:      "string field - present without dependency",
+			form:      &FormStringCondition{Method: "credit_card", Token: ""},
+			wantErr:   true,
+			wantField: "Token",
 		},
 		{
 			name: "string field - absent without dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{Method: "", Token: ""})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormStringCondition{Method: "", Token: ""},
 		},
 		{
 			name: "string field - absent with optional dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{Method: "", Token: "tok_123"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormStringCondition{Method: "", Token: "tok_123"},
 		},
 		{
 			name: "integer field - nonzero with dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormIntCondition]()
-				err := validator.Validate(&FormIntCondition{Quantity: 5, Warehouse: "main"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormIntCondition{Quantity: 5, Warehouse: "main"},
 		},
 		{
-			name: "integer field - nonzero without dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormIntCondition]()
-				err := validator.Validate(&FormIntCondition{Quantity: 5, Warehouse: ""})
-				if err == nil {
-					t.Error("expected validation error")
-				}
-			},
+			name:    "integer field - nonzero without dependency",
+			form:    &FormIntCondition{Quantity: 5, Warehouse: ""},
+			wantErr: true,
 		},
 		{
 			name: "integer field - zero",
-			testFunc: func(t *testing.T) {
-				validator := New[FormIntCondition]()
-				err := validator.Validate(&FormIntCondition{Quantity: 0, Warehouse: ""})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormIntCondition{Quantity: 0, Warehouse: ""},
 		},
 		{
 			name: "boolean field - true with dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormBoolCondition]()
-				err := validator.Validate(&FormBoolCondition{Enabled: true, Config: "settings"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormBoolCondition{Enabled: true, Config: "settings"},
 		},
 		{
-			name: "boolean field - true without dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormBoolCondition]()
-				err := validator.Validate(&FormBoolCondition{Enabled: true, Config: ""})
-				if err == nil {
-					t.Error("expected validation error")
-				}
-			},
+			name:    "boolean field - true without dependency",
+			form:    &FormBoolCondition{Enabled: true, Config: ""},
+			wantErr: true,
 		},
 		{
 			name: "boolean field - false",
-			testFunc: func(t *testing.T) {
-				validator := New[FormBoolCondition]()
-				err := validator.Validate(&FormBoolCondition{Enabled: false, Config: ""})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormBoolCondition{Enabled: false, Config: ""},
 		},
 		{
 			name: "multiple fields - all satisfied",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{
-					GuestName:     "John Doe",
-					Phone:         "555-1234",
-					Address:       "123 Main St",
-					EmergencyName: "Jane Doe",
-				})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
+			form: &FormMultiple{
+				GuestName:     "John Doe",
+				Phone:         "555-1234",
+				Address:       "123 Main St",
+				EmergencyName: "Jane Doe",
 			},
 		},
 		{
 			name: "multiple fields - Address missing",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{
-					GuestName:     "John Doe",
-					Phone:         "555-1234",
-					Address:       "",
-					EmergencyName: "Jane Doe",
-				})
-				if err == nil {
-					t.Error("expected validation error for Address")
-				}
+			form: &FormMultiple{
+				GuestName:     "John Doe",
+				Phone:         "555-1234",
+				Address:       "",
+				EmergencyName: "Jane Doe",
 			},
+			wantErr: true,
 		},
 		{
 			name: "multiple fields - EmergencyName missing",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{
-					GuestName:     "John Doe",
-					Phone:         "555-1234",
-					Address:       "123 Main St",
-					EmergencyName: "",
-				})
-				if err == nil {
-					t.Error("expected validation error for EmergencyName")
-				}
+			form: &FormMultiple{
+				GuestName:     "John Doe",
+				Phone:         "555-1234",
+				Address:       "123 Main St",
+				EmergencyName: "",
 			},
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, tt.testFunc)
+		t.Run(tt.name, func(t *testing.T) {
+			switch form := tt.form.(type) {
+			case *FormStringCondition:
+				validator := pedantigo.New[FormStringCondition]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected ValidationError, got %T", err)
+					require.NotEmpty(t, ve.Errors, "expected errors list")
+					if tt.wantField != "" {
+						assert.Equal(t, tt.wantField, ve.Errors[0].Field)
+					}
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			case *FormIntCondition:
+				validator := pedantigo.New[FormIntCondition]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			case *FormBoolCondition:
+				validator := pedantigo.New[FormBoolCondition]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			case *FormMultiple:
+				validator := pedantigo.New[FormMultiple]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			}
+		})
 	}
 }
 
@@ -563,180 +461,138 @@ func TestRequiredWithout(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		testFunc func(*testing.T)
+		name      string
+		form      interface{}
+		wantErr   bool
+		wantField string
 	}{
 		{
 			name: "string field - absent with dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{DefaultAddress: "", CustomAddress: "123 Oak St"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormStringCondition{DefaultAddress: "", CustomAddress: "123 Oak St"},
 		},
 		{
-			name: "string field - absent without dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{DefaultAddress: "", CustomAddress: ""})
-				if err == nil {
-					t.Error("expected validation error")
-				}
-				ve, ok := err.(*ValidationError)
-				if !ok {
-					t.Fatalf("expected ValidationError, got %T", err)
-				}
-				if len(ve.Errors) == 0 || ve.Errors[0].Field != "CustomAddress" {
-					t.Errorf("expected error for CustomAddress field")
-				}
-			},
+			name:      "string field - absent without dependency",
+			form:      &FormStringCondition{DefaultAddress: "", CustomAddress: ""},
+			wantErr:   true,
+			wantField: "CustomAddress",
 		},
 		{
 			name: "string field - present without dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{DefaultAddress: "456 Elm St", CustomAddress: ""})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormStringCondition{DefaultAddress: "456 Elm St", CustomAddress: ""},
 		},
 		{
 			name: "string field - present with optional dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormStringCondition]()
-				err := validator.Validate(&FormStringCondition{DefaultAddress: "456 Elm St", CustomAddress: "123 Oak St"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormStringCondition{DefaultAddress: "456 Elm St", CustomAddress: "123 Oak St"},
 		},
 		{
 			name: "integer field - zero with dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormIntCondition]()
-				err := validator.Validate(&FormIntCondition{FixedAmount: 0, PercentageCode: "SAVE10"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormIntCondition{FixedAmount: 0, PercentageCode: "SAVE10"},
 		},
 		{
-			name: "integer field - zero without dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormIntCondition]()
-				err := validator.Validate(&FormIntCondition{FixedAmount: 0, PercentageCode: ""})
-				if err == nil {
-					t.Error("expected validation error")
-				}
-			},
+			name:    "integer field - zero without dependency",
+			form:    &FormIntCondition{FixedAmount: 0, PercentageCode: ""},
+			wantErr: true,
 		},
 		{
 			name: "integer field - nonzero",
-			testFunc: func(t *testing.T) {
-				validator := New[FormIntCondition]()
-				err := validator.Validate(&FormIntCondition{FixedAmount: 50, PercentageCode: ""})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormIntCondition{FixedAmount: 50, PercentageCode: ""},
 		},
 		{
 			name: "boolean field - false with dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormBoolCondition]()
-				err := validator.Validate(&FormBoolCondition{UseDefault: false, CustomRule: "notify_all"})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormBoolCondition{UseDefault: false, CustomRule: "notify_all"},
 		},
 		{
-			name: "boolean field - false without dependency",
-			testFunc: func(t *testing.T) {
-				validator := New[FormBoolCondition]()
-				err := validator.Validate(&FormBoolCondition{UseDefault: false, CustomRule: ""})
-				if err == nil {
-					t.Error("expected validation error")
-				}
-			},
+			name:    "boolean field - false without dependency",
+			form:    &FormBoolCondition{UseDefault: false, CustomRule: ""},
+			wantErr: true,
 		},
 		{
 			name: "boolean field - true",
-			testFunc: func(t *testing.T) {
-				validator := New[FormBoolCondition]()
-				err := validator.Validate(&FormBoolCondition{UseDefault: true, CustomRule: ""})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
+			form: &FormBoolCondition{UseDefault: true, CustomRule: ""},
 		},
 		{
 			name: "multiple fields - all satisfied",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{
-					WarehouseLocation: "WH-A1",
-					ShippingLabel:     "LABEL-123",
-					StorageBox:        "",
-					ShippingTracking:  "",
-				})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
+			form: &FormMultiple{
+				WarehouseLocation: "WH-A1",
+				ShippingLabel:     "LABEL-123",
+				StorageBox:        "",
+				ShippingTracking:  "",
 			},
 		},
 		{
 			name: "multiple fields - StorageBox missing",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{
-					WarehouseLocation: "",
-					ShippingLabel:     "LABEL-123",
-					StorageBox:        "",
-					ShippingTracking:  "TRACK-456",
-				})
-				if err == nil {
-					t.Error("expected validation error for StorageBox")
-				}
+			form: &FormMultiple{
+				WarehouseLocation: "",
+				ShippingLabel:     "LABEL-123",
+				StorageBox:        "",
+				ShippingTracking:  "TRACK-456",
 			},
+			wantErr: true,
 		},
 		{
 			name: "multiple fields - ShippingTracking missing",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{
-					WarehouseLocation: "WH-A1",
-					ShippingLabel:     "",
-					StorageBox:        "BOX-789",
-					ShippingTracking:  "",
-				})
-				if err == nil {
-					t.Error("expected validation error for ShippingTracking")
-				}
+			form: &FormMultiple{
+				WarehouseLocation: "WH-A1",
+				ShippingLabel:     "",
+				StorageBox:        "BOX-789",
+				ShippingTracking:  "",
 			},
+			wantErr: true,
 		},
 		{
 			name: "multiple fields - alternates provided",
-			testFunc: func(t *testing.T) {
-				validator := New[FormMultiple]()
-				err := validator.Validate(&FormMultiple{
-					WarehouseLocation: "",
-					ShippingLabel:     "",
-					StorageBox:        "BOX-789",
-					ShippingTracking:  "TRACK-456",
-				})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
+			form: &FormMultiple{
+				WarehouseLocation: "",
+				ShippingLabel:     "",
+				StorageBox:        "BOX-789",
+				ShippingTracking:  "TRACK-456",
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, tt.testFunc)
+		t.Run(tt.name, func(t *testing.T) {
+			switch form := tt.form.(type) {
+			case *FormStringCondition:
+				validator := pedantigo.New[FormStringCondition]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected ValidationError, got %T", err)
+					require.NotEmpty(t, ve.Errors, "expected errors list")
+					if tt.wantField != "" {
+						assert.Equal(t, tt.wantField, ve.Errors[0].Field)
+					}
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			case *FormIntCondition:
+				validator := pedantigo.New[FormIntCondition]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			case *FormBoolCondition:
+				validator := pedantigo.New[FormBoolCondition]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			case *FormMultiple:
+				validator := pedantigo.New[FormMultiple]()
+				err := validator.Validate(form)
+				if tt.wantErr {
+					require.Error(t, err, "expected validation error")
+				} else {
+					assert.NoError(t, err, "expected no errors")
+				}
+			}
+		})
 	}
 }
 
@@ -745,215 +601,169 @@ func TestRequiredWithout(t *testing.T) {
 // ============================================================================
 
 func TestCrossFieldConstraints(t *testing.T) {
-	tests := []struct {
-		name     string
-		testFunc func(*testing.T)
-	}{
-		{
-			name: "complex scenario - valid business account",
-			testFunc: func(t *testing.T) {
-				type UserProfile struct {
-					AccountType      string `json:"account_type"`
-					IsVerified       bool   `json:"is_verified"`
-					BusinessName     string `json:"business_name" pedantigo:"required_if=AccountType:business"`
-					TaxID            string `json:"tax_id" pedantigo:"required_if=AccountType:business"`
-					VerificationDoc  string `json:"verification_doc" pedantigo:"required_if=IsVerified:true"`
-					BackupEmail      string `json:"backup_email" pedantigo:"required_unless=AccountType:government"`
-					NotificationPref string `json:"notification_pref" pedantigo:"required_with=BackupEmail"`
-				}
-				validator := New[UserProfile]()
-				err := validator.Validate(&UserProfile{
-					AccountType:      "business",
-					IsVerified:       true,
-					BusinessName:     "Acme Corp",
-					TaxID:            "12-3456789",
-					VerificationDoc:  "doc_123",
-					BackupEmail:      "backup@acme.com",
-					NotificationPref: "email",
-				})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
-		},
-		{
-			name: "complex scenario - business without BusinessName",
-			testFunc: func(t *testing.T) {
-				type UserProfile struct {
-					AccountType      string `json:"account_type"`
-					IsVerified       bool   `json:"is_verified"`
-					BusinessName     string `json:"business_name" pedantigo:"required_if=AccountType:business"`
-					TaxID            string `json:"tax_id" pedantigo:"required_if=AccountType:business"`
-					VerificationDoc  string `json:"verification_doc" pedantigo:"required_if=IsVerified:true"`
-					BackupEmail      string `json:"backup_email" pedantigo:"required_unless=AccountType:government"`
-					NotificationPref string `json:"notification_pref" pedantigo:"required_with=BackupEmail"`
-				}
-				validator := New[UserProfile]()
-				err := validator.Validate(&UserProfile{
-					AccountType:      "business",
-					IsVerified:       false,
-					BusinessName:     "",
-					TaxID:            "12-3456789",
-					VerificationDoc:  "",
-					BackupEmail:      "backup@example.com",
-					NotificationPref: "email",
-				})
-				if err == nil {
-					t.Error("expected validation error for BusinessName")
-				}
-			},
-		},
-		{
-			name: "complex scenario - valid government account",
-			testFunc: func(t *testing.T) {
-				type UserProfile struct {
-					AccountType      string `json:"account_type"`
-					IsVerified       bool   `json:"is_verified"`
-					BusinessName     string `json:"business_name" pedantigo:"required_if=AccountType:business"`
-					TaxID            string `json:"tax_id" pedantigo:"required_if=AccountType:business"`
-					VerificationDoc  string `json:"verification_doc" pedantigo:"required_if=IsVerified:true"`
-					BackupEmail      string `json:"backup_email" pedantigo:"required_unless=AccountType:government"`
-					NotificationPref string `json:"notification_pref" pedantigo:"required_with=BackupEmail"`
-				}
-				validator := New[UserProfile]()
-				err := validator.Validate(&UserProfile{
-					AccountType:      "government",
-					IsVerified:       true,
-					BusinessName:     "",
-					TaxID:            "",
-					VerificationDoc:  "gov_doc_456",
-					BackupEmail:      "",
-					NotificationPref: "",
-				})
-				if err != nil {
-					t.Errorf("expected no errors, got: %v", err)
-				}
-			},
-		},
-		{
-			name: "complex scenario - missing NotificationPref for BackupEmail",
-			testFunc: func(t *testing.T) {
-				type UserProfile struct {
-					AccountType      string `json:"account_type"`
-					IsVerified       bool   `json:"is_verified"`
-					BusinessName     string `json:"business_name" pedantigo:"required_if=AccountType:business"`
-					TaxID            string `json:"tax_id" pedantigo:"required_if=AccountType:business"`
-					VerificationDoc  string `json:"verification_doc" pedantigo:"required_if=IsVerified:true"`
-					BackupEmail      string `json:"backup_email" pedantigo:"required_unless=AccountType:government"`
-					NotificationPref string `json:"notification_pref" pedantigo:"required_with=BackupEmail"`
-				}
-				validator := New[UserProfile]()
-				err := validator.Validate(&UserProfile{
-					AccountType:      "personal",
-					IsVerified:       false,
-					BusinessName:     "",
-					TaxID:            "",
-					VerificationDoc:  "",
-					BackupEmail:      "backup@example.com",
-					NotificationPref: "",
-				})
-				if err == nil {
-					t.Error("expected validation error for NotificationPref")
-				}
-			},
-		},
-		{
-			name: "field index resolution",
-			testFunc: func(t *testing.T) {
-				type Form struct {
-					Field1 string `json:"field1"`
-					Field2 string `json:"field2"`
-					Field3 string `json:"field3" pedantigo:"required_if=Field1:trigger"`
-					Field4 string `json:"field4" pedantigo:"required_unless=Field2:skip"`
-				}
-				validator := New[Form]()
-				if validator == nil {
-					t.Fatal("validator creation failed")
-				}
-				_ = validator.Validate(&Form{
-					Field1: "trigger",
-					Field2: "active",
-					Field3: "value",
-					Field4: "value",
-				})
-			},
-		},
-		{
-			name: "zero value distinction",
-			testFunc: func(t *testing.T) {
-				type Form struct {
-					TriggerField string `json:"trigger_field"`
-					TargetField  string `json:"target_field" pedantigo:"required_with=TriggerField"`
-				}
-				validator := New[Form]()
-				err := validator.Validate(&Form{
-					TriggerField: "value",
-					TargetField:  "",
-				})
-				if err == nil {
-					t.Error("expected validation error for zero value with required_with")
-				}
-			},
-		},
-		{
-			name: "unexported fields handling - valid",
-			testFunc: func(t *testing.T) {
-				type Form struct {
-					privateField string
-					PublicField  string `json:"public_field"`
-					Conditional  string `json:"conditional" pedantigo:"required_if=PublicField:trigger"`
-				}
-				validator := New[Form]()
-				err := validator.Validate(&Form{
-					privateField: "ignored",
-					PublicField:  "trigger",
-					Conditional:  "value",
-				})
-				if err != nil {
-					t.Errorf("expected validation to work, got: %v", err)
-				}
-			},
-		},
-		{
-			name: "unexported fields handling - invalid",
-			testFunc: func(t *testing.T) {
-				type Form struct {
-					privateField string
-					PublicField  string `json:"public_field"`
-					Conditional  string `json:"conditional" pedantigo:"required_if=PublicField:trigger"`
-				}
-				validator := New[Form]()
-				err := validator.Validate(&Form{
-					privateField: "ignored",
-					PublicField:  "trigger",
-					Conditional:  "",
-				})
-				if err == nil {
-					t.Error("expected validation error when Conditional missing")
-				}
-			},
-		},
-		{
-			name: "reflect value handling",
-			testFunc: func(t *testing.T) {
-				type Form struct {
-					Status string `json:"status"`
-					Detail string `json:"detail" pedantigo:"required_if=Status:complete"`
-				}
-				validator := New[Form]()
-				form := Form{
-					Status: "complete",
-					Detail: "",
-				}
-				err := validator.Validate(&form)
-				if err == nil {
-					t.Error("expected validation error")
-				}
-			},
-		},
-	}
+	t.Run("complex scenario - valid business account", func(t *testing.T) {
+		type UserProfile struct {
+			AccountType      string `json:"account_type"`
+			IsVerified       bool   `json:"is_verified"`
+			BusinessName     string `json:"business_name" pedantigo:"required_if=AccountType:business"`
+			TaxID            string `json:"tax_id" pedantigo:"required_if=AccountType:business"`
+			VerificationDoc  string `json:"verification_doc" pedantigo:"required_if=IsVerified:true"`
+			BackupEmail      string `json:"backup_email" pedantigo:"required_unless=AccountType:government"`
+			NotificationPref string `json:"notification_pref" pedantigo:"required_with=BackupEmail"`
+		}
+		validator := pedantigo.New[UserProfile]()
+		err := validator.Validate(&UserProfile{
+			AccountType:      "business",
+			IsVerified:       true,
+			BusinessName:     "Acme Corp",
+			TaxID:            "12-3456789",
+			VerificationDoc:  "doc_123",
+			BackupEmail:      "backup@acme.com",
+			NotificationPref: "email",
+		})
+		assert.NoError(t, err, "expected no errors")
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, tt.testFunc)
-	}
+	t.Run("complex scenario - business without BusinessName", func(t *testing.T) {
+		type UserProfile struct {
+			AccountType      string `json:"account_type"`
+			IsVerified       bool   `json:"is_verified"`
+			BusinessName     string `json:"business_name" pedantigo:"required_if=AccountType:business"`
+			TaxID            string `json:"tax_id" pedantigo:"required_if=AccountType:business"`
+			VerificationDoc  string `json:"verification_doc" pedantigo:"required_if=IsVerified:true"`
+			BackupEmail      string `json:"backup_email" pedantigo:"required_unless=AccountType:government"`
+			NotificationPref string `json:"notification_pref" pedantigo:"required_with=BackupEmail"`
+		}
+		validator := pedantigo.New[UserProfile]()
+		err := validator.Validate(&UserProfile{
+			AccountType:      "business",
+			IsVerified:       false,
+			BusinessName:     "",
+			TaxID:            "12-3456789",
+			VerificationDoc:  "",
+			BackupEmail:      "backup@example.com",
+			NotificationPref: "email",
+		})
+		require.Error(t, err, "expected validation error for BusinessName")
+	})
+
+	t.Run("complex scenario - valid government account", func(t *testing.T) {
+		type UserProfile struct {
+			AccountType      string `json:"account_type"`
+			IsVerified       bool   `json:"is_verified"`
+			BusinessName     string `json:"business_name" pedantigo:"required_if=AccountType:business"`
+			TaxID            string `json:"tax_id" pedantigo:"required_if=AccountType:business"`
+			VerificationDoc  string `json:"verification_doc" pedantigo:"required_if=IsVerified:true"`
+			BackupEmail      string `json:"backup_email" pedantigo:"required_unless=AccountType:government"`
+			NotificationPref string `json:"notification_pref" pedantigo:"required_with=BackupEmail"`
+		}
+		validator := pedantigo.New[UserProfile]()
+		err := validator.Validate(&UserProfile{
+			AccountType:      "government",
+			IsVerified:       true,
+			BusinessName:     "",
+			TaxID:            "",
+			VerificationDoc:  "gov_doc_456",
+			BackupEmail:      "",
+			NotificationPref: "",
+		})
+		assert.NoError(t, err, "expected no errors")
+	})
+
+	t.Run("complex scenario - missing NotificationPref for BackupEmail", func(t *testing.T) {
+		type UserProfile struct {
+			AccountType      string `json:"account_type"`
+			IsVerified       bool   `json:"is_verified"`
+			BusinessName     string `json:"business_name" pedantigo:"required_if=AccountType:business"`
+			TaxID            string `json:"tax_id" pedantigo:"required_if=AccountType:business"`
+			VerificationDoc  string `json:"verification_doc" pedantigo:"required_if=IsVerified:true"`
+			BackupEmail      string `json:"backup_email" pedantigo:"required_unless=AccountType:government"`
+			NotificationPref string `json:"notification_pref" pedantigo:"required_with=BackupEmail"`
+		}
+		validator := pedantigo.New[UserProfile]()
+		err := validator.Validate(&UserProfile{
+			AccountType:      "personal",
+			IsVerified:       false,
+			BusinessName:     "",
+			TaxID:            "",
+			VerificationDoc:  "",
+			BackupEmail:      "backup@example.com",
+			NotificationPref: "",
+		})
+		require.Error(t, err, "expected validation error for NotificationPref")
+	})
+
+	t.Run("field index resolution", func(t *testing.T) {
+		type Form struct {
+			Field1 string `json:"field1"`
+			Field2 string `json:"field2"`
+			Field3 string `json:"field3" pedantigo:"required_if=Field1:trigger"`
+			Field4 string `json:"field4" pedantigo:"required_unless=Field2:skip"`
+		}
+		validator := pedantigo.New[Form]()
+		require.NotNil(t, validator, "validator creation failed")
+		_ = validator.Validate(&Form{
+			Field1: "trigger",
+			Field2: "active",
+			Field3: "value",
+			Field4: "value",
+		})
+	})
+
+	t.Run("zero value distinction", func(t *testing.T) {
+		type Form struct {
+			TriggerField string `json:"trigger_field"`
+			TargetField  string `json:"target_field" pedantigo:"required_with=TriggerField"`
+		}
+		validator := pedantigo.New[Form]()
+		err := validator.Validate(&Form{
+			TriggerField: "value",
+			TargetField:  "",
+		})
+		require.Error(t, err, "expected validation error for zero value with required_with")
+	})
+
+	t.Run("unexported fields handling - valid", func(t *testing.T) {
+		type Form struct {
+			privateField string
+			PublicField  string `json:"public_field"`
+			Conditional  string `json:"conditional" pedantigo:"required_if=PublicField:trigger"`
+		}
+		validator := pedantigo.New[Form]()
+		err := validator.Validate(&Form{
+			privateField: "ignored",
+			PublicField:  "trigger",
+			Conditional:  "value",
+		})
+		assert.NoError(t, err, "expected validation to work")
+	})
+
+	t.Run("unexported fields handling - invalid", func(t *testing.T) {
+		type Form struct {
+			privateField string
+			PublicField  string `json:"public_field"`
+			Conditional  string `json:"conditional" pedantigo:"required_if=PublicField:trigger"`
+		}
+		validator := pedantigo.New[Form]()
+		err := validator.Validate(&Form{
+			privateField: "ignored",
+			PublicField:  "trigger",
+			Conditional:  "",
+		})
+		require.Error(t, err, "expected validation error when Conditional missing")
+	})
+
+	t.Run("reflect value handling", func(t *testing.T) {
+		type Form struct {
+			Status string `json:"status"`
+			Detail string `json:"detail" pedantigo:"required_if=Status:complete"`
+		}
+		validator := pedantigo.New[Form]()
+		form := Form{
+			Status: "complete",
+			Detail: "",
+		}
+		err := validator.Validate(&form)
+		require.Error(t, err, "expected validation error")
+	})
 }

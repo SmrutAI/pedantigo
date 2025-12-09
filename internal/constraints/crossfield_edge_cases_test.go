@@ -6,6 +6,7 @@ import (
 	"time"
 
 	. "github.com/SmrutAI/Pedantigo"
+	"github.com/stretchr/testify/assert"
 )
 
 // ==================================================
@@ -70,14 +71,13 @@ func TestCrossField_NonexistentField(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.expectPanic {
 				defer func() {
-					if r := recover(); r == nil {
-						t.Error("expected panic for nonexistent field reference")
-					}
+					r := recover()
+					assert.NotNil(t, r, "expected panic for nonexistent field reference")
 				}()
 			}
 			_ = tt.testFunc()
 			if tt.expectPanic {
-				t.Error("should have panicked before reaching here")
+				assert.Fail(t, "should have panicked before reaching here")
 			}
 		})
 	}
@@ -140,8 +140,8 @@ func TestCrossField_TypeIncompatibility(t *testing.T) {
 			// Type assertion to get the validator's Validate method
 			if v, ok := validator.(interface{ Validate(interface{}) error }); ok {
 				err := v.Validate(obj)
-				if tt.expectErr && err == nil {
-					t.Error("expected error for incompatible types")
+				if tt.expectErr {
+					assert.Error(t, err, "expected error for incompatible types")
 				}
 			}
 		})
@@ -202,11 +202,10 @@ func TestCrossField_NilPointer(t *testing.T) {
 			validator, obj := tt.setup()
 			if v, ok := validator.(interface{ Validate(interface{}) error }); ok {
 				err := v.Validate(obj)
-				if tt.expectErr && err == nil {
-					t.Error("expected error for nil pointer comparison")
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
+				if tt.expectErr {
+					assert.Error(t, err, "expected error for nil pointer comparison")
+				} else {
+					assert.NoError(t, err, "expected no error for nil pointer comparison")
 				}
 			}
 		})
@@ -262,14 +261,13 @@ func TestCrossField_CaseSensitivity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.expectPanic {
 				defer func() {
-					if r := recover(); r == nil {
-						t.Error("expected panic for case-sensitive field name mismatch")
-					}
+					r := recover()
+					assert.NotNil(t, r, "expected panic for case-sensitive field name mismatch")
 				}()
 			}
 			_ = tt.testFunc()
 			if tt.expectPanic {
-				t.Error("should have panicked before reaching here")
+				assert.Fail(t, "should have panicked before reaching here")
 			}
 		})
 	}
@@ -372,8 +370,8 @@ func TestCrossField_MultipleConstraints(t *testing.T) {
 			validator, obj := tt.setup()
 			if v, ok := validator.(interface{ Validate(interface{}) error }); ok {
 				err := v.Validate(obj)
-				if tt.expectErr && err == nil {
-					t.Error("expected error for constraint violation")
+				if tt.expectErr {
+					assert.Error(t, err, "expected error for constraint violation")
 				}
 			}
 		})
@@ -415,12 +413,11 @@ func TestCrossField_SelfReference(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer func() {
-				if r := recover(); r == nil {
-					t.Error("expected panic for self-referencing field")
-				}
+				r := recover()
+				assert.NotNil(t, r, "expected panic for self-referencing field")
 			}()
 			_ = tt.testFunc()
-			t.Error("should have panicked before reaching here")
+			assert.Fail(t, "should have panicked before reaching here")
 		})
 	}
 }
@@ -513,11 +510,10 @@ func TestCrossField_ZeroValue(t *testing.T) {
 			validator, obj := tt.setup()
 			if v, ok := validator.(interface{ Validate(interface{}) error }); ok {
 				err := v.Validate(obj)
-				if tt.expectErr && err == nil {
-					t.Error("expected error for zero value comparison")
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
+				if tt.expectErr {
+					assert.Error(t, err, "expected error for zero value comparison")
+				} else {
+					assert.NoError(t, err, "expected no error for zero value comparison")
 				}
 			}
 		})
@@ -623,11 +619,10 @@ func TestCrossField_EmptyString(t *testing.T) {
 			validator, obj := tt.setup()
 			if v, ok := validator.(interface{ Validate(interface{}) error }); ok {
 				err := v.Validate(obj)
-				if tt.expectErr && err == nil {
-					t.Error("expected error for empty string comparison")
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
+				if tt.expectErr {
+					assert.Error(t, err, "expected error for empty string comparison")
+				} else {
+					assert.NoError(t, err, "expected no error for empty string comparison")
 				}
 			}
 		})
@@ -688,8 +683,8 @@ func TestCrossField_TimeComparison(t *testing.T) {
 			validator, obj := tt.setup()
 			if v, ok := validator.(interface{ Validate(interface{}) error }); ok {
 				err := v.Validate(obj)
-				if tt.expectErr && err == nil {
-					t.Error("expected error for time comparison")
+				if tt.expectErr {
+					assert.Error(t, err, "expected error for time comparison")
 				}
 			}
 		})
@@ -919,12 +914,11 @@ func TestCrossField_UnexportedField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer func() {
-				if r := recover(); r == nil {
-					t.Error("expected panic when referencing unexported field")
-				}
+				r := recover()
+				assert.NotNil(t, r, "expected panic when referencing unexported field")
 			}()
 			_ = tt.testFunc()
-			t.Error("should have panicked before reaching here")
+			assert.Fail(t, "should have panicked before reaching here")
 		})
 	}
 }

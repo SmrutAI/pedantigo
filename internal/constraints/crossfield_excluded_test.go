@@ -3,7 +3,9 @@ package constraints_test
 import (
 	"testing"
 
-	. "github.com/SmrutAI/Pedantigo"
+	"github.com/SmrutAI/Pedantigo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ==================================================
@@ -37,7 +39,7 @@ func TestExcludedIf(t *testing.T) {
 	}{
 		{
 			name:      "condition met field absent - valid",
-			validator: New[Payment](),
+			validator: pedantigo.New[Payment](),
 			data: &Payment{
 				Method:     "card",
 				CashAmount: 0,
@@ -46,7 +48,7 @@ func TestExcludedIf(t *testing.T) {
 		},
 		{
 			name:      "condition met field present - invalid",
-			validator: New[Payment](),
+			validator: pedantigo.New[Payment](),
 			data: &Payment{
 				Method:     "card",
 				CashAmount: 100,
@@ -56,7 +58,7 @@ func TestExcludedIf(t *testing.T) {
 		},
 		{
 			name:      "condition not met field present - valid",
-			validator: New[Payment](),
+			validator: pedantigo.New[Payment](),
 			data: &Payment{
 				Method:     "cash",
 				CashAmount: 100,
@@ -65,7 +67,7 @@ func TestExcludedIf(t *testing.T) {
 		},
 		{
 			name:      "condition not met field absent - valid",
-			validator: New[Payment](),
+			validator: pedantigo.New[Payment](),
 			data: &Payment{
 				Method:     "cash",
 				CashAmount: 0,
@@ -74,7 +76,7 @@ func TestExcludedIf(t *testing.T) {
 		},
 		{
 			name:      "boolean condition valid - false with absent",
-			validator: New[UserPreferences](),
+			validator: pedantigo.New[UserPreferences](),
 			data: &UserPreferences{
 				OptIn:       false,
 				PhoneNumber: "",
@@ -83,7 +85,7 @@ func TestExcludedIf(t *testing.T) {
 		},
 		{
 			name:      "boolean condition invalid - false with present",
-			validator: New[UserPreferences](),
+			validator: pedantigo.New[UserPreferences](),
 			data: &UserPreferences{
 				OptIn:       false,
 				PhoneNumber: "+1234567890",
@@ -93,7 +95,7 @@ func TestExcludedIf(t *testing.T) {
 		},
 		{
 			name:      "boolean condition valid - true with present",
-			validator: New[UserPreferences](),
+			validator: pedantigo.New[UserPreferences](),
 			data: &UserPreferences{
 				OptIn:       true,
 				PhoneNumber: "+1234567890",
@@ -102,7 +104,7 @@ func TestExcludedIf(t *testing.T) {
 		},
 		{
 			name:      "multiple conditions - bicycle without license plate",
-			validator: New[Vehicle](),
+			validator: pedantigo.New[Vehicle](),
 			data: &Vehicle{
 				Type:         "bicycle",
 				LicensePlate: "",
@@ -112,7 +114,7 @@ func TestExcludedIf(t *testing.T) {
 		},
 		{
 			name:      "multiple conditions - bicycle with license plate invalid",
-			validator: New[Vehicle](),
+			validator: pedantigo.New[Vehicle](),
 			data: &Vehicle{
 				Type:         "bicycle",
 				LicensePlate: "ABC123",
@@ -126,83 +128,53 @@ func TestExcludedIf(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			switch v := tt.validator.(type) {
-			case *Validator[Payment]:
+			case *pedantigo.Validator[Payment]:
 				err := v.Validate(tt.data.(*Payment))
-				if tt.expectErr && err == nil {
-					t.Error("expected validation error, got nil")
-					return
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
-					return
-				}
-				if tt.expectErr && err != nil {
-					ve, ok := err.(*ValidationError)
-					if !ok {
-						t.Fatalf("expected *ValidationError, got %T", err)
-					}
-					foundError := false
+				if tt.expectErr {
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var found bool
 					for _, fieldErr := range ve.Errors {
 						if fieldErr.Field == tt.errField {
-							foundError = true
+							found = true
 							break
 						}
 					}
-					if !foundError {
-						t.Errorf("expected error for field %s, got %v", tt.errField, ve.Errors)
-					}
+					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
+				} else {
+					assert.NoError(t, err)
 				}
-			case *Validator[UserPreferences]:
+			case *pedantigo.Validator[UserPreferences]:
 				err := v.Validate(tt.data.(*UserPreferences))
-				if tt.expectErr && err == nil {
-					t.Error("expected validation error, got nil")
-					return
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
-					return
-				}
-				if tt.expectErr && err != nil {
-					ve, ok := err.(*ValidationError)
-					if !ok {
-						t.Fatalf("expected *ValidationError, got %T", err)
-					}
-					foundError := false
+				if tt.expectErr {
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var found bool
 					for _, fieldErr := range ve.Errors {
 						if fieldErr.Field == tt.errField {
-							foundError = true
+							found = true
 							break
 						}
 					}
-					if !foundError {
-						t.Errorf("expected error for field %s, got %v", tt.errField, ve.Errors)
-					}
+					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
+				} else {
+					assert.NoError(t, err)
 				}
-			case *Validator[Vehicle]:
+			case *pedantigo.Validator[Vehicle]:
 				err := v.Validate(tt.data.(*Vehicle))
-				if tt.expectErr && err == nil {
-					t.Error("expected validation error, got nil")
-					return
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
-					return
-				}
-				if tt.expectErr && err != nil {
-					ve, ok := err.(*ValidationError)
-					if !ok {
-						t.Fatalf("expected *ValidationError, got %T", err)
-					}
-					foundError := false
+				if tt.expectErr {
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var found bool
 					for _, fieldErr := range ve.Errors {
 						if fieldErr.Field == tt.errField {
-							foundError = true
+							found = true
 							break
 						}
 					}
-					if !foundError {
-						t.Errorf("expected error for field %s, got %v", tt.errField, ve.Errors)
-					}
+					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
+				} else {
+					assert.NoError(t, err)
 				}
 			}
 		})
@@ -229,7 +201,7 @@ func TestExcludedUnless(t *testing.T) {
 	}{
 		{
 			name:      "condition met field present - valid",
-			validator: New[Document](),
+			validator: pedantigo.New[Document](),
 			data: &Document{
 				Status:        "approved",
 				ApprovalNotes: "Looks good to me",
@@ -238,7 +210,7 @@ func TestExcludedUnless(t *testing.T) {
 		},
 		{
 			name:      "condition met field absent - valid",
-			validator: New[Document](),
+			validator: pedantigo.New[Document](),
 			data: &Document{
 				Status:        "approved",
 				ApprovalNotes: "",
@@ -247,7 +219,7 @@ func TestExcludedUnless(t *testing.T) {
 		},
 		{
 			name:      "condition not met field absent - valid",
-			validator: New[Document](),
+			validator: pedantigo.New[Document](),
 			data: &Document{
 				Status:        "pending",
 				ApprovalNotes: "",
@@ -256,7 +228,7 @@ func TestExcludedUnless(t *testing.T) {
 		},
 		{
 			name:      "condition not met field present - invalid",
-			validator: New[Document](),
+			validator: pedantigo.New[Document](),
 			data: &Document{
 				Status:        "pending",
 				ApprovalNotes: "Some notes",
@@ -269,31 +241,21 @@ func TestExcludedUnless(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			switch v := tt.validator.(type) {
-			case *Validator[Document]:
+			case *pedantigo.Validator[Document]:
 				err := v.Validate(tt.data.(*Document))
-				if tt.expectErr && err == nil {
-					t.Error("expected validation error, got nil")
-					return
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
-					return
-				}
-				if tt.expectErr && err != nil {
-					ve, ok := err.(*ValidationError)
-					if !ok {
-						t.Fatalf("expected *ValidationError, got %T", err)
-					}
-					foundError := false
+				if tt.expectErr {
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var found bool
 					for _, fieldErr := range ve.Errors {
 						if fieldErr.Field == tt.errField {
-							foundError = true
+							found = true
 							break
 						}
 					}
-					if !foundError {
-						t.Errorf("expected error for field %s, got %v", tt.errField, ve.Errors)
-					}
+					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
+				} else {
+					assert.NoError(t, err)
 				}
 			}
 		})
@@ -330,7 +292,7 @@ func TestExcludedWith(t *testing.T) {
 	}{
 		{
 			name:      "other field present field absent - valid",
-			validator: New[User](),
+			validator: pedantigo.New[User](),
 			data: &User{
 				HomePhone: "+1234567890",
 				WorkPhone: "",
@@ -339,7 +301,7 @@ func TestExcludedWith(t *testing.T) {
 		},
 		{
 			name:      "other field present field present - invalid",
-			validator: New[User](),
+			validator: pedantigo.New[User](),
 			data: &User{
 				HomePhone: "+1234567890",
 				WorkPhone: "+0987654321",
@@ -349,7 +311,7 @@ func TestExcludedWith(t *testing.T) {
 		},
 		{
 			name:      "other field absent field present - valid",
-			validator: New[User](),
+			validator: pedantigo.New[User](),
 			data: &User{
 				HomePhone: "",
 				WorkPhone: "+0987654321",
@@ -358,7 +320,7 @@ func TestExcludedWith(t *testing.T) {
 		},
 		{
 			name:      "other field absent field absent - valid",
-			validator: New[User](),
+			validator: pedantigo.New[User](),
 			data: &User{
 				HomePhone: "",
 				WorkPhone: "",
@@ -367,7 +329,7 @@ func TestExcludedWith(t *testing.T) {
 		},
 		{
 			name:      "integer field present absent - valid",
-			validator: New[Account](),
+			validator: pedantigo.New[Account](),
 			data: &Account{
 				BankBalance:    5000,
 				CreditLineUsed: 0,
@@ -376,7 +338,7 @@ func TestExcludedWith(t *testing.T) {
 		},
 		{
 			name:      "integer field both present - invalid",
-			validator: New[Account](),
+			validator: pedantigo.New[Account](),
 			data: &Account{
 				BankBalance:    5000,
 				CreditLineUsed: 2000,
@@ -386,7 +348,7 @@ func TestExcludedWith(t *testing.T) {
 		},
 		{
 			name:      "integer field absent can be present - valid",
-			validator: New[Account](),
+			validator: pedantigo.New[Account](),
 			data: &Account{
 				BankBalance:    0,
 				CreditLineUsed: 2000,
@@ -395,7 +357,7 @@ func TestExcludedWith(t *testing.T) {
 		},
 		{
 			name:      "boolean field true reason absent - valid",
-			validator: New[Feature](),
+			validator: pedantigo.New[Feature](),
 			data: &Feature{
 				EnabledGlobally: true,
 				OverrideReason:  "",
@@ -404,7 +366,7 @@ func TestExcludedWith(t *testing.T) {
 		},
 		{
 			name:      "boolean field true reason present - invalid",
-			validator: New[Feature](),
+			validator: pedantigo.New[Feature](),
 			data: &Feature{
 				EnabledGlobally: true,
 				OverrideReason:  "Special case",
@@ -414,7 +376,7 @@ func TestExcludedWith(t *testing.T) {
 		},
 		{
 			name:      "boolean field false reason present - valid",
-			validator: New[Feature](),
+			validator: pedantigo.New[Feature](),
 			data: &Feature{
 				EnabledGlobally: false,
 				OverrideReason:  "Special case",
@@ -426,83 +388,53 @@ func TestExcludedWith(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			switch v := tt.validator.(type) {
-			case *Validator[User]:
+			case *pedantigo.Validator[User]:
 				err := v.Validate(tt.data.(*User))
-				if tt.expectErr && err == nil {
-					t.Error("expected validation error, got nil")
-					return
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
-					return
-				}
-				if tt.expectErr && err != nil {
-					ve, ok := err.(*ValidationError)
-					if !ok {
-						t.Fatalf("expected *ValidationError, got %T", err)
-					}
-					foundError := false
+				if tt.expectErr {
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var found bool
 					for _, fieldErr := range ve.Errors {
 						if fieldErr.Field == tt.errField {
-							foundError = true
+							found = true
 							break
 						}
 					}
-					if !foundError {
-						t.Errorf("expected error for field %s, got %v", tt.errField, ve.Errors)
-					}
+					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
+				} else {
+					assert.NoError(t, err)
 				}
-			case *Validator[Account]:
+			case *pedantigo.Validator[Account]:
 				err := v.Validate(tt.data.(*Account))
-				if tt.expectErr && err == nil {
-					t.Error("expected validation error, got nil")
-					return
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
-					return
-				}
-				if tt.expectErr && err != nil {
-					ve, ok := err.(*ValidationError)
-					if !ok {
-						t.Fatalf("expected *ValidationError, got %T", err)
-					}
-					foundError := false
+				if tt.expectErr {
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var found bool
 					for _, fieldErr := range ve.Errors {
 						if fieldErr.Field == tt.errField {
-							foundError = true
+							found = true
 							break
 						}
 					}
-					if !foundError {
-						t.Errorf("expected error for field %s, got %v", tt.errField, ve.Errors)
-					}
+					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
+				} else {
+					assert.NoError(t, err)
 				}
-			case *Validator[Feature]:
+			case *pedantigo.Validator[Feature]:
 				err := v.Validate(tt.data.(*Feature))
-				if tt.expectErr && err == nil {
-					t.Error("expected validation error, got nil")
-					return
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
-					return
-				}
-				if tt.expectErr && err != nil {
-					ve, ok := err.(*ValidationError)
-					if !ok {
-						t.Fatalf("expected *ValidationError, got %T", err)
-					}
-					foundError := false
+				if tt.expectErr {
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var found bool
 					for _, fieldErr := range ve.Errors {
 						if fieldErr.Field == tt.errField {
-							foundError = true
+							found = true
 							break
 						}
 					}
-					if !foundError {
-						t.Errorf("expected error for field %s, got %v", tt.errField, ve.Errors)
-					}
+					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
+				} else {
+					assert.NoError(t, err)
 				}
 			}
 		})
@@ -534,7 +466,7 @@ func TestExcludedWithout(t *testing.T) {
 	}{
 		{
 			name:      "other field absent field absent - valid",
-			validator: New[Address](),
+			validator: pedantigo.New[Address](),
 			data: &Address{
 				Country: "",
 				ZipCode: "",
@@ -543,7 +475,7 @@ func TestExcludedWithout(t *testing.T) {
 		},
 		{
 			name:      "other field absent field present - invalid",
-			validator: New[Address](),
+			validator: pedantigo.New[Address](),
 			data: &Address{
 				Country: "",
 				ZipCode: "12345",
@@ -553,7 +485,7 @@ func TestExcludedWithout(t *testing.T) {
 		},
 		{
 			name:      "other field present field present - valid",
-			validator: New[Address](),
+			validator: pedantigo.New[Address](),
 			data: &Address{
 				Country: "USA",
 				ZipCode: "12345",
@@ -562,7 +494,7 @@ func TestExcludedWithout(t *testing.T) {
 		},
 		{
 			name:      "other field present field absent - valid",
-			validator: New[Address](),
+			validator: pedantigo.New[Address](),
 			data: &Address{
 				Country: "USA",
 				ZipCode: "",
@@ -571,7 +503,7 @@ func TestExcludedWithout(t *testing.T) {
 		},
 		{
 			name:      "boolean field true policy present - valid",
-			validator: New[Notification](),
+			validator: pedantigo.New[Notification](),
 			data: &Notification{
 				IsEnabled:   true,
 				RetryPolicy: "exponential",
@@ -580,7 +512,7 @@ func TestExcludedWithout(t *testing.T) {
 		},
 		{
 			name:      "boolean field false policy present - invalid",
-			validator: New[Notification](),
+			validator: pedantigo.New[Notification](),
 			data: &Notification{
 				IsEnabled:   false,
 				RetryPolicy: "exponential",
@@ -590,7 +522,7 @@ func TestExcludedWithout(t *testing.T) {
 		},
 		{
 			name:      "boolean field false policy absent - valid",
-			validator: New[Notification](),
+			validator: pedantigo.New[Notification](),
 			data: &Notification{
 				IsEnabled:   false,
 				RetryPolicy: "",
@@ -602,57 +534,37 @@ func TestExcludedWithout(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			switch v := tt.validator.(type) {
-			case *Validator[Address]:
+			case *pedantigo.Validator[Address]:
 				err := v.Validate(tt.data.(*Address))
-				if tt.expectErr && err == nil {
-					t.Error("expected validation error, got nil")
-					return
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
-					return
-				}
-				if tt.expectErr && err != nil {
-					ve, ok := err.(*ValidationError)
-					if !ok {
-						t.Fatalf("expected *ValidationError, got %T", err)
-					}
-					foundError := false
+				if tt.expectErr {
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var found bool
 					for _, fieldErr := range ve.Errors {
 						if fieldErr.Field == tt.errField {
-							foundError = true
+							found = true
 							break
 						}
 					}
-					if !foundError {
-						t.Errorf("expected error for field %s, got %v", tt.errField, ve.Errors)
-					}
+					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
+				} else {
+					assert.NoError(t, err)
 				}
-			case *Validator[Notification]:
+			case *pedantigo.Validator[Notification]:
 				err := v.Validate(tt.data.(*Notification))
-				if tt.expectErr && err == nil {
-					t.Error("expected validation error, got nil")
-					return
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
-					return
-				}
-				if tt.expectErr && err != nil {
-					ve, ok := err.(*ValidationError)
-					if !ok {
-						t.Fatalf("expected *ValidationError, got %T", err)
-					}
-					foundError := false
+				if tt.expectErr {
+					ve, ok := err.(*pedantigo.ValidationError)
+					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var found bool
 					for _, fieldErr := range ve.Errors {
 						if fieldErr.Field == tt.errField {
-							foundError = true
+							found = true
 							break
 						}
 					}
-					if !foundError {
-						t.Errorf("expected error for field %s, got %v", tt.errField, ve.Errors)
-					}
+					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
+				} else {
+					assert.NoError(t, err)
 				}
 			}
 		})
@@ -706,22 +618,17 @@ func TestExcludedWithoutUnmarshal(t *testing.T) {
 		},
 	}
 
-	validator := New[Shipping]()
+	validator := pedantigo.New[Shipping]()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := validator.Unmarshal([]byte(tt.jsonData))
-			if tt.expectErr && err == nil {
-				t.Error("expected validation error, got nil")
-				return
-			}
-			if !tt.expectErr && err != nil {
-				t.Errorf("expected no error, got %v", err)
-				return
-			}
-			if !tt.expectErr && tt.checkFn != nil {
-				if !tt.checkFn(result) {
-					t.Errorf("data validation failed for %+v", result)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				if tt.checkFn != nil {
+					assert.True(t, tt.checkFn(result), "data validation failed for %+v", result)
 				}
 			}
 		})
@@ -740,7 +647,7 @@ func TestMultipleExclusionConstraints_Complex(t *testing.T) {
 		SuspendedUntilDate string `json:"suspended_until_date" pedantigo:"excluded_without=Status"`
 	}
 
-	validator := New[Subscription]()
+	validator := pedantigo.New[Subscription]()
 
 	tests := []struct {
 		name      string
@@ -782,12 +689,10 @@ func TestMultipleExclusionConstraints_Complex(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.Validate(tt.data)
-			if tt.expectErr && err == nil {
-				t.Error("expected validation error, got nil")
-				return
-			}
-			if !tt.expectErr && err != nil {
-				t.Errorf("expected no error, got %v", err)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -803,7 +708,7 @@ func TestConditionalExclusion_RealWorldPaymentExample(t *testing.T) {
 		RoutingNumber  string `json:"routing_number" pedantigo:"excluded_without=Type"`
 	}
 
-	validator := New[PaymentMethod]()
+	validator := pedantigo.New[PaymentMethod]()
 
 	tests := []struct {
 		name      string
@@ -863,12 +768,10 @@ func TestConditionalExclusion_RealWorldPaymentExample(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.Validate(tt.data)
-			if tt.expectErr && err == nil {
-				t.Error("expected validation error, got nil")
-				return
-			}
-			if !tt.expectErr && err != nil {
-				t.Errorf("expected no error, got %v", err)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
