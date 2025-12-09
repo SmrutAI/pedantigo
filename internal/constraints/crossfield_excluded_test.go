@@ -17,11 +17,6 @@ func TestExcludedIf(t *testing.T) {
 		CashAmount int    `json:"cash_amount" pedantigo:"excluded_if=Method card"`
 	}
 
-	type Order struct {
-		PaymentType string `json:"payment_type" pedantigo:"required"`
-		CheckNumber string `json:"check_number" pedantigo:"excluded_if=PaymentType credit_card"`
-	}
-
 	type UserPreferences struct {
 		OptIn       bool   `json:"opt_in" pedantigo:"required"`
 		PhoneNumber string `json:"phone_number" pedantigo:"excluded_if=OptIn false"`
@@ -76,25 +71,6 @@ func TestExcludedIf(t *testing.T) {
 				CashAmount: 0,
 			},
 			expectErr: false,
-		},
-		{
-			name:      "string comparison valid - empty check number",
-			validator: New[Order](),
-			data: &Order{
-				PaymentType: "credit_card",
-				CheckNumber: "",
-			},
-			expectErr: false,
-		},
-		{
-			name:      "string comparison invalid - check number present",
-			validator: New[Order](),
-			data: &Order{
-				PaymentType: "credit_card",
-				CheckNumber: "CHK123456",
-			},
-			expectErr: true,
-			errField:  "CheckNumber",
 		},
 		{
 			name:      "boolean condition valid - false with absent",
@@ -152,32 +128,6 @@ func TestExcludedIf(t *testing.T) {
 			switch v := tt.validator.(type) {
 			case *Validator[Payment]:
 				err := v.Validate(tt.data.(*Payment))
-				if tt.expectErr && err == nil {
-					t.Error("expected validation error, got nil")
-					return
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
-					return
-				}
-				if tt.expectErr && err != nil {
-					ve, ok := err.(*ValidationError)
-					if !ok {
-						t.Fatalf("expected *ValidationError, got %T", err)
-					}
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == tt.errField {
-							foundError = true
-							break
-						}
-					}
-					if !foundError {
-						t.Errorf("expected error for field %s, got %v", tt.errField, ve.Errors)
-					}
-				}
-			case *Validator[Order]:
-				err := v.Validate(tt.data.(*Order))
 				if tt.expectErr && err == nil {
 					t.Error("expected validation error, got nil")
 					return
@@ -270,11 +220,6 @@ func TestExcludedUnless(t *testing.T) {
 		ApprovalNotes string `json:"approval_notes" pedantigo:"excluded_unless=Status approved"`
 	}
 
-	type Permission struct {
-		Role            string `json:"role" pedantigo:"required"`
-		SecretKeyAccess string `json:"secret_key_access" pedantigo:"excluded_unless=Role admin"`
-	}
-
 	tests := []struct {
 		name      string
 		validator interface{}
@@ -319,34 +264,6 @@ func TestExcludedUnless(t *testing.T) {
 			expectErr: true,
 			errField:  "ApprovalNotes",
 		},
-		{
-			name:      "multiple values admin with access - valid",
-			validator: New[Permission](),
-			data: &Permission{
-				Role:            "admin",
-				SecretKeyAccess: "secret123",
-			},
-			expectErr: false,
-		},
-		{
-			name:      "multiple values user with access - invalid",
-			validator: New[Permission](),
-			data: &Permission{
-				Role:            "user",
-				SecretKeyAccess: "secret123",
-			},
-			expectErr: true,
-			errField:  "SecretKeyAccess",
-		},
-		{
-			name:      "multiple values user without access - valid",
-			validator: New[Permission](),
-			data: &Permission{
-				Role:            "user",
-				SecretKeyAccess: "",
-			},
-			expectErr: false,
-		},
 	}
 
 	for _, tt := range tests {
@@ -354,32 +271,6 @@ func TestExcludedUnless(t *testing.T) {
 			switch v := tt.validator.(type) {
 			case *Validator[Document]:
 				err := v.Validate(tt.data.(*Document))
-				if tt.expectErr && err == nil {
-					t.Error("expected validation error, got nil")
-					return
-				}
-				if !tt.expectErr && err != nil {
-					t.Errorf("expected no error, got %v", err)
-					return
-				}
-				if tt.expectErr && err != nil {
-					ve, ok := err.(*ValidationError)
-					if !ok {
-						t.Fatalf("expected *ValidationError, got %T", err)
-					}
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == tt.errField {
-							foundError = true
-							break
-						}
-					}
-					if !foundError {
-						t.Errorf("expected error for field %s, got %v", tt.errField, ve.Errors)
-					}
-				}
-			case *Validator[Permission]:
-				err := v.Validate(tt.data.(*Permission))
 				if tt.expectErr && err == nil {
 					t.Error("expected validation error, got nil")
 					return

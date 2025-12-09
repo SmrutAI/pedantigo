@@ -71,29 +71,9 @@ func ValidateValue(
 		constraintsMap := parseTagFunc(field.Tag)
 		if constraintsMap == nil {
 			// No validation tags, but still check nested structs, slices, and maps
-			if fieldValue.Kind() == reflect.Struct {
-				errors = append(errors, recursiveValidateFunc(fieldValue, fieldPath)...)
-			} else if fieldValue.Kind() == reflect.Slice {
-				// Recursively validate struct elements in slices
-				for i := 0; i < fieldValue.Len(); i++ {
-					elemValue := fieldValue.Index(i)
-					elemPath := fmt.Sprintf("%s[%d]", fieldPath, i)
-					if elemValue.Kind() == reflect.Struct {
-						errors = append(errors, recursiveValidateFunc(elemValue, elemPath)...)
-					}
-				}
-			} else if fieldValue.Kind() == reflect.Map {
-				// Recursively validate struct values in maps
-				iter := fieldValue.MapRange()
-				for iter.Next() {
-					mapKey := iter.Key()
-					mapValue := iter.Value()
-					mapPath := fmt.Sprintf("%s[%v]", fieldPath, mapKey.Interface())
-					if mapValue.Kind() == reflect.Struct {
-						errors = append(errors, recursiveValidateFunc(mapValue, mapPath)...)
-					}
-				}
-			}
+
+			nestedErrors := validateNestedElements(fieldValue, recursiveValidateFunc, fieldPath)
+			errors = append(errors, nestedErrors...)
 			continue
 		}
 
@@ -184,4 +164,38 @@ func ValidateValue(
 	}
 
 	return errors
+}
+
+func validateNestedElements(fieldValue reflect.Value,
+	recursiveValidateFunc func(val reflect.Value, path string) []FieldError,
+	fieldPath string,
+) []FieldError {
+
+	fieldErrors := make([]FieldError, 0)
+
+	if fieldValue.Kind() == reflect.Struct {
+		fieldErrors = append(fieldErrors, recursiveValidateFunc(fieldValue, fieldPath)...)
+	} else if fieldValue.Kind() == reflect.Slice {
+		// Recursively validate struct elements in slices
+		for i := 0; i < fieldValue.Len(); i++ {
+			elemValue := fieldValue.Index(i)
+			elemPath := fmt.Sprintf("%s[%d]", fieldPath, i)
+			if elemValue.Kind() == reflect.Struct {
+				fieldErrors = append(fieldErrors, recursiveValidateFunc(elemValue, elemPath)...)
+			}
+		}
+	} else if fieldValue.Kind() == reflect.Map {
+		// Recursively validate struct values in maps
+		iter := fieldValue.MapRange()
+		for iter.Next() {
+			mapKey := iter.Key()
+			mapValue := iter.Value()
+			mapPath := fmt.Sprintf("%s[%v]", fieldPath, mapKey.Interface())
+			if mapValue.Kind() == reflect.Struct {
+				fieldErrors = append(fieldErrors, recursiveValidateFunc(mapValue, mapPath)...)
+			}
+		}
+	}
+
+	return fieldErrors
 }
