@@ -13,6 +13,24 @@ import (
 // Schema generates a JSON Schema from the validator's type T
 // The schema includes all validation constraints mapped to JSON Schema properties
 func (v *Validator[T]) Schema() *jsonschema.Schema {
+	// Fast path: read lock check for cached schema
+	v.schemaMu.RLock()
+	if v.cachedSchema != nil {
+		cached := v.cachedSchema
+		v.schemaMu.RUnlock()
+		return cached
+	}
+	v.schemaMu.RUnlock()
+
+	// Slow path: generate and cache
+	v.schemaMu.Lock()
+	defer v.schemaMu.Unlock()
+
+	// Double-check (another goroutine may have cached it while we waited for the lock)
+	if v.cachedSchema != nil {
+		return v.cachedSchema
+	}
+
 	// Generate base schema using jsonschema library
 	// Create a zero value instance of T for reflection
 	var zero T
@@ -42,6 +60,8 @@ func (v *Validator[T]) Schema() *jsonschema.Schema {
 	// Enhance schema with our custom constraints
 	v.enhanceSchema(actualSchema, v.typ)
 
+	// Cache result
+	v.cachedSchema = actualSchema
 	return actualSchema
 }
 
@@ -354,14 +374,99 @@ func parseDefaultValue(value string, typ reflect.Type) any {
 // Returns expanded schema with nested objects inlined (no $ref/$defs)
 // Use this for: OpenAI function calling, Anthropic tool use, Claude structured outputs
 func (v *Validator[T]) SchemaJSON() ([]byte, error) {
-	schema := v.Schema()
-	return json.MarshalIndent(schema, "", "  ")
+	// Fast path: read lock check for cached JSON
+	v.schemaMu.RLock()
+	if v.cachedSchemaJSON != nil {
+		cached := v.cachedSchemaJSON
+		v.schemaMu.RUnlock()
+		return cached, nil
+	}
+	// Check if schema is cached (we'll marshal it)
+	if v.cachedSchema != nil {
+		schema := v.cachedSchema
+		v.schemaMu.RUnlock()
+
+		// Marshal outside lock
+		jsonBytes, err := json.MarshalIndent(schema, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+
+		// Cache the JSON bytes
+		v.schemaMu.Lock()
+		v.cachedSchemaJSON = jsonBytes
+		v.schemaMu.Unlock()
+
+		return jsonBytes, nil
+	}
+	v.schemaMu.RUnlock()
+
+	// Slow path: generate schema and JSON, then cache both
+	v.schemaMu.Lock()
+	defer v.schemaMu.Unlock()
+
+	// Double-check both caches
+	if v.cachedSchemaJSON != nil {
+		return v.cachedSchemaJSON, nil
+	}
+
+	// Generate schema WITHOUT calling Schema() to avoid deadlock
+	var zero T
+	reflector := jsonschema.Reflector{
+		ExpandedStruct: true,
+		DoNotReference: true,
+	}
+	baseSchema := reflector.Reflect(zero)
+
+	actualSchema := baseSchema
+	if baseSchema.Properties == nil && len(baseSchema.Definitions) > 0 {
+		for _, def := range baseSchema.Definitions {
+			if def.Type == "object" && def.Properties != nil {
+				actualSchema = def
+				break
+			}
+		}
+	}
+
+	actualSchema.Required = nil
+	v.enhanceSchema(actualSchema, v.typ)
+
+	// Cache schema
+	v.cachedSchema = actualSchema
+
+	// Marshal to JSON
+	jsonBytes, err := json.MarshalIndent(actualSchema, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache JSON bytes
+	v.cachedSchemaJSON = jsonBytes
+	return jsonBytes, nil
 }
 
 // SchemaOpenAPI generates a JSON Schema with $ref support for OpenAPI/Swagger specs
 // Returns schema with $ref/$defs for type reusability and cleaner documentation
 // Use this for: OpenAPI 3.0 specs, Swagger documentation, API documentation tools
 func (v *Validator[T]) SchemaOpenAPI() *jsonschema.Schema {
+	// Fast path: read lock check for cached OpenAPI schema
+	v.schemaMu.RLock()
+	if v.cachedOpenAPI != nil {
+		cached := v.cachedOpenAPI
+		v.schemaMu.RUnlock()
+		return cached
+	}
+	v.schemaMu.RUnlock()
+
+	// Slow path: generate and cache
+	v.schemaMu.Lock()
+	defer v.schemaMu.Unlock()
+
+	// Double-check (another goroutine may have cached it while we waited for the lock)
+	if v.cachedOpenAPI != nil {
+		return v.cachedOpenAPI
+	}
+
 	var zero T
 	reflector := jsonschema.Reflector{
 		ExpandedStruct: true,  // Expand root struct inline
@@ -372,6 +477,8 @@ func (v *Validator[T]) SchemaOpenAPI() *jsonschema.Schema {
 	// Enhance all schemas (root and definitions) with constraints
 	v.enhanceSchemaWithDefs(baseSchema, v.typ)
 
+	// Cache result
+	v.cachedOpenAPI = baseSchema
 	return baseSchema
 }
 
@@ -379,8 +486,64 @@ func (v *Validator[T]) SchemaOpenAPI() *jsonschema.Schema {
 // Returns schema with $ref/$defs for type reusability
 // Use this for: OpenAPI 3.0 specs, Swagger documentation, API documentation tools
 func (v *Validator[T]) SchemaJSONOpenAPI() ([]byte, error) {
-	schema := v.SchemaOpenAPI()
-	return json.MarshalIndent(schema, "", "  ")
+	// Fast path: read lock check for cached OpenAPI JSON
+	v.schemaMu.RLock()
+	if v.cachedOpenAPIJSON != nil {
+		cached := v.cachedOpenAPIJSON
+		v.schemaMu.RUnlock()
+		return cached, nil
+	}
+	// Check if OpenAPI schema is cached (we'll marshal it)
+	if v.cachedOpenAPI != nil {
+		schema := v.cachedOpenAPI
+		v.schemaMu.RUnlock()
+
+		// Marshal outside lock
+		jsonBytes, err := json.MarshalIndent(schema, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+
+		// Cache the JSON bytes
+		v.schemaMu.Lock()
+		v.cachedOpenAPIJSON = jsonBytes
+		v.schemaMu.Unlock()
+
+		return jsonBytes, nil
+	}
+	v.schemaMu.RUnlock()
+
+	// Slow path: generate OpenAPI schema and JSON, then cache both
+	v.schemaMu.Lock()
+	defer v.schemaMu.Unlock()
+
+	// Double-check both caches
+	if v.cachedOpenAPIJSON != nil {
+		return v.cachedOpenAPIJSON, nil
+	}
+
+	// Generate OpenAPI schema WITHOUT calling SchemaOpenAPI() to avoid deadlock
+	var zero T
+	reflector := jsonschema.Reflector{
+		ExpandedStruct: true,
+		DoNotReference: false, // Allow $ref/$defs
+	}
+	baseSchema := reflector.Reflect(zero)
+
+	v.enhanceSchemaWithDefs(baseSchema, v.typ)
+
+	// Cache OpenAPI schema
+	v.cachedOpenAPI = baseSchema
+
+	// Marshal to JSON
+	jsonBytes, err := json.MarshalIndent(baseSchema, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache JSON bytes
+	v.cachedOpenAPIJSON = jsonBytes
+	return jsonBytes, nil
 }
 
 // enhanceSchemaWithDefs enhances both root schema and all definitions

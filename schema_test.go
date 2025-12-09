@@ -2,7 +2,11 @@ package pedantigo
 
 import (
 	"encoding/json"
+	"fmt"
+	"sync"
 	"testing"
+
+	"github.com/invopop/jsonschema"
 )
 
 // ==================================================
@@ -580,5 +584,279 @@ func TestSchemaOpenAPI_ConstraintsInDefinitions(t *testing.T) {
 	}
 	if phoneProp.MinLength == nil || *phoneProp.MinLength != 10 {
 		t.Errorf("expected phone minLength 10 in Contact definition, got %v", phoneProp.MinLength)
+	}
+}
+
+// ==================================================
+// Schema caching tests (TDD red phase)
+// ==================================================
+
+func TestSchema_CachingWorks(t *testing.T) {
+	type Product struct {
+		Name  string  `json:"name" pedantigo:"required,min=3"`
+		Price float64 `json:"price" pedantigo:"gt=0"`
+	}
+
+	validator := New[Product]()
+
+	// First call to Schema()
+	schema1 := validator.Schema()
+	if schema1 == nil {
+		t.Fatal("expected first schema call to return non-nil schema")
+	}
+
+	// Second call to Schema()
+	schema2 := validator.Schema()
+	if schema2 == nil {
+		t.Fatal("expected second schema call to return non-nil schema")
+	}
+
+	// Both calls should return the same pointer (caching is working)
+	if schema1 != schema2 {
+		t.Error("expected Schema() to return the same cached pointer on subsequent calls")
+	}
+}
+
+func TestSchemaJSON_CachingWorks(t *testing.T) {
+	type Config struct {
+		Host string `json:"host" pedantigo:"required,min=1"`
+		Port int    `json:"port" pedantigo:"gt=0,lt=65536"`
+	}
+
+	validator := New[Config]()
+
+	// First call to SchemaJSON()
+	json1, err1 := validator.SchemaJSON()
+	if err1 != nil {
+		t.Fatalf("expected first SchemaJSON() to succeed, got error: %v", err1)
+	}
+	if json1 == nil {
+		t.Fatal("expected first SchemaJSON() call to return non-nil bytes")
+	}
+
+	// Second call to SchemaJSON()
+	json2, err2 := validator.SchemaJSON()
+	if err2 != nil {
+		t.Fatalf("expected second SchemaJSON() to succeed, got error: %v", err2)
+	}
+	if json2 == nil {
+		t.Fatal("expected second SchemaJSON() call to return non-nil bytes")
+	}
+
+	// Both calls should return the same bytes (caching is working)
+	if len(json1) != len(json2) {
+		t.Errorf("expected cached SchemaJSON() to return identical bytes, got different lengths: %d vs %d", len(json1), len(json2))
+	}
+
+	// Compare byte-by-byte for exact equality
+	for i := range json1 {
+		if json1[i] != json2[i] {
+			t.Error("expected SchemaJSON() to return identical cached bytes on subsequent calls")
+			break
+		}
+	}
+}
+
+func TestSchemaOpenAPI_CachingWorks(t *testing.T) {
+	type Item struct {
+		ID    string `json:"id" pedantigo:"required,uuid"`
+		Title string `json:"title" pedantigo:"required,min=5"`
+	}
+
+	validator := New[Item]()
+
+	// First call to SchemaOpenAPI()
+	openapi1 := validator.SchemaOpenAPI()
+	if openapi1 == nil {
+		t.Fatal("expected first SchemaOpenAPI() call to return non-nil schema")
+	}
+
+	// Second call to SchemaOpenAPI()
+	openapi2 := validator.SchemaOpenAPI()
+	if openapi2 == nil {
+		t.Fatal("expected second SchemaOpenAPI() call to return non-nil schema")
+	}
+
+	// Both calls should return the same pointer (caching is working)
+	if openapi1 != openapi2 {
+		t.Error("expected SchemaOpenAPI() to return the same cached pointer on subsequent calls")
+	}
+}
+
+func TestSchemaJSONOpenAPI_CachingWorks(t *testing.T) {
+	type Event struct {
+		Name      string `json:"name" pedantigo:"required,min=1"`
+		Timestamp int64  `json:"timestamp" pedantigo:"required,gte=0"`
+	}
+
+	validator := New[Event]()
+
+	// First call to SchemaJSONOpenAPI()
+	json1, err1 := validator.SchemaJSONOpenAPI()
+	if err1 != nil {
+		t.Fatalf("expected first SchemaJSONOpenAPI() to succeed, got error: %v", err1)
+	}
+	if json1 == nil {
+		t.Fatal("expected first SchemaJSONOpenAPI() call to return non-nil bytes")
+	}
+
+	// Second call to SchemaJSONOpenAPI()
+	json2, err2 := validator.SchemaJSONOpenAPI()
+	if err2 != nil {
+		t.Fatalf("expected second SchemaJSONOpenAPI() to succeed, got error: %v", err2)
+	}
+	if json2 == nil {
+		t.Fatal("expected second SchemaJSONOpenAPI() call to return non-nil bytes")
+	}
+
+	// Both calls should return identical bytes (caching is working)
+	if len(json1) != len(json2) {
+		t.Errorf("expected cached SchemaJSONOpenAPI() to return identical bytes, got different lengths: %d vs %d", len(json1), len(json2))
+	}
+
+	// Compare byte-by-byte for exact equality
+	for i := range json1 {
+		if json1[i] != json2[i] {
+			t.Error("expected SchemaJSONOpenAPI() to return identical cached bytes on subsequent calls")
+			break
+		}
+	}
+}
+
+func TestSchema_ThreadSafe(t *testing.T) {
+	type User struct {
+		Name  string `json:"name" pedantigo:"required"`
+		Email string `json:"email" pedantigo:"required,email"`
+	}
+
+	validator := New[User]()
+
+	// 100 goroutines calling Schema() concurrently
+	numGoroutines := 100
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+
+	// Collect all schema pointers from concurrent calls
+	schemaChan := make(chan *jsonschema.Schema, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			schema := validator.Schema()
+			schemaChan <- schema
+		}()
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+	close(schemaChan)
+
+	// Collect all returned pointers
+	pointers := make([]*jsonschema.Schema, 0, numGoroutines)
+	for schema := range schemaChan {
+		if schema == nil {
+			t.Fatal("expected Schema() to return non-nil schema even under concurrent access")
+		}
+		pointers = append(pointers, schema)
+	}
+
+	// All pointers should be identical (same cached schema)
+	firstPointer := pointers[0]
+	for i, ptr := range pointers {
+		if ptr != firstPointer {
+			t.Errorf("goroutine %d got different schema pointer than first call, expected same cached pointer", i)
+		}
+	}
+}
+
+func TestSchemaJSON_ThreadSafe(t *testing.T) {
+	type Settings struct {
+		Timeout int `json:"timeout" pedantigo:"gt=0,lt=60000"`
+		Retries int `json:"retries" pedantigo:"gte=0,lte=10"`
+	}
+
+	validator := New[Settings]()
+
+	// 100 goroutines calling SchemaJSON() concurrently
+	numGoroutines := 100
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+
+	// Collect all JSON bytes from concurrent calls
+	jsonChan := make(chan []byte, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			jsonBytes, err := validator.SchemaJSON()
+			if err != nil {
+				// Don't call t.Errorf from goroutine - causes hangs
+				panic(fmt.Sprintf("unexpected error in concurrent SchemaJSON() call: %v", err))
+			}
+			jsonChan <- jsonBytes
+		}()
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+	close(jsonChan)
+
+	// Collect all returned bytes
+	allBytes := make([][]byte, 0, numGoroutines)
+	for jsonBytes := range jsonChan {
+		if jsonBytes == nil {
+			t.Fatal("expected SchemaJSON() to return non-nil bytes even under concurrent access")
+		}
+		allBytes = append(allBytes, jsonBytes)
+	}
+
+	// All byte slices should be identical (same cached content)
+	firstBytes := allBytes[0]
+	for i, jsonBytes := range allBytes {
+		if len(jsonBytes) != len(firstBytes) {
+			t.Errorf("goroutine %d got different JSON length than first call, expected same cached content", i)
+			continue
+		}
+
+		for j := range jsonBytes {
+			if jsonBytes[j] != firstBytes[j] {
+				t.Errorf("goroutine %d got different JSON bytes than first call, expected same cached content", i)
+				break
+			}
+		}
+	}
+}
+
+func TestSchema_IndependentCaches(t *testing.T) {
+	type Cat struct {
+		Name string `json:"name" pedantigo:"required"`
+	}
+
+	type Dog struct {
+		Name string `json:"name" pedantigo:"required"`
+	}
+
+	validatorCat := New[Cat]()
+	validatorDog := New[Dog]()
+
+	// Get schemas from both validators
+	catSchema1 := validatorCat.Schema()
+	dogSchema1 := validatorDog.Schema()
+
+	catSchema2 := validatorCat.Schema()
+	dogSchema2 := validatorDog.Schema()
+
+	// Each validator should cache its own schema
+	if catSchema1 != catSchema2 {
+		t.Error("expected Cat validator to return the same cached schema pointer")
+	}
+
+	if dogSchema1 != dogSchema2 {
+		t.Error("expected Dog validator to return the same cached schema pointer")
+	}
+
+	// But the two validators should have different cached schemas
+	if catSchema1 == dogSchema1 {
+		t.Error("expected Cat and Dog validators to have independent cached schemas")
 	}
 }

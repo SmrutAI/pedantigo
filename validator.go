@@ -6,7 +6,10 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/invopop/jsonschema"
 )
 
 // ValidatorOptions configures validator behavior
@@ -39,6 +42,13 @@ type Validator[T any] struct {
 	typ                reflect.Type
 	options            ValidatorOptions
 	fieldDeserializers map[string]fieldDeserializer
+
+	// Schema caching (lazy initialization with double-checked locking)
+	schemaMu          sync.RWMutex
+	cachedSchema      *jsonschema.Schema // Schema() result
+	cachedSchemaJSON  []byte             // SchemaJSON() result
+	cachedOpenAPI     *jsonschema.Schema // SchemaOpenAPI() result
+	cachedOpenAPIJSON []byte             // SchemaJSONOpenAPI() result
 }
 
 // New creates a new Validator for type T with optional configuration
