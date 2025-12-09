@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCompareValues_Numeric(t *testing.T) {
@@ -64,17 +66,12 @@ func TestCompareValues_Numeric(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			res, err := CompareValues(tt.op, tt.left, tt.right)
 
-			if tt.wantErr && err == nil {
-				t.Error("expected error, got nil")
-				return
+			if tt.wantErr {
+				assert.Error(t, err, "expected error for %s", tt.name)
+			} else {
+				assert.NoError(t, err, "unexpected error for %s", tt.name)
 			}
-			if !tt.wantErr && err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-			if res != tt.wantRes {
-				t.Errorf("expected result=%v, got %v", tt.wantRes, res)
-			}
+			assert.Equal(t, tt.wantRes, res, "result mismatch for %s", tt.name)
 		})
 	}
 }
@@ -106,13 +103,8 @@ func TestCompareValues_String(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			res, err := CompareValues(tt.op, tt.left, tt.right)
 
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-			if res != tt.wantRes {
-				t.Errorf("expected result=%v, got %v", tt.wantRes, res)
-			}
+			assert.NoError(t, err, "unexpected error for %s", tt.name)
+			assert.Equal(t, tt.wantRes, res, "result mismatch for %s", tt.name)
 		})
 	}
 }
@@ -147,13 +139,8 @@ func TestCompareValues_Time(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			res, err := CompareValues(tt.op, tt.left, tt.right)
 
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-			if res != tt.wantRes {
-				t.Errorf("expected result=%v, got %v", tt.wantRes, res)
-			}
+			assert.NoError(t, err, "unexpected error for %s", tt.name)
+			assert.Equal(t, tt.wantRes, res, "result mismatch for %s", tt.name)
 		})
 	}
 }
@@ -186,17 +173,12 @@ func TestCompareValues_Nil(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			res, err := CompareValues(tt.op, tt.left, tt.right)
 
-			if tt.wantErr && err == nil {
-				t.Error("expected error, got nil")
-				return
+			if tt.wantErr {
+				assert.Error(t, err, "expected error for %s", tt.name)
+			} else {
+				assert.NoError(t, err, "unexpected error for %s", tt.name)
 			}
-			if !tt.wantErr && err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-			if res != tt.wantRes {
-				t.Errorf("expected result=%v, got %v", tt.wantRes, res)
-			}
+			assert.Equal(t, tt.wantRes, res, "result mismatch for %s", tt.name)
 		})
 	}
 }
@@ -221,9 +203,7 @@ func TestCompareValues_TypeIncompatibility(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := CompareValues(tt.op, tt.left, tt.right)
-			if err == nil {
-				t.Error("expected incompatibility error, got nil")
-			}
+			assert.Error(t, err, "expected incompatibility error for %s", tt.name)
 		})
 	}
 }
@@ -243,9 +223,7 @@ func TestCompareValues_InvalidOperator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := CompareValues(tt.op, tt.left, tt.right)
-			if err == nil {
-				t.Error("expected operator error, got nil")
-			}
+			assert.Error(t, err, "expected operator error for %s", tt.name)
 		})
 	}
 }
@@ -277,9 +255,7 @@ func TestIsNumeric(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			kind := reflect.ValueOf(tt.value).Kind()
 			result := isNumeric(kind)
-			if result != tt.wantNumeric {
-				t.Errorf("expected %v, got %v", tt.wantNumeric, result)
-			}
+			assert.Equal(t, tt.wantNumeric, result, "numeric check mismatch for %s", tt.name)
 		})
 	}
 }
@@ -311,9 +287,7 @@ func TestIsZeroValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := IsZeroValue(tt.value)
-			if result != tt.wantZero {
-				t.Errorf("expected %v, got %v", tt.wantZero, result)
-			}
+			assert.Equal(t, tt.wantZero, result, "zero value check mismatch for %s", tt.name)
 		})
 	}
 }
@@ -345,9 +319,7 @@ func TestIsNilValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isNilValue(tt.value)
-			if result != tt.wantNil {
-				t.Errorf("expected %v, got %v", tt.wantNil, result)
-			}
+			assert.Equal(t, tt.wantNil, result, "nil value check mismatch for %s", tt.name)
 		})
 	}
 }
@@ -368,9 +340,7 @@ func TestIsTime(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isTime(tt.value)
-			if result != tt.wantTime {
-				t.Errorf("expected %v, got %v", tt.wantTime, result)
-			}
+			assert.Equal(t, tt.wantTime, result, "time check mismatch for %s", tt.name)
 		})
 	}
 }

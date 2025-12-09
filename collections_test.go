@@ -2,6 +2,9 @@ package pedantigo
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ==================== Slice Validation Tests ====================
@@ -19,13 +22,8 @@ func TestSlice_ValidEmails(t *testing.T) {
 	jsonData := []byte(`{"admins":["alice@example.com","bob@example.com"]}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors for valid emails, got %v", err)
-	}
-
-	if len(config.Admins) != 2 {
-		t.Errorf("expected 2 admins, got %d", len(config.Admins))
-	}
+	assert.NoError(t, err)
+	assert.Len(t, config.Admins, 2)
 }
 
 func TestSlice_InvalidEmail_SingleElement(t *testing.T) {
@@ -37,14 +35,10 @@ func TestSlice_InvalidEmail_SingleElement(t *testing.T) {
 	jsonData := []byte(`{"admins":["not-an-email"]}`)
 
 	_, err := validator.Unmarshal(jsonData)
-	if err == nil {
-		t.Error("expected validation error for invalid email in slice")
-	}
+	require.Error(t, err)
 
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
 
 	foundError := false
 	for _, fieldErr := range ve.Errors {
@@ -53,9 +47,7 @@ func TestSlice_InvalidEmail_SingleElement(t *testing.T) {
 		}
 	}
 
-	if !foundError {
-		t.Errorf("expected error at 'Admins[0]', got %v", ve.Errors)
-	}
+	assert.True(t, foundError, "expected error at 'Admins[0]', got %v", ve.Errors)
 }
 
 func TestSlice_InvalidEmail_MultipleElements(t *testing.T) {
@@ -67,17 +59,11 @@ func TestSlice_InvalidEmail_MultipleElements(t *testing.T) {
 	jsonData := []byte(`{"admins":["alice@example.com","invalid","bob@example.com","also-invalid"]}`)
 
 	_, err := validator.Unmarshal(jsonData)
-	if err == nil {
-		t.Fatal("expected validation errors, got nil")
-	}
+	require.Error(t, err)
 
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
-	if len(ve.Errors) != 2 {
-		t.Errorf("expected 2 validation errors, got %d: %v", len(ve.Errors), ve.Errors)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
+	assert.Len(t, ve.Errors, 2)
 
 	// Check first error at index 1
 	foundError1 := false
@@ -86,9 +72,7 @@ func TestSlice_InvalidEmail_MultipleElements(t *testing.T) {
 			foundError1 = true
 		}
 	}
-	if !foundError1 {
-		t.Errorf("expected error at 'Admins[1]', got %v", ve.Errors)
-	}
+	assert.True(t, foundError1, "expected error at 'Admins[1]', got %v", ve.Errors)
 
 	// Check second error at index 3
 	foundError2 := false
@@ -97,9 +81,7 @@ func TestSlice_InvalidEmail_MultipleElements(t *testing.T) {
 			foundError2 = true
 		}
 	}
-	if !foundError2 {
-		t.Errorf("expected error at 'Admins[3]', got %v", ve.Errors)
-	}
+	assert.True(t, foundError2, "expected error at 'Admins[3]', got %v", ve.Errors)
 }
 
 func TestSlice_MinLength(t *testing.T) {
@@ -111,17 +93,11 @@ func TestSlice_MinLength(t *testing.T) {
 	jsonData := []byte(`{"tags":["abc","de","fgh"]}`)
 
 	_, err := validator.Unmarshal(jsonData)
-	if err == nil {
-		t.Fatal("expected validation error, got nil")
-	}
+	require.Error(t, err)
 
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
-	if len(ve.Errors) != 1 {
-		t.Errorf("expected 1 validation error, got %d: %v", len(ve.Errors), ve.Errors)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
+	assert.Len(t, ve.Errors, 1)
 
 	foundError := false
 	for _, fieldErr := range ve.Errors {
@@ -130,9 +106,7 @@ func TestSlice_MinLength(t *testing.T) {
 		}
 	}
 
-	if !foundError {
-		t.Errorf("expected error at 'Tags[1]', got %v", ve.Errors)
-	}
+	assert.True(t, foundError, "expected error at 'Tags[1]', got %v", ve.Errors)
 }
 
 func TestSlice_NestedStructValidation(t *testing.T) {
@@ -149,17 +123,11 @@ func TestSlice_NestedStructValidation(t *testing.T) {
 	jsonData := []byte(`{"addresses":[{"city":"NYC","zip":"10001"},{"zip":"123"}]}`)
 
 	_, err := validator.Unmarshal(jsonData)
-	if err == nil {
-		t.Fatal("expected validation errors, got nil")
-	}
+	require.Error(t, err)
 
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
-	if len(ve.Errors) != 2 {
-		t.Errorf("expected 2 validation errors, got %d: %v", len(ve.Errors), ve.Errors)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
+	assert.Len(t, ve.Errors, 2)
 
 	// Check for missing city at index 1
 	foundError1 := false
@@ -168,9 +136,7 @@ func TestSlice_NestedStructValidation(t *testing.T) {
 			foundError1 = true
 		}
 	}
-	if !foundError1 {
-		t.Errorf("expected error at 'Addresses[1].City', got %v", ve.Errors)
-	}
+	assert.True(t, foundError1, "expected error at 'Addresses[1].City', got %v", ve.Errors)
 
 	// Check for short zip at index 1
 	foundError2 := false
@@ -179,9 +145,7 @@ func TestSlice_NestedStructValidation(t *testing.T) {
 			foundError2 = true
 		}
 	}
-	if !foundError2 {
-		t.Errorf("expected error at 'Addresses[1].Zip', got %v", ve.Errors)
-	}
+	assert.True(t, foundError2, "expected error at 'Addresses[1].Zip', got %v", ve.Errors)
 }
 
 func TestSlice_EmptySlice(t *testing.T) {
@@ -193,13 +157,8 @@ func TestSlice_EmptySlice(t *testing.T) {
 	jsonData := []byte(`{"admins":[]}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors for empty slice, got %v", err)
-	}
-
-	if len(config.Admins) != 0 {
-		t.Errorf("expected empty admins slice, got %d elements", len(config.Admins))
-	}
+	assert.NoError(t, err)
+	assert.Len(t, config.Admins, 0)
 }
 
 func TestSlice_NilSlice(t *testing.T) {
@@ -211,13 +170,8 @@ func TestSlice_NilSlice(t *testing.T) {
 	jsonData := []byte(`{"admins":null}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors for nil slice, got %v", err)
-	}
-
-	if config.Admins != nil {
-		t.Errorf("expected nil admins slice, got %v", config.Admins)
-	}
+	assert.NoError(t, err)
+	assert.Nil(t, config.Admins)
 }
 
 // ==================== Map Validation Tests ====================
@@ -235,13 +189,8 @@ func TestMap_ValidEmails(t *testing.T) {
 	jsonData := []byte(`{"contacts":{"admin":"alice@example.com","support":"bob@example.com"}}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors for valid emails, got %v", err)
-	}
-
-	if len(config.Contacts) != 2 {
-		t.Errorf("expected 2 contacts, got %d", len(config.Contacts))
-	}
+	assert.NoError(t, err)
+	assert.Len(t, config.Contacts, 2)
 }
 
 func TestMap_InvalidEmail_SingleValue(t *testing.T) {
@@ -253,14 +202,10 @@ func TestMap_InvalidEmail_SingleValue(t *testing.T) {
 	jsonData := []byte(`{"contacts":{"admin":"not-an-email"}}`)
 
 	_, err := validator.Unmarshal(jsonData)
-	if err == nil {
-		t.Fatal("expected validation error for invalid email in map")
-	}
+	require.Error(t, err)
 
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
 
 	foundError := false
 	for _, fieldErr := range ve.Errors {
@@ -269,9 +214,7 @@ func TestMap_InvalidEmail_SingleValue(t *testing.T) {
 		}
 	}
 
-	if !foundError {
-		t.Errorf("expected error at 'Contacts[admin]', got %v", ve.Errors)
-	}
+	assert.True(t, foundError, "expected error at 'Contacts[admin]', got %v", ve.Errors)
 }
 
 func TestMap_InvalidEmail_MultipleValues(t *testing.T) {
@@ -283,18 +226,11 @@ func TestMap_InvalidEmail_MultipleValues(t *testing.T) {
 	jsonData := []byte(`{"contacts":{"admin":"alice@example.com","support":"invalid","billing":"bob@example.com","sales":"also-invalid"}}`)
 
 	_, err := validator.Unmarshal(jsonData)
-	if err == nil {
-		t.Fatal("expected validation errors")
-	}
+	require.Error(t, err)
 
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
-
-	if len(ve.Errors) != 2 {
-		t.Errorf("expected 2 validation errors, got %d: %v", len(ve.Errors), ve.Errors)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
+	assert.Len(t, ve.Errors, 2)
 
 	// Check that we have errors for the invalid keys (exact keys may vary due to map iteration order)
 	invalidKeys := map[string]bool{"support": false, "sales": false}
@@ -309,12 +245,8 @@ func TestMap_InvalidEmail_MultipleValues(t *testing.T) {
 		}
 	}
 
-	if !invalidKeys["support"] {
-		t.Errorf("expected error at 'Contacts[support]', got %v", ve.Errors)
-	}
-	if !invalidKeys["sales"] {
-		t.Errorf("expected error at 'Contacts[sales]', got %v", ve.Errors)
-	}
+	assert.True(t, invalidKeys["support"], "expected error at 'Contacts[support]', got %v", ve.Errors)
+	assert.True(t, invalidKeys["sales"], "expected error at 'Contacts[sales]', got %v", ve.Errors)
 }
 
 func TestMap_MinLength(t *testing.T) {
@@ -326,18 +258,11 @@ func TestMap_MinLength(t *testing.T) {
 	jsonData := []byte(`{"tags":{"category":"abc","type":"de","status":"fgh"}}`)
 
 	_, err := validator.Unmarshal(jsonData)
-	if err == nil {
-		t.Fatal("expected validation error")
-	}
+	require.Error(t, err)
 
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
-
-	if len(ve.Errors) != 1 {
-		t.Errorf("expected 1 validation error, got %d: %v", len(ve.Errors), ve.Errors)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
+	assert.Len(t, ve.Errors, 1)
 
 	foundError := false
 	for _, fieldErr := range ve.Errors {
@@ -346,9 +271,7 @@ func TestMap_MinLength(t *testing.T) {
 		}
 	}
 
-	if !foundError {
-		t.Errorf("expected error at 'Tags[type]', got %v", ve.Errors)
-	}
+	assert.True(t, foundError, "expected error at 'Tags[type]', got %v", ve.Errors)
 }
 
 func TestMap_NestedStructValidation(t *testing.T) {
@@ -365,18 +288,11 @@ func TestMap_NestedStructValidation(t *testing.T) {
 	jsonData := []byte(`{"offices":{"hq":{"city":"NYC","zip":"10001"},"branch":{"zip":"123"}}}`)
 
 	_, err := validator.Unmarshal(jsonData)
-	if err == nil {
-		t.Fatal("expected validation errors")
-	}
+	require.Error(t, err)
 
 	ve, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("expected *ValidationError, got %T", err)
-	}
-
-	if len(ve.Errors) != 2 {
-		t.Errorf("expected 2 validation errors, got %d: %v", len(ve.Errors), ve.Errors)
-	}
+	require.True(t, ok, "expected *ValidationError, got %T", err)
+	assert.Len(t, ve.Errors, 2)
 
 	// Check for missing city at branch office
 	foundError1 := false
@@ -385,9 +301,7 @@ func TestMap_NestedStructValidation(t *testing.T) {
 			foundError1 = true
 		}
 	}
-	if !foundError1 {
-		t.Errorf("expected error at 'Offices[branch].City', got %v", ve.Errors)
-	}
+	assert.True(t, foundError1, "expected error at 'Offices[branch].City', got %v", ve.Errors)
 
 	// Check for short zip at branch office
 	foundError2 := false
@@ -396,9 +310,7 @@ func TestMap_NestedStructValidation(t *testing.T) {
 			foundError2 = true
 		}
 	}
-	if !foundError2 {
-		t.Errorf("expected error at 'Offices[branch].Zip', got %v", ve.Errors)
-	}
+	assert.True(t, foundError2, "expected error at 'Offices[branch].Zip', got %v", ve.Errors)
 }
 
 func TestMap_EmptyMap(t *testing.T) {
@@ -410,13 +322,8 @@ func TestMap_EmptyMap(t *testing.T) {
 	jsonData := []byte(`{"contacts":{}}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors for empty map, got %v", err)
-	}
-
-	if len(config.Contacts) != 0 {
-		t.Errorf("expected empty contacts map, got %d elements", len(config.Contacts))
-	}
+	assert.NoError(t, err)
+	assert.Len(t, config.Contacts, 0)
 }
 
 func TestMap_NilMap(t *testing.T) {
@@ -428,11 +335,6 @@ func TestMap_NilMap(t *testing.T) {
 	jsonData := []byte(`{"contacts":null}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	if err != nil {
-		t.Errorf("expected no errors for nil map, got %v", err)
-	}
-
-	if config.Contacts != nil {
-		t.Errorf("expected nil contacts map, got %v", config.Contacts)
-	}
+	assert.NoError(t, err)
+	assert.Nil(t, config.Contacts)
 }

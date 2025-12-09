@@ -2,6 +2,8 @@ package pedantigo
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFieldError(t *testing.T) {
@@ -69,17 +71,9 @@ func TestFieldError(t *testing.T) {
 				Value:   tt.value,
 			}
 
-			if err.Field != tt.wantField {
-				t.Errorf("field: expected %q, got %q", tt.wantField, err.Field)
-			}
-
-			if err.Message != tt.wantMessage {
-				t.Errorf("message: expected %q, got %q", tt.wantMessage, err.Message)
-			}
-
-			if err.Value != tt.wantValue {
-				t.Errorf("value: expected %v, got %v", tt.wantValue, err.Value)
-			}
+			assert.Equal(t, tt.wantField, err.Field)
+			assert.Equal(t, tt.wantMessage, err.Message)
+			assert.Equal(t, tt.wantValue, err.Value)
 		})
 	}
 }
@@ -107,12 +101,8 @@ func TestValidationError(t *testing.T) {
 			wantErrorMsg:   "Email: is required",
 			wantErrorCount: 1,
 			validateErrors: func(t *testing.T, ve *ValidationError) {
-				if ve.Errors[0].Field != "Email" {
-					t.Errorf("first error field: expected 'Email', got %q", ve.Errors[0].Field)
-				}
-				if ve.Errors[0].Message != "is required" {
-					t.Errorf("first error message: expected 'is required', got %q", ve.Errors[0].Message)
-				}
+				assert.Equal(t, "Email", ve.Errors[0].Field)
+				assert.Equal(t, "is required", ve.Errors[0].Message)
 			},
 		},
 		{
@@ -124,15 +114,9 @@ func TestValidationError(t *testing.T) {
 			wantErrorMsg:   "Email: is required (and 1 more errors)",
 			wantErrorCount: 2,
 			validateErrors: func(t *testing.T, ve *ValidationError) {
-				if ve.Errors[0].Field != "Email" {
-					t.Errorf("first error field: expected 'Email', got %q", ve.Errors[0].Field)
-				}
-				if ve.Errors[1].Field != "Age" {
-					t.Errorf("second error field: expected 'Age', got %q", ve.Errors[1].Field)
-				}
-				if ve.Errors[1].Message != "must be at least 18" {
-					t.Errorf("second error message: expected 'must be at least 18', got %q", ve.Errors[1].Message)
-				}
+				assert.Equal(t, "Email", ve.Errors[0].Field)
+				assert.Equal(t, "Age", ve.Errors[1].Field)
+				assert.Equal(t, "must be at least 18", ve.Errors[1].Message)
 			},
 		},
 		{
@@ -145,12 +129,8 @@ func TestValidationError(t *testing.T) {
 			wantErrorMsg:   "Email: is required (and 2 more errors)",
 			wantErrorCount: 3,
 			validateErrors: func(t *testing.T, ve *ValidationError) {
-				if ve.Errors[0].Field != "Email" {
-					t.Errorf("first error field: expected 'Email', got %q", ve.Errors[0].Field)
-				}
-				if ve.Errors[2].Field != "Name" {
-					t.Errorf("third error field: expected 'Name', got %q", ve.Errors[2].Field)
-				}
+				assert.Equal(t, "Email", ve.Errors[0].Field)
+				assert.Equal(t, "Name", ve.Errors[2].Field)
 			},
 		},
 		{
@@ -165,12 +145,8 @@ func TestValidationError(t *testing.T) {
 			wantErrorMsg:   "Email: is required (and 4 more errors)",
 			wantErrorCount: 5,
 			validateErrors: func(t *testing.T, ve *ValidationError) {
-				if ve.Errors[3].Field != "Phone" {
-					t.Errorf("fourth error field: expected 'Phone', got %q", ve.Errors[3].Field)
-				}
-				if ve.Errors[4].Field != "Address" {
-					t.Errorf("fifth error field: expected 'Address', got %q", ve.Errors[4].Field)
-				}
+				assert.Equal(t, "Phone", ve.Errors[3].Field)
+				assert.Equal(t, "Address", ve.Errors[4].Field)
 			},
 		},
 	}
@@ -182,14 +158,10 @@ func TestValidationError(t *testing.T) {
 			}
 
 			// Test Error() method
-			if ve.Error() != tt.wantErrorMsg {
-				t.Errorf("error message: expected %q, got %q", tt.wantErrorMsg, ve.Error())
-			}
+			assert.Equal(t, tt.wantErrorMsg, ve.Error())
 
 			// Test error count
-			if len(ve.Errors) != tt.wantErrorCount {
-				t.Errorf("error count: expected %d, got %d", tt.wantErrorCount, len(ve.Errors))
-			}
+			assert.Equal(t, tt.wantErrorCount, len(ve.Errors))
 
 			// Run additional validations if provided
 			if tt.validateErrors != nil {
