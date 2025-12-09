@@ -72,7 +72,7 @@ repos:
       - id: check-tests
         name: Run Go tests
         description: Runs make test
-        entry: make test
+        entry: make test-coverage
         language: system
         types: [go]
         pass_filenames: false

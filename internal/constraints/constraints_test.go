@@ -1,0 +1,827 @@
+package constraints
+
+import (
+	"regexp"
+	"testing"
+)
+
+// TestMaxConstraint tests maxConstraint.Validate() for numeric values
+func TestMaxConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		max     int
+		wantErr bool
+	}{
+		// Valid cases - below max
+		{name: "int below max", value: 50, max: 100, wantErr: false},
+		{name: "int at max", value: 100, max: 100, wantErr: false},
+		{name: "int zero with positive max", value: 0, max: 100, wantErr: false},
+		{name: "int negative with positive max", value: -50, max: 100, wantErr: false},
+
+		// Invalid cases - exceeds max
+		{name: "int exceeds max", value: 150, max: 100, wantErr: true},
+		{name: "int exceeds negative max", value: -3, max: -5, wantErr: true},
+
+		// Float values
+		{name: "float below max", value: 3.5, max: 10, wantErr: false},
+		{name: "float at max", value: 10.0, max: 10, wantErr: false},
+		{name: "float exceeds max", value: 10.1, max: 10, wantErr: true},
+
+		// Negative max
+		{name: "negative value with negative max (valid)", value: -10, max: -5, wantErr: false},
+		{name: "negative value with negative max (invalid)", value: -3, max: -5, wantErr: true},
+
+		// Different numeric types
+		{name: "int8 below max", value: int8(50), max: 100, wantErr: false},
+		{name: "int8 exceeds max", value: int8(127), max: 100, wantErr: true},
+		{name: "int16 below max", value: int16(50), max: 100, wantErr: false},
+		{name: "int32 below max", value: int32(50), max: 100, wantErr: false},
+		{name: "int64 below max", value: int64(50), max: 100, wantErr: false},
+		{name: "uint below max", value: uint(50), max: 100, wantErr: false},
+		{name: "uint exceeds max", value: uint(150), max: 100, wantErr: true},
+		{name: "uint8 below max", value: uint8(50), max: 100, wantErr: false},
+		{name: "uint16 below max", value: uint16(50), max: 100, wantErr: false},
+		{name: "uint32 below max", value: uint32(50), max: 100, wantErr: false},
+		{name: "uint64 below max", value: uint64(50), max: 100, wantErr: false},
+		{name: "float32 below max", value: float32(3.5), max: 10, wantErr: false},
+		{name: "float32 exceeds max", value: float32(10.5), max: 10, wantErr: true},
+		{name: "float64 below max", value: float64(3.5), max: 10, wantErr: false},
+		{name: "float64 exceeds max", value: float64(10.5), max: 10, wantErr: true},
+
+		// String (length check)
+		{name: "string below max length", value: "hello", max: 10, wantErr: false},
+		{name: "string at max length", value: "helloworld", max: 10, wantErr: false},
+		{name: "string exceeds max length", value: "hello world!", max: 10, wantErr: true},
+		{name: "empty string with max length", value: "", max: 10, wantErr: false},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*int)(nil), max: 100, wantErr: false},
+
+		// Invalid type
+		{name: "invalid type - bool", value: true, max: 100, wantErr: true},
+		{name: "invalid type - slice", value: []int{1, 2, 3}, max: 100, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := maxConstraint{max: tt.max}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestMaxLengthConstraint tests maxLengthConstraint.Validate() for strings
+func TestMaxLengthConstraint(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     any
+		maxLength int
+		wantErr   bool
+	}{
+		// Valid cases
+		{name: "string below max length", value: "hello", maxLength: 10, wantErr: false},
+		{name: "string at max length", value: "helloworld", maxLength: 10, wantErr: false},
+		{name: "empty string", value: "", maxLength: 10, wantErr: false},
+		{name: "single char at max length", value: "a", maxLength: 1, wantErr: false},
+
+		// Invalid cases - exceeds max length
+		{name: "string exceeds max length", value: "hello world!", maxLength: 10, wantErr: true},
+		{name: "string far exceeds max length", value: "this is a very long string", maxLength: 5, wantErr: true},
+		{name: "string one char over max", value: "ab", maxLength: 1, wantErr: true},
+
+		// Edge cases
+		{name: "max length zero with empty string", value: "", maxLength: 0, wantErr: false},
+		{name: "max length zero with non-empty string", value: "a", maxLength: 0, wantErr: true},
+		{name: "large max length", value: "hello", maxLength: 1000, wantErr: false},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*string)(nil), maxLength: 10, wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, maxLength: 10, wantErr: true},
+		{name: "invalid type - bool", value: true, maxLength: 10, wantErr: true},
+		{name: "invalid type - slice", value: []string{"a", "b"}, maxLength: 10, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := maxLengthConstraint{maxLength: tt.maxLength}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestLtConstraint tests ltConstraint.Validate() for < threshold
+func TestLtConstraint(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     any
+		threshold float64
+		wantErr   bool
+	}{
+		// Valid cases - value < threshold
+		{name: "int less than threshold", value: 10, threshold: 20, wantErr: false},
+		{name: "int at boundary", value: 19, threshold: 20, wantErr: false},
+		{name: "float less than threshold", value: 3.14, threshold: 5.0, wantErr: false},
+		{name: "negative less than zero", value: -10, threshold: 0, wantErr: false},
+		{name: "negative less than positive", value: -5, threshold: 10, wantErr: false},
+
+		// Invalid cases - value >= threshold
+		{name: "int equals threshold", value: 20, threshold: 20, wantErr: true},
+		{name: "int exceeds threshold", value: 25, threshold: 20, wantErr: true},
+		{name: "float equals threshold", value: 5.0, threshold: 5.0, wantErr: true},
+		{name: "float exceeds threshold", value: 6.5, threshold: 5.0, wantErr: true},
+
+		// Different numeric types
+		{name: "int8 less than threshold", value: int8(10), threshold: 20, wantErr: false},
+		{name: "int8 exceeds threshold", value: int8(25), threshold: 20, wantErr: true},
+		{name: "uint less than threshold", value: uint(10), threshold: 20, wantErr: false},
+		{name: "uint exceeds threshold", value: uint(25), threshold: 20, wantErr: true},
+		{name: "float32 less than threshold", value: float32(3.14), threshold: 5.0, wantErr: false},
+		{name: "float32 exceeds threshold", value: float32(6.5), threshold: 5.0, wantErr: true},
+
+		// Zero and near-zero thresholds
+		{name: "negative less than zero threshold", value: -10, threshold: 0, wantErr: false},
+		{name: "zero equals zero threshold", value: 0, threshold: 0, wantErr: true},
+		{name: "positive exceeds zero threshold", value: 5, threshold: 0, wantErr: true},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*int)(nil), threshold: 20, wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - string", value: "hello", threshold: 20, wantErr: true},
+		{name: "invalid type - bool", value: true, threshold: 20, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := ltConstraint{threshold: tt.threshold}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestLeConstraint tests leConstraint.Validate() for <= threshold
+func TestLeConstraint(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     any
+		threshold float64
+		wantErr   bool
+	}{
+		// Valid cases - value <= threshold
+		{name: "int less than threshold", value: 10, threshold: 20, wantErr: false},
+		{name: "int equals threshold", value: 20, threshold: 20, wantErr: false},
+		{name: "float less than threshold", value: 3.14, threshold: 5.0, wantErr: false},
+		{name: "float equals threshold", value: 5.0, threshold: 5.0, wantErr: false},
+		{name: "negative less than zero", value: -10, threshold: 0, wantErr: false},
+		{name: "zero equals zero", value: 0, threshold: 0, wantErr: false},
+
+		// Invalid cases - value > threshold
+		{name: "int exceeds threshold", value: 25, threshold: 20, wantErr: true},
+		{name: "float exceeds threshold", value: 6.5, threshold: 5.0, wantErr: true},
+		{name: "positive exceeds zero", value: 5, threshold: 0, wantErr: true},
+
+		// Different numeric types
+		{name: "int8 equals threshold", value: int8(20), threshold: 20, wantErr: false},
+		{name: "int8 exceeds threshold", value: int8(25), threshold: 20, wantErr: true},
+		{name: "uint less than threshold", value: uint(10), threshold: 20, wantErr: false},
+		{name: "uint equals threshold", value: uint(20), threshold: 20, wantErr: false},
+		{name: "uint exceeds threshold", value: uint(25), threshold: 20, wantErr: true},
+		{name: "float32 equals threshold", value: float32(5.0), threshold: 5.0, wantErr: false},
+		{name: "float32 exceeds threshold", value: float32(6.5), threshold: 5.0, wantErr: true},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*int)(nil), threshold: 20, wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - string", value: "hello", threshold: 20, wantErr: true},
+		{name: "invalid type - bool", value: true, threshold: 20, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := leConstraint{threshold: tt.threshold}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestUrlConstraint tests urlConstraint.Validate() for valid URLs
+func TestUrlConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		wantErr bool
+	}{
+		// Valid HTTP URLs
+		{name: "http URL simple", value: "http://example.com", wantErr: false},
+		{name: "http URL with path", value: "http://example.com/path", wantErr: false},
+		{name: "http URL with query", value: "http://example.com/path?key=value", wantErr: false},
+		{name: "http URL with subdomain", value: "http://api.example.com", wantErr: false},
+		{name: "http URL with port", value: "http://example.com:8080", wantErr: false},
+		{name: "http URL with complex path", value: "http://example.com/path/to/resource?id=123&name=test", wantErr: false},
+
+		// Valid HTTPS URLs
+		{name: "https URL simple", value: "https://example.com", wantErr: false},
+		{name: "https URL with path", value: "https://example.com/path", wantErr: false},
+		{name: "https URL with query", value: "https://example.com/path?key=value", wantErr: false},
+		{name: "https URL with subdomain", value: "https://api.example.com", wantErr: false},
+		{name: "https URL with port", value: "https://example.com:443", wantErr: false},
+
+		// Empty string - should be skipped
+		{name: "empty string", value: "", wantErr: false},
+
+		// Invalid schemes
+		{name: "ftp scheme", value: "ftp://example.com", wantErr: true},
+		{name: "file scheme", value: "file:///etc/passwd", wantErr: true},
+		{name: "data scheme", value: "data:text/plain,hello", wantErr: true},
+
+		// Invalid URLs
+		{name: "invalid URL - missing host", value: "http://", wantErr: true},
+		{name: "invalid URL - no scheme", value: "example.com", wantErr: true},
+		{name: "invalid URL - malformed", value: "http://exa mple.com", wantErr: true},
+		{name: "invalid URL - only path", value: "/path/to/resource", wantErr: true},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*string)(nil), wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, wantErr: true},
+		{name: "invalid type - bool", value: true, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := urlConstraint{}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestUuidConstraint tests uuidConstraint.Validate() for valid UUIDs
+func TestUuidConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		wantErr bool
+	}{
+		// Valid UUIDs (v4 format - the regex validates the format, not version)
+		{name: "valid UUID lowercase", value: "550e8400-e29b-41d4-a716-446655440000", wantErr: false},
+		{name: "valid UUID uppercase", value: "550E8400-E29B-41D4-A716-446655440000", wantErr: false},
+		{name: "valid UUID mixed case", value: "550e8400-E29B-41D4-a716-446655440000", wantErr: false},
+		{name: "valid UUID all zeros", value: "00000000-0000-0000-0000-000000000000", wantErr: false},
+		{name: "valid UUID all f's", value: "ffffffff-ffff-ffff-ffff-ffffffffffff", wantErr: false},
+		{name: "valid UUID numeric heavy", value: "12345678-1234-1234-1234-123456789012", wantErr: false},
+
+		// Empty string - should be skipped
+		{name: "empty string", value: "", wantErr: false},
+
+		// Invalid UUID formats
+		{name: "invalid UUID - no dashes", value: "550e8400e29b41d4a716446655440000", wantErr: true},
+		{name: "invalid UUID - wrong dash positions", value: "550e8400-e29b-41d4a716-446655440000", wantErr: true},
+		{name: "invalid UUID - too short", value: "550e8400-e29b-41d4-a716", wantErr: true},
+		{name: "invalid UUID - too long", value: "550e8400-e29b-41d4-a716-446655440000-extra", wantErr: true},
+		{name: "invalid UUID - invalid hex char", value: "550e8400-e29b-41d4-a716-44665544000g", wantErr: true},
+		{name: "invalid UUID - spaces", value: "550e8400 -e29b-41d4-a716-446655440000", wantErr: true},
+		{name: "invalid UUID - extra dashes", value: "550e8400--e29b-41d4-a716-446655440000", wantErr: true},
+
+		// Non-UUID formats
+		{name: "random string", value: "not-a-uuid-at-all-right-here", wantErr: true},
+		{name: "numeric string", value: "12345678-1234-1234-1234-12345678901", wantErr: true},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*string)(nil), wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, wantErr: true},
+		{name: "invalid type - bool", value: true, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := uuidConstraint{}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestRegexConstraint tests regexConstraint.Validate() for custom patterns
+func TestRegexConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		pattern string
+		wantErr bool
+	}{
+		// Phone number pattern
+		{name: "valid phone", value: "123-456-7890", pattern: `^\d{3}-\d{3}-\d{4}$`, wantErr: false},
+		{name: "invalid phone - no dashes", value: "1234567890", pattern: `^\d{3}-\d{3}-\d{4}$`, wantErr: true},
+		{name: "invalid phone - wrong format", value: "12-34-5678", pattern: `^\d{3}-\d{3}-\d{4}$`, wantErr: true},
+
+		// Alphanumeric pattern
+		{name: "valid alphanumeric", value: "abc123", pattern: `^[a-zA-Z0-9]+$`, wantErr: false},
+		{name: "invalid alphanumeric - spaces", value: "abc 123", pattern: `^[a-zA-Z0-9]+$`, wantErr: true},
+		{name: "invalid alphanumeric - special chars", value: "abc-123", pattern: `^[a-zA-Z0-9]+$`, wantErr: true},
+
+		// Hex color pattern
+		{name: "valid hex color", value: "#FF5733", pattern: `^#[0-9A-Fa-f]{6}$`, wantErr: false},
+		{name: "valid hex color lowercase", value: "#ff5733", pattern: `^#[0-9A-Fa-f]{6}$`, wantErr: false},
+		{name: "invalid hex color - no hash", value: "FF5733", pattern: `^#[0-9A-Fa-f]{6}$`, wantErr: true},
+		{name: "invalid hex color - invalid char", value: "#FF573G", pattern: `^#[0-9A-Fa-f]{6}$`, wantErr: true},
+
+		// Email-like pattern
+		{name: "valid email pattern", value: "user@example.com", pattern: `^[a-zA-Z0-9.]+@[a-zA-Z0-9.]+$`, wantErr: false},
+		{name: "invalid email pattern - no domain", value: "user@", pattern: `^[a-zA-Z0-9.]+@[a-zA-Z0-9.]+$`, wantErr: true},
+
+		// Simple digit pattern
+		{name: "valid digits", value: "12345", pattern: `^\d+$`, wantErr: false},
+		{name: "invalid digits - letter", value: "1234a", pattern: `^\d+$`, wantErr: true},
+
+		// Empty string - should be skipped
+		{name: "empty string", value: "", pattern: `^\d+$`, wantErr: false},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*string)(nil), pattern: `^\d+$`, wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, pattern: `^\d+$`, wantErr: true},
+		{name: "invalid type - bool", value: true, pattern: `^\d+$`, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			regex, err := regexp.Compile(tt.pattern)
+			if err != nil {
+				t.Fatalf("failed to compile regex: %v", err)
+			}
+			constraint := regexConstraint{pattern: tt.pattern, regex: regex}
+			err = constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestIpv4Constraint tests ipv4Constraint.Validate() for valid IPv4 addresses
+func TestIpv4Constraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		wantErr bool
+	}{
+		// Valid IPv4 addresses
+		{name: "valid IPv4 - localhost", value: "127.0.0.1", wantErr: false},
+		{name: "valid IPv4 - private range", value: "192.168.1.1", wantErr: false},
+		{name: "valid IPv4 - private range 10", value: "10.0.0.1", wantErr: false},
+		{name: "valid IPv4 - private range 172", value: "172.16.0.1", wantErr: false},
+		{name: "valid IPv4 - zeros", value: "0.0.0.0", wantErr: false},
+		{name: "valid IPv4 - broadcast", value: "255.255.255.255", wantErr: false},
+		{name: "valid IPv4 - google DNS", value: "8.8.8.8", wantErr: false},
+		{name: "valid IPv4 - public IP", value: "1.1.1.1", wantErr: false},
+
+		// Empty string - should be skipped
+		{name: "empty string", value: "", wantErr: false},
+
+		// Invalid IPv4 addresses
+		{name: "invalid IPv4 - out of range", value: "256.1.1.1", wantErr: true},
+		{name: "invalid IPv4 - too few octets", value: "192.168.1", wantErr: true},
+		{name: "invalid IPv4 - too many octets", value: "192.168.1.1.1", wantErr: true},
+		{name: "invalid IPv4 - letters", value: "192.168.a.1", wantErr: true},
+		{name: "invalid IPv4 - empty octets", value: "192.168..1", wantErr: true},
+
+		// IPv6 addresses - should fail
+		{name: "IPv6 address fails", value: "::1", wantErr: true},
+		{name: "IPv6 full address fails", value: "2001:0db8:85a3:0000:0000:8a2e:0370:7334", wantErr: true},
+		{name: "IPv6 compressed fails", value: "2001:db8::1", wantErr: true},
+
+		// Other invalid formats
+		{name: "hostname not IP", value: "example.com", wantErr: true},
+		{name: "CIDR notation not IP", value: "192.168.1.0/24", wantErr: true},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*string)(nil), wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, wantErr: true},
+		{name: "invalid type - bool", value: true, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := ipv4Constraint{}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestIpv6Constraint tests ipv6Constraint.Validate() for valid IPv6 addresses
+func TestIpv6Constraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		wantErr bool
+	}{
+		// Valid IPv6 addresses - full form
+		{name: "valid IPv6 - localhost loopback", value: "::1", wantErr: false},
+		{name: "valid IPv6 - unspecified", value: "::", wantErr: false},
+		{name: "valid IPv6 - full form", value: "2001:0db8:85a3:0000:0000:8a2e:0370:7334", wantErr: false},
+
+		// Valid IPv6 addresses - compressed form
+		{name: "valid IPv6 - compressed", value: "2001:db8::1", wantErr: false},
+		{name: "valid IPv6 - compressed form 2", value: "2001:db8::8a2e:370:7334", wantErr: false},
+		{name: "valid IPv6 - link-local", value: "fe80::1", wantErr: false},
+		{name: "valid IPv6 - multicast", value: "ff02::1", wantErr: false},
+
+		// Valid IPv6 addresses - zone ID variants (some may fail depending on implementation)
+		{name: "valid IPv6 - with numbers", value: "1234:5678:90ab:cdef:1234:5678:90ab:cdef", wantErr: false},
+
+		// Empty string - should be skipped
+		{name: "empty string", value: "", wantErr: false},
+
+		// IPv4 addresses - should fail
+		{name: "IPv4 localhost fails", value: "127.0.0.1", wantErr: true},
+		{name: "IPv4 private fails", value: "192.168.1.1", wantErr: true},
+		{name: "IPv4 google DNS fails", value: "8.8.8.8", wantErr: true},
+
+		// Invalid IPv6 addresses
+		{name: "invalid IPv6 - too many colons", value: "2001::db8:::1", wantErr: true},
+		{name: "invalid IPv6 - invalid hex", value: "2001:db8::gggg", wantErr: true},
+		{name: "invalid IPv6 - too many groups", value: "2001:0db8:85a3:0000:0000:8a2e:0370:7334:extra", wantErr: true},
+		{name: "invalid IPv6 - incomplete", value: "2001:db8:", wantErr: true},
+
+		// Other invalid formats
+		{name: "hostname not IP", value: "example.com", wantErr: true},
+		{name: "IPv6 with port fails", value: "[2001:db8::1]:8080", wantErr: true},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*string)(nil), wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, wantErr: true},
+		{name: "invalid type - bool", value: true, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := ipv6Constraint{}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestEnumConstraint tests enumConstraint.Validate() for allowed values
+func TestEnumConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		values  []string
+		wantErr bool
+	}{
+		// String values
+		{name: "string in enum", value: "active", values: []string{"pending", "active", "completed"}, wantErr: false},
+		{name: "string in enum - first value", value: "pending", values: []string{"pending", "active", "completed"}, wantErr: false},
+		{name: "string in enum - last value", value: "completed", values: []string{"pending", "active", "completed"}, wantErr: false},
+		{name: "string not in enum", value: "invalid", values: []string{"pending", "active", "completed"}, wantErr: true},
+		{name: "string case sensitive", value: "Active", values: []string{"pending", "active", "completed"}, wantErr: true},
+
+		// Int values
+		{name: "int in enum", value: 1, values: []string{"0", "1", "2"}, wantErr: false},
+		{name: "int in enum - zero", value: 0, values: []string{"0", "1", "2"}, wantErr: false},
+		{name: "int not in enum", value: 5, values: []string{"0", "1", "2"}, wantErr: true},
+		{name: "int8 in enum", value: int8(1), values: []string{"0", "1", "2"}, wantErr: false},
+		{name: "int16 in enum", value: int16(1), values: []string{"0", "1", "2"}, wantErr: false},
+		{name: "int32 in enum", value: int32(1), values: []string{"0", "1", "2"}, wantErr: false},
+		{name: "int64 in enum", value: int64(1), values: []string{"0", "1", "2"}, wantErr: false},
+
+		// Uint values
+		{name: "uint in enum", value: uint(1), values: []string{"0", "1", "2"}, wantErr: false},
+		{name: "uint not in enum", value: uint(5), values: []string{"0", "1", "2"}, wantErr: true},
+		{name: "uint8 in enum", value: uint8(1), values: []string{"0", "1", "2"}, wantErr: false},
+		{name: "uint16 in enum", value: uint16(1), values: []string{"0", "1", "2"}, wantErr: false},
+		{name: "uint32 in enum", value: uint32(1), values: []string{"0", "1", "2"}, wantErr: false},
+		{name: "uint64 in enum", value: uint64(1), values: []string{"0", "1", "2"}, wantErr: false},
+
+		// Float values
+		{name: "float in enum", value: 3.14, values: []string{"2.71", "3.14", "2.0"}, wantErr: false},
+		{name: "float not in enum", value: 1.5, values: []string{"2.71", "3.14", "2.0"}, wantErr: true},
+		{name: "float32 in enum", value: float32(2.5), values: []string{"2.5", "1.5"}, wantErr: false},
+		{name: "float64 in enum", value: float64(3.14), values: []string{"3.14", "2.71"}, wantErr: false},
+
+		// Bool values
+		{name: "bool true in enum", value: true, values: []string{"true", "false"}, wantErr: false},
+		{name: "bool false in enum", value: false, values: []string{"true", "false"}, wantErr: false},
+
+		// Empty enum
+		{name: "value not in empty enum", value: "test", values: []string{}, wantErr: true},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*string)(nil), values: []string{"a", "b"}, wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - slice", value: []string{"a"}, values: []string{"a", "b"}, wantErr: true},
+		{name: "invalid type - map", value: map[string]int{"a": 1}, values: []string{"a", "b"}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := enumConstraint{values: tt.values}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestDefaultConstraint tests defaultConstraint.Validate() - no-op validator
+func TestDefaultConstraint(t *testing.T) {
+	tests := []struct {
+		name  string
+		value any
+	}{
+		{name: "string value", value: "test"},
+		{name: "int value", value: 42},
+		{name: "float value", value: 3.14},
+		{name: "bool value", value: true},
+		{name: "nil value", value: nil},
+		{name: "empty string", value: ""},
+		{name: "zero int", value: 0},
+		{name: "slice", value: []int{1, 2, 3}},
+		{name: "map", value: map[string]int{"a": 1}},
+	}
+
+	constraint := defaultConstraint{value: "default"}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// defaultConstraint always returns nil - it's a no-op validator
+			err := constraint.Validate(tt.value)
+			if err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+		})
+	}
+}
+
+// TestMinConstraint tests minConstraint.Validate() for numeric values
+// Added to ensure comprehensive coverage of all constraints mentioned
+func TestMinConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		min     int
+		wantErr bool
+	}{
+		// Valid cases - above min
+		{name: "int above min", value: 50, min: 10, wantErr: false},
+		{name: "int at min", value: 10, min: 10, wantErr: false},
+		{name: "int zero with negative min", value: 0, min: -10, wantErr: false},
+
+		// Invalid cases - below min
+		{name: "int below min", value: 5, min: 10, wantErr: true},
+		{name: "int far below min", value: -50, min: 10, wantErr: true},
+
+		// Float values
+		{name: "float above min", value: 5.0, min: 3, wantErr: false},
+		{name: "float at min", value: 3.0, min: 3, wantErr: false},
+		{name: "float below min", value: 2.5, min: 3, wantErr: true},
+
+		// Different numeric types
+		{name: "int8 above min", value: int8(50), min: 10, wantErr: false},
+		{name: "uint above min", value: uint(50), min: 10, wantErr: false},
+		{name: "float32 above min", value: float32(5.0), min: 3, wantErr: false},
+
+		// String (length check)
+		{name: "string above min length", value: "hello", min: 3, wantErr: false},
+		{name: "string at min length", value: "hel", min: 3, wantErr: false},
+		{name: "string below min length", value: "hi", min: 3, wantErr: true},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*int)(nil), min: 10, wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - bool", value: true, min: 10, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := minConstraint{min: tt.min}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestGtConstraint tests gtConstraint.Validate() for > threshold
+func TestGtConstraint(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     any
+		threshold float64
+		wantErr   bool
+	}{
+		// Valid cases - value > threshold
+		{name: "int greater than threshold", value: 25, threshold: 20, wantErr: false},
+		{name: "float greater than threshold", value: 6.5, threshold: 5.0, wantErr: false},
+		{name: "negative greater than negative", value: -5, threshold: -10, wantErr: false},
+
+		// Invalid cases - value <= threshold
+		{name: "int equals threshold", value: 20, threshold: 20, wantErr: true},
+		{name: "int less than threshold", value: 10, threshold: 20, wantErr: true},
+		{name: "float equals threshold", value: 5.0, threshold: 5.0, wantErr: true},
+		{name: "float less than threshold", value: 3.14, threshold: 5.0, wantErr: true},
+
+		// Different numeric types
+		{name: "int8 greater than threshold", value: int8(25), threshold: 20, wantErr: false},
+		{name: "uint greater than threshold", value: uint(25), threshold: 20, wantErr: false},
+		{name: "float32 greater than threshold", value: float32(6.5), threshold: 5.0, wantErr: false},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*int)(nil), threshold: 20, wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - string", value: "hello", threshold: 20, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := gtConstraint{threshold: tt.threshold}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestGeConstraint tests geConstraint.Validate() for >= threshold
+func TestGeConstraint(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     any
+		threshold float64
+		wantErr   bool
+	}{
+		// Valid cases - value >= threshold
+		{name: "int greater than threshold", value: 25, threshold: 20, wantErr: false},
+		{name: "int equals threshold", value: 20, threshold: 20, wantErr: false},
+		{name: "float greater than threshold", value: 6.5, threshold: 5.0, wantErr: false},
+		{name: "float equals threshold", value: 5.0, threshold: 5.0, wantErr: false},
+
+		// Invalid cases - value < threshold
+		{name: "int less than threshold", value: 10, threshold: 20, wantErr: true},
+		{name: "float less than threshold", value: 3.14, threshold: 5.0, wantErr: true},
+
+		// Different numeric types
+		{name: "int8 greater than threshold", value: int8(25), threshold: 20, wantErr: false},
+		{name: "int8 equals threshold", value: int8(20), threshold: 20, wantErr: false},
+		{name: "uint greater than threshold", value: uint(25), threshold: 20, wantErr: false},
+		{name: "float32 equals threshold", value: float32(5.0), threshold: 5.0, wantErr: false},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*int)(nil), threshold: 20, wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - string", value: "hello", threshold: 20, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := geConstraint{threshold: tt.threshold}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestMinLengthConstraint tests minLengthConstraint.Validate() for strings
+func TestMinLengthConstraint(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     any
+		minLength int
+		wantErr   bool
+	}{
+		// Valid cases
+		{name: "string above min length", value: "hello", minLength: 3, wantErr: false},
+		{name: "string at min length", value: "hel", minLength: 3, wantErr: false},
+		{name: "long string", value: "this is a long string", minLength: 5, wantErr: false},
+		{name: "single char at min", value: "a", minLength: 1, wantErr: false},
+
+		// Invalid cases - below min length
+		{name: "string below min length", value: "hi", minLength: 3, wantErr: true},
+		{name: "empty string below min", value: "", minLength: 1, wantErr: true},
+
+		// Edge cases
+		{name: "min length zero with empty string", value: "", minLength: 0, wantErr: false},
+		{name: "min length zero with non-empty", value: "a", minLength: 0, wantErr: false},
+
+		// Nil pointer - should skip validation
+		{name: "nil pointer", value: (*string)(nil), minLength: 3, wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, minLength: 3, wantErr: true},
+		{name: "invalid type - bool", value: true, minLength: 3, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := minLengthConstraint{minLength: tt.minLength}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestEmailConstraint tests emailConstraint.Validate() for email format
+func TestEmailConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		wantErr bool
+	}{
+		// Valid emails
+		{name: "simple email", value: "user@example.com", wantErr: false},
+		{name: "email with dots", value: "user.name@example.com", wantErr: false},
+		{name: "email with plus", value: "user+tag@example.com", wantErr: false},
+		{name: "email with dash", value: "user-name@example.com", wantErr: false},
+		{name: "email with underscore", value: "user_name@example.com", wantErr: false},
+		{name: "email with number", value: "user123@example.com", wantErr: false},
+		{name: "email with percent", value: "user%test@example.com", wantErr: false},
+		{name: "email with subdomain", value: "user@mail.example.com", wantErr: false},
+
+		// Empty string - should be skipped
+		{name: "empty string", value: "", wantErr: false},
+
+		// Invalid emails
+		{name: "no at symbol", value: "userexample.com", wantErr: true},
+		{name: "double at", value: "user@@example.com", wantErr: true},
+		{name: "no domain", value: "user@", wantErr: true},
+		{name: "no local part", value: "@example.com", wantErr: true},
+		{name: "no TLD", value: "user@example", wantErr: true},
+		{name: "space in email", value: "user @example.com", wantErr: true},
+		{name: "invalid char", value: "user#@example.com", wantErr: true},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, wantErr: true},
+		{name: "invalid type - bool", value: true, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := emailConstraint{}
+			err := constraint.Validate(tt.value)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr=%v, got err=%v", tt.wantErr, err)
+			}
+		})
+	}
+}
