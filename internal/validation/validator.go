@@ -100,66 +100,13 @@ func ValidateValue(
 
 		// For slices, validate each element instead of the slice itself
 		if fieldValue.Kind() == reflect.Slice {
-			for i := 0; i < fieldValue.Len(); i++ {
-				elemValue := fieldValue.Index(i)
-				elemPath := fmt.Sprintf("%s[%d]", fieldPath, i)
-
-				// Apply constraints to each element
-				for _, validator := range validators {
-					if err := validator.Validate(elemValue.Interface()); err != nil {
-						errors = append(errors, FieldError{
-							Field:   elemPath,
-							Message: err.Error(),
-							Value:   elemValue.Interface(),
-						})
-					}
-				}
-
-				// Recursively validate nested structs in slice
-				if elemValue.Kind() == reflect.Struct {
-					errors = append(errors, recursiveValidateFunc(elemValue, elemPath)...)
-				}
-			}
+			errors = append(errors, validateSliceElements(fieldValue, fieldPath, validators, recursiveValidateFunc)...)
 		} else if fieldValue.Kind() == reflect.Map {
 			// For maps, validate each value instead of the map itself
-			iter := fieldValue.MapRange()
-			for iter.Next() {
-				mapKey := iter.Key()
-				mapValue := iter.Value()
-				mapPath := fmt.Sprintf("%s[%v]", fieldPath, mapKey.Interface())
-
-				// Apply constraints to each value
-				for _, validator := range validators {
-					if err := validator.Validate(mapValue.Interface()); err != nil {
-						errors = append(errors, FieldError{
-							Field:   mapPath,
-							Message: err.Error(),
-							Value:   mapValue.Interface(),
-						})
-					}
-				}
-
-				// Recursively validate nested structs in map
-				if mapValue.Kind() == reflect.Struct {
-					errors = append(errors, recursiveValidateFunc(mapValue, mapPath)...)
-				}
-			}
+			errors = append(errors, validateMapElements(fieldValue, fieldPath, validators, recursiveValidateFunc)...)
 		} else {
 			// For non-slice/map fields, apply constraints directly
-			for _, validator := range validators {
-				if err := validator.Validate(fieldValue.Interface()); err != nil {
-					errors = append(errors, FieldError{
-						Field:   fieldPath,
-						Message: err.Error(),
-						Value:   fieldValue.Interface(),
-					})
-				}
-			}
-
-			// Recursively validate nested structs
-			if fieldValue.Kind() == reflect.Struct {
-				errors = append(errors, recursiveValidateFunc(fieldValue, fieldPath)...)
-			}
+			errors = append(errors, validateScalarField(fieldValue, fieldPath, validators, recursiveValidateFunc)...)
 		}
 	}
 
@@ -198,4 +145,93 @@ func validateNestedElements(fieldValue reflect.Value,
 	}
 
 	return fieldErrors
+}
+
+func validateSliceElements(
+	fieldValue reflect.Value,
+	fieldPath string,
+	validators []ConstraintValidator,
+	recursiveValidateFunc func(val reflect.Value, path string) []FieldError,
+) []FieldError {
+	var errors []FieldError
+	for i := 0; i < fieldValue.Len(); i++ {
+		elemValue := fieldValue.Index(i)
+		elemPath := fmt.Sprintf("%s[%d]", fieldPath, i)
+
+		// Apply constraints to each element
+		for _, validator := range validators {
+			if err := validator.Validate(elemValue.Interface()); err != nil {
+				errors = append(errors, FieldError{
+					Field:   elemPath,
+					Message: err.Error(),
+					Value:   elemValue.Interface(),
+				})
+			}
+		}
+
+		// Recursively validate nested structs in slice
+		if elemValue.Kind() == reflect.Struct {
+			errors = append(errors, recursiveValidateFunc(elemValue, elemPath)...)
+		}
+	}
+	return errors
+}
+
+func validateMapElements(
+	fieldValue reflect.Value,
+	fieldPath string,
+	validators []ConstraintValidator,
+	recursiveValidateFunc func(val reflect.Value, path string) []FieldError,
+) []FieldError {
+	var errors []FieldError
+	iter := fieldValue.MapRange()
+	for iter.Next() {
+		mapKey := iter.Key()
+		mapValue := iter.Value()
+		mapPath := fmt.Sprintf("%s[%v]", fieldPath, mapKey.Interface())
+
+		// Apply constraints to each value
+		for _, validator := range validators {
+			if err := validator.Validate(mapValue.Interface()); err != nil {
+				errors = append(errors, FieldError{
+					Field:   mapPath,
+					Message: err.Error(),
+					Value:   mapValue.Interface(),
+				})
+			}
+		}
+
+		// Recursively validate nested structs in map
+		if mapValue.Kind() == reflect.Struct {
+			errors = append(errors, recursiveValidateFunc(mapValue, mapPath)...)
+		}
+	}
+	return errors
+}
+
+func validateScalarField(
+	fieldValue reflect.Value,
+	fieldPath string,
+	validators []ConstraintValidator,
+	recursiveValidateFunc func(val reflect.Value, path string) []FieldError,
+) []FieldError {
+	var errors []FieldError
+
+	// Apply constraints directly
+	for _, validator := range validators {
+		if err := validator.Validate(fieldValue.Interface()); err != nil {
+			errors = append(errors, FieldError{
+				Field:   fieldPath,
+				Message: err.Error(),
+				Value:   fieldValue.Interface(),
+			})
+		}
+	}
+
+	// Recursively validate nested structs
+	if fieldValue.Kind() == reflect.Struct {
+		errors = append(errors, recursiveValidateFunc(fieldValue, fieldPath)...)
+	}
+
+	return errors
 }
