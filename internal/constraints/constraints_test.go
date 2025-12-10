@@ -1358,3 +1358,52 @@ func TestParseConditionalConstraint_ErrorPath(t *testing.T) {
 		})
 	}
 }
+
+// TestLenConstraint tests lenConstraint.Validate() for exact string length
+func TestLenConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		length  int
+		wantErr bool
+	}{
+		// Valid cases - exact match
+		{name: "exact match 5 chars", value: "hello", length: 5, wantErr: false},
+		{name: "exact match 1 char", value: "a", length: 1, wantErr: false},
+		{name: "exact match 10 chars", value: "helloworld", length: 10, wantErr: false},
+		{name: "exact match 20 chars", value: "abcdefghijklmnopqrst", length: 20, wantErr: false},
+		{name: "zero length with empty string", value: "", length: 0, wantErr: false},
+		{name: "unicode exact match", value: "café", length: 4, wantErr: false},
+		{name: "emoji exact match", value: "👍🎉", length: 2, wantErr: false},
+
+		// Invalid cases - length mismatch
+		{name: "too short by 1", value: "hi", length: 5, wantErr: true},
+		{name: "too long by 1", value: "hello!", length: 5, wantErr: true},
+		{name: "too short by many", value: "hi", length: 10, wantErr: true},
+		{name: "too long by many", value: "hello world!", length: 5, wantErr: true},
+		{name: "non-empty string with zero length", value: "a", length: 0, wantErr: true},
+
+		// Edge cases
+		{name: "nil pointer", value: (*string)(nil), length: 5, wantErr: false},
+		{name: "large length match", value: "this is a very long string that we need to validate", length: 51, wantErr: false},
+		{name: "spaces and special chars", value: "  hello!  ", length: 10, wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, length: 3, wantErr: true},
+		{name: "invalid type - bool", value: true, length: 4, wantErr: true},
+		{name: "invalid type - slice", value: []string{"a", "b"}, length: 2, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := lenConstraint{length: tt.length}
+			err := constraint.Validate(tt.value)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

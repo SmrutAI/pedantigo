@@ -37,6 +37,7 @@ type (
 	ipv6Constraint    struct{}
 	enumConstraint    struct{ values []string }
 	defaultConstraint struct{ value string }
+	lenConstraint     struct{ length int }
 )
 
 var (
@@ -569,6 +570,42 @@ func (c defaultConstraint) Validate(value any) error {
 	return nil // No-op for validation
 }
 
+// lenConstraint validates that a string has exact length
+func (c lenConstraint) Validate(value any) error {
+	// 1. Get reflect.Value
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// 2. Handle pointer indirection
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	// 3. Type check - ensure string
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("len constraint requires string value")
+	}
+
+	// 4. Get string value
+	str := v.String()
+
+	// 5. Note: len constraint validates empty strings (len=0 is valid)
+	// Do NOT skip empty strings like other constraints
+
+	// 6. Validation logic - count runes, not bytes (for Unicode support)
+	runeCount := len([]rune(str))
+	if runeCount != c.length {
+		return fmt.Errorf("must be exactly %d characters", c.length)
+	}
+
+	return nil
+}
+
 // BuildConstraints creates constraint instances from parsed tag map
 func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []Constraint {
 	var result []Constraint
@@ -617,6 +654,10 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			result = append(result, ipv6Constraint{})
 		case "oneof":
 			result = append(result, buildEnumConstraint(value))
+		case "len":
+			if constraint, ok := buildLenConstraint(value); ok {
+				result = append(result, constraint)
+			}
 		case "default":
 			result = append(result, defaultConstraint{value: value})
 		}
@@ -679,4 +720,14 @@ func buildRegexConstraint(pattern string) Constraint {
 func buildEnumConstraint(value string) Constraint {
 	values := strings.Fields(value)
 	return enumConstraint{values: values}
+}
+
+// buildLenConstraint creates a len constraint from a numeric value.
+// Returns (constraint, true) on success or (nil, false) if parsing fails.
+func buildLenConstraint(value string) (Constraint, bool) {
+	length, err := strconv.Atoi(value)
+	if err != nil {
+		return nil, false
+	}
+	return lenConstraint{length: length}, true
 }

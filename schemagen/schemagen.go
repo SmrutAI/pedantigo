@@ -204,6 +204,14 @@ func ApplyConstraints(schema *jsonschema.Schema, constraintsMap map[string]strin
 			}
 			schema.Enum = enumValues
 
+		case "len":
+			// len → minLength + maxLength (exact length)
+			if length, err := strconv.Atoi(value); err == nil {
+				l := uint64(length)
+				schema.MinLength = &l
+				schema.MaxLength = &l
+			}
+
 		case "default":
 			// default → default value
 			schema.Default = ParseDefaultValue(value, fieldType)
