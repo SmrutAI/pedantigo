@@ -42,6 +42,7 @@ type (
 	alphaConstraint    struct{}
 	alphanumConstraint struct{}
 	containsConstraint struct{ substring string }
+	excludesConstraint struct{ substring string }
 )
 
 var (
@@ -783,6 +784,44 @@ func (c containsConstraint) Validate(value any) error {
 	return nil
 }
 
+// excludesConstraint validates that a string does NOT contain a specific substring
+// Validate checks if the value satisfies the constraint
+func (c excludesConstraint) Validate(value any) error {
+	// 1. Get reflect.Value
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// 2. Handle pointer indirection
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	// 3. Type check - ensure string
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("excludes constraint requires string value")
+	}
+
+	// 4. Get string value
+	str := v.String()
+
+	// 5. Skip empty strings
+	if str == "" {
+		return nil
+	}
+
+	// 6. Validation logic - check if string does NOT contain substring
+	if strings.Contains(str, c.substring) {
+		return fmt.Errorf("must not contain '%s'", c.substring)
+	}
+
+	return nil
+}
+
 // BuildConstraints creates constraint instances from parsed tag map
 func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []Constraint {
 	var result []Constraint
@@ -843,6 +882,10 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			result = append(result, alphanumConstraint{})
 		case "contains":
 			if constraint, ok := buildContainsConstraint(value); ok {
+				result = append(result, constraint)
+			}
+		case "excludes":
+			if constraint, ok := buildExcludesConstraint(value); ok {
 				result = append(result, constraint)
 			}
 		case "default":
@@ -925,4 +968,12 @@ func buildContainsConstraint(value string) (Constraint, bool) {
 		return nil, false // Empty substring is invalid
 	}
 	return containsConstraint{substring: value}, true
+}
+
+// buildExcludesConstraint creates an excludes constraint with the specified substring
+func buildExcludesConstraint(value string) (Constraint, bool) {
+	if value == "" {
+		return nil, false // Empty substring is invalid
+	}
+	return excludesConstraint{substring: value}, true
 }

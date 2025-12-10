@@ -1595,3 +1595,52 @@ func TestContainsConstraint(t *testing.T) {
 		})
 	}
 }
+
+// TestExcludesConstraint tests excludesConstraint.Validate() for substring exclusion
+func TestExcludesConstraint(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     any
+		substring string
+		wantErr   bool
+	}{
+		// Valid cases - substring NOT present
+		{name: "substring not found", value: "hello", substring: "world", wantErr: false},
+		{name: "case mismatch (no match)", value: "hello", substring: "HELLO", wantErr: false},
+		{name: "partial match not counted", value: "hello", substring: "helloworld", wantErr: false},
+		{name: "similar characters", value: "hello", substring: "helo", wantErr: false},
+		{name: "substring with space", value: "hello", substring: "hel lo", wantErr: false},
+		{name: "unicode mismatch", value: "hello", substring: "café", wantErr: false},
+
+		// Invalid cases - substring IS present (should fail)
+		{name: "substring at start", value: "helloworld", substring: "hello", wantErr: true},
+		{name: "substring in middle", value: "helloworld", substring: "low", wantErr: true},
+		{name: "substring at end", value: "helloworld", substring: "world", wantErr: true},
+		{name: "full match", value: "hello", substring: "hello", wantErr: true},
+		{name: "single character present", value: "hello", substring: "e", wantErr: true},
+		{name: "substring with numbers", value: "test123", substring: "123", wantErr: true},
+
+		// Edge cases
+		{name: "empty string", value: "", substring: "test", wantErr: false},
+		{name: "nil pointer", value: (*string)(nil), substring: "test", wantErr: false},
+		{name: "unicode substring present", value: "hello café", substring: "café", wantErr: true},
+		{name: "special characters present", value: "test@example.com", substring: "@", wantErr: true},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, substring: "123", wantErr: true},
+		{name: "invalid type - bool", value: true, substring: "true", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := excludesConstraint{substring: tt.substring}
+			err := constraint.Validate(tt.value)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
