@@ -4,6 +4,7 @@ package schemagen
 import (
 	"encoding/json"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -223,6 +224,11 @@ func ApplyConstraints(schema *jsonschema.Schema, constraintsMap map[string]strin
 		case "alphanum":
 			// alphanum → pattern for alphanumeric characters only (a-z, A-Z, 0-9)
 			schema.Pattern = "^[a-zA-Z0-9]+$"
+
+		case "contains":
+			// contains → pattern for substring presence (with escaped special characters)
+			escapedSubstring := regexp.QuoteMeta(value)
+			schema.Pattern = ".*" + escapedSubstring + ".*"
 
 		case "default":
 			// default → default value

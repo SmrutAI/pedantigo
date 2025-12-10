@@ -333,6 +333,69 @@ func TestApplyConstraints(t *testing.T) {
 				assert.Equal(t, "hello", schema.Default)
 			},
 		},
+		{
+			name:      "len constraint",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"len": "8",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				require.NotNil(t, schema.MinLength)
+				assert.Equal(t, uint64(8), *schema.MinLength)
+				require.NotNil(t, schema.MaxLength)
+				assert.Equal(t, uint64(8), *schema.MaxLength)
+			},
+		},
+		{
+			name:      "ascii constraint",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"ascii": "",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, "^[\\x00-\\x7F]*$", schema.Pattern)
+			},
+		},
+		{
+			name:      "alpha constraint",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"alpha": "",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, "^[a-zA-Z]+$", schema.Pattern)
+			},
+		},
+		{
+			name:      "alphanum constraint",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"alphanum": "",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, "^[a-zA-Z0-9]+$", schema.Pattern)
+			},
+		},
+		{
+			name:      "contains constraint",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"contains": "test",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, ".*test.*", schema.Pattern)
+			},
+		},
+		{
+			name:      "contains with special chars",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"contains": "@example.com",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, `.*@example\.com.*`, schema.Pattern)
+			},
+		},
 	}
 
 	for _, tt := range tests {

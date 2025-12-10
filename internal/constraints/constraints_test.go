@@ -1543,3 +1543,54 @@ func TestAlphanumConstraint(t *testing.T) {
 		})
 	}
 }
+
+func TestContainsConstraint(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     any
+		substring string
+		wantErr   bool
+	}{
+		// Valid cases - substring present
+		{name: "substring at start", value: "helloworld", substring: "hello", wantErr: false},
+		{name: "substring in middle", value: "helloworld", substring: "low", wantErr: false},
+		{name: "substring at end", value: "helloworld", substring: "world", wantErr: false},
+		{name: "full match", value: "hello", substring: "hello", wantErr: false},
+		{name: "single character", value: "hello", substring: "e", wantErr: false},
+		{name: "repeated substring", value: "hello hello", substring: "hello", wantErr: false},
+		{name: "substring with numbers", value: "test123", substring: "123", wantErr: false},
+
+		// Invalid cases - substring absent or case mismatch
+		{name: "substring not found", value: "hello", substring: "world", wantErr: true},
+		{name: "case mismatch", value: "hello", substring: "HELLO", wantErr: true},
+		{name: "partial match", value: "hello", substring: "helloworld", wantErr: true},
+		{name: "similar characters", value: "hello", substring: "helo", wantErr: true},
+		{name: "substring with space", value: "hello", substring: "hel lo", wantErr: true},
+		{name: "empty value non-empty substring", value: "", substring: "test", wantErr: true},
+		{name: "unicode mismatch", value: "hello", substring: "café", wantErr: true},
+
+		// Edge cases
+		{name: "empty string empty substring", value: "", substring: "", wantErr: false},
+		{name: "non-empty with empty substring", value: "hello", substring: "", wantErr: false},
+		{name: "nil pointer", value: (*string)(nil), substring: "test", wantErr: false},
+		{name: "unicode substring present", value: "hello café", substring: "café", wantErr: false},
+		{name: "special characters", value: "test@example.com", substring: "@", wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, substring: "123", wantErr: true},
+		{name: "invalid type - bool", value: true, substring: "true", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := containsConstraint{substring: tt.substring}
+			err := constraint.Validate(tt.value)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

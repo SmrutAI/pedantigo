@@ -41,6 +41,7 @@ type (
 	asciiConstraint    struct{}
 	alphaConstraint    struct{}
 	alphanumConstraint struct{}
+	containsConstraint struct{ substring string }
 )
 
 var (
@@ -724,6 +725,43 @@ func (c alphanumConstraint) Validate(value any) error {
 	return nil
 }
 
+// containsConstraint validates that a string contains a specific substring
+func (c containsConstraint) Validate(value any) error {
+	// 1. Get reflect.Value
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// 2. Handle pointer indirection
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	// 3. Type check - ensure string
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("contains constraint requires string value")
+	}
+
+	// 4. Get string value
+	str := v.String()
+
+	// 5. Skip empty strings only if substring is non-empty
+	if str == "" && c.substring != "" {
+		return fmt.Errorf("must contain '%s'", c.substring)
+	}
+
+	// 6. Validation logic - check if string contains substring
+	if !strings.Contains(str, c.substring) {
+		return fmt.Errorf("must contain '%s'", c.substring)
+	}
+
+	return nil
+}
+
 // BuildConstraints creates constraint instances from parsed tag map
 func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []Constraint {
 	var result []Constraint
@@ -782,6 +820,10 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			result = append(result, alphaConstraint{})
 		case "alphanum":
 			result = append(result, alphanumConstraint{})
+		case "contains":
+			if constraint, ok := buildContainsConstraint(value); ok {
+				result = append(result, constraint)
+			}
 		case "default":
 			result = append(result, defaultConstraint{value: value})
 		}
@@ -854,4 +896,12 @@ func buildLenConstraint(value string) (Constraint, bool) {
 		return nil, false
 	}
 	return lenConstraint{length: length}, true
+}
+
+// buildContainsConstraint creates a contains constraint with the specified substring
+func buildContainsConstraint(value string) (Constraint, bool) {
+	if value == "" {
+		return nil, false // Empty substring is invalid
+	}
+	return containsConstraint{substring: value}, true
 }
