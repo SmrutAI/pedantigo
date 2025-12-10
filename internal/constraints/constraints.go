@@ -38,6 +38,7 @@ type (
 	enumConstraint    struct{ values []string }
 	defaultConstraint struct{ value string }
 	lenConstraint     struct{ length int }
+	asciiConstraint   struct{}
 )
 
 var (
@@ -606,6 +607,45 @@ func (c lenConstraint) Validate(value any) error {
 	return nil
 }
 
+// asciiConstraint validates that a string contains only ASCII characters
+func (c asciiConstraint) Validate(value any) error {
+	// 1. Get reflect.Value
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// 2. Handle pointer indirection
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	// 3. Type check - ensure string
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("ascii constraint requires string value")
+	}
+
+	// 4. Get string value
+	str := v.String()
+
+	// 5. Skip empty strings
+	if str == "" {
+		return nil
+	}
+
+	// 6. Validation logic - check all runes are ASCII (0-127)
+	for _, r := range str {
+		if r > 127 {
+			return fmt.Errorf("must contain only ASCII characters")
+		}
+	}
+
+	return nil
+}
+
 // BuildConstraints creates constraint instances from parsed tag map
 func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []Constraint {
 	var result []Constraint
@@ -658,6 +698,8 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			if constraint, ok := buildLenConstraint(value); ok {
 				result = append(result, constraint)
 			}
+		case "ascii":
+			result = append(result, asciiConstraint{})
 		case "default":
 			result = append(result, defaultConstraint{value: value})
 		}

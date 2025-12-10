@@ -1407,3 +1407,48 @@ func TestLenConstraint(t *testing.T) {
 		})
 	}
 }
+
+// TestAsciiConstraint tests asciiConstraint.Validate() for ASCII-only strings
+func TestAsciiConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		wantErr bool
+	}{
+		// Valid cases - ASCII characters
+		{name: "basic ASCII letters", value: "hello", wantErr: false},
+		{name: "ASCII digits", value: "12345", wantErr: false},
+		{name: "ASCII symbols", value: "!@#$%", wantErr: false},
+		{name: "mixed ASCII", value: "Hello123!", wantErr: false},
+		{name: "spaces and newlines", value: "hello\nworld\t!", wantErr: false},
+
+		// Invalid cases - non-ASCII
+		{name: "unicode accented", value: "café", wantErr: true},
+		{name: "emoji", value: "hello 👍", wantErr: true},
+		{name: "chinese characters", value: "你好", wantErr: true},
+		{name: "cyrillic", value: "привет", wantErr: true},
+		{name: "mixed ASCII and unicode", value: "hello世界", wantErr: true},
+
+		// Edge cases
+		{name: "empty string", value: "", wantErr: false},
+		{name: "nil pointer", value: (*string)(nil), wantErr: false},
+		{name: "single ASCII char", value: "a", wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, wantErr: true},
+		{name: "invalid type - bool", value: true, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := asciiConstraint{}
+			err := constraint.Validate(tt.value)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
