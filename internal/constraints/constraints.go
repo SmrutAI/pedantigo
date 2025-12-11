@@ -48,6 +48,7 @@ type (
 	lowercaseConstraint  struct{}
 	uppercaseConstraint  struct{}
 	positiveConstraint   struct{}
+	negativeConstraint   struct{}
 )
 
 var (
@@ -1006,6 +1007,40 @@ func (c positiveConstraint) Validate(value any) error {
 	return nil
 }
 
+// Validate for negativeConstraint validates that a numeric value is less than 0
+func (c negativeConstraint) Validate(value any) error {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// Handle pointer types
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	var numValue float64
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		numValue = float64(v.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		numValue = float64(v.Uint())
+	case reflect.Float32, reflect.Float64:
+		numValue = v.Float()
+	default:
+		return fmt.Errorf("negative constraint requires numeric value")
+	}
+
+	if numValue >= 0 {
+		return fmt.Errorf("must be negative (less than 0)")
+	}
+
+	return nil
+}
+
 // BuildConstraints creates constraint instances from parsed tag map
 func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []Constraint {
 	var result []Constraint
@@ -1086,6 +1121,8 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			result = append(result, uppercaseConstraint{})
 		case "positive":
 			result = append(result, positiveConstraint{})
+		case "negative":
+			result = append(result, negativeConstraint{})
 		case "default":
 			result = append(result, defaultConstraint{value: value})
 		}
