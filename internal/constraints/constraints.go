@@ -46,6 +46,7 @@ type (
 	startswithConstraint struct{ prefix string }
 	endswithConstraint   struct{ suffix string }
 	lowercaseConstraint  struct{}
+	uppercaseConstraint  struct{}
 )
 
 var (
@@ -939,6 +940,44 @@ func (c lowercaseConstraint) Validate(value any) error {
 	return nil
 }
 
+// uppercaseConstraint validates that a string contains only uppercase characters
+// Validate checks if the value satisfies the constraint
+func (c uppercaseConstraint) Validate(value any) error {
+	// 1. Get reflect.Value
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return nil // Skip validation for invalid values
+	}
+
+	// 2. Handle pointer indirection
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil // Skip validation for nil pointers
+		}
+		v = v.Elem()
+	}
+
+	// 3. Type check - ensure string
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("uppercase constraint requires string value")
+	}
+
+	// 4. Get string value
+	str := v.String()
+
+	// 5. Skip empty strings
+	if str == "" {
+		return nil
+	}
+
+	// 6. Validation logic - check if string is all uppercase
+	if str != strings.ToUpper(str) {
+		return fmt.Errorf("must be all uppercase")
+	}
+
+	return nil
+}
+
 // BuildConstraints creates constraint instances from parsed tag map
 func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []Constraint {
 	var result []Constraint
@@ -1015,6 +1054,8 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			}
 		case "lowercase":
 			result = append(result, lowercaseConstraint{})
+		case "uppercase":
+			result = append(result, uppercaseConstraint{})
 		case "default":
 			result = append(result, defaultConstraint{value: value})
 		}
