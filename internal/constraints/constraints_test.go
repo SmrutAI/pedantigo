@@ -1736,3 +1736,49 @@ func TestEndswithConstraint(t *testing.T) {
 		})
 	}
 }
+
+// TestLowercaseConstraint tests lowercaseConstraint.Validate() for lowercase validation
+func TestLowercaseConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   any
+		wantErr bool
+	}{
+		// Valid cases - all lowercase
+		{name: "all lowercase letters", value: "hello", wantErr: false},
+		{name: "lowercase with numbers", value: "hello123", wantErr: false},
+		{name: "lowercase with spaces", value: "hello world", wantErr: false},
+		{name: "lowercase with special chars", value: "hello@world!", wantErr: false},
+		{name: "lowercase with hyphens", value: "hello-world", wantErr: false},
+		{name: "numbers only", value: "12345", wantErr: false},
+		{name: "special chars only", value: "@#$%", wantErr: false},
+
+		// Invalid cases - contains uppercase
+		{name: "single uppercase", value: "Hello", wantErr: true},
+		{name: "all uppercase", value: "HELLO", wantErr: true},
+		{name: "mixed case", value: "hElLo", wantErr: true},
+		{name: "uppercase at end", value: "hellO", wantErr: true},
+		{name: "camelCase", value: "helloWorld", wantErr: true},
+
+		// Edge cases
+		{name: "empty string", value: "", wantErr: false},
+		{name: "nil pointer", value: (*string)(nil), wantErr: false},
+
+		// Invalid types
+		{name: "invalid type - int", value: 123, wantErr: true},
+		{name: "invalid type - bool", value: true, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			constraint := lowercaseConstraint{}
+			err := constraint.Validate(tt.value)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
