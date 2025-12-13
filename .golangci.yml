@@ -1,0 +1,94 @@
+# golangci-lint configuration for Pedantigo (v2 format)
+#
+# Run: golangci-lint run ./...
+# or: make lint
+
+version: "2"
+
+linters:
+  default: none
+  enable:
+    # Core linters
+    - govet
+    - staticcheck
+    - unused
+    # Error handling
+    - errcheck
+    - errorlint
+    # Code quality
+    - gocritic
+    - gocyclo
+    - gocognit
+    - dupl
+    - misspell
+    # Security
+    - gosec
+    # Style
+    - goconst
+    - godot
+    - godox
+    - whitespace
+    # Testing
+    - testifylint
+
+  settings:
+    gocyclo:
+      min-complexity: 70  # BuildConstraints has 64 (dispatcher pattern)
+    gocognit:
+      min-complexity: 85  # BuildConstraints has 81 (dispatcher pattern)
+    dupl:
+      threshold: 150  # Allow more duplication in test files
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+    gosec:
+      severity: medium
+      confidence: medium
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - commentFormatting
+        - whyNoLint
+    godox:
+      keywords:
+        - TODO
+        - FIXME
+
+  exclusions:
+    presets:
+      - comments
+      - std-error-handling
+    rules:
+      # Allow TODO/FIXME in test code
+      - path: _test\.go
+        linters:
+          - godox
+      # Allow long functions in generated code
+      - path: (.*)?_gen\.go
+        linters:
+          - gocyclo
+          - gocognit
+    paths:
+      - vendor
+      - third_party
+      - testdata
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/SmrutAI/Pedantigo
+  exclusions:
+    paths:
+      - vendor
+      - third_party
+
+run:
+  timeout: 5m
+  tests: true

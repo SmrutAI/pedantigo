@@ -2,18 +2,20 @@ package pedantigo
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
+
+	"github.com/invopop/jsonschema"
 
 	"github.com/SmrutAI/Pedantigo/internal/constraints"
 	"github.com/SmrutAI/Pedantigo/internal/deserialize"
 	"github.com/SmrutAI/Pedantigo/internal/tags"
 	"github.com/SmrutAI/Pedantigo/internal/validation"
-	"github.com/invopop/jsonschema"
 )
 
-// Validator validates structs of type T
+// Validator validates structs of type T.
 type Validator[T any] struct {
 	typ                reflect.Type
 	options            ValidatorOptions
@@ -30,7 +32,7 @@ type Validator[T any] struct {
 	cachedOpenAPIJSON []byte             // SchemaJSONOpenAPI() result
 }
 
-// New creates a new Validator for type T with optional configuration
+// New creates a new Validator for type T with optional configuration.
 func New[T any](opts ...ValidatorOptions) *Validator[T] {
 	var zero T
 	typ := reflect.TypeOf(zero)
@@ -61,7 +63,7 @@ func New[T any](opts ...ValidatorOptions) *Validator[T] {
 	return validator
 }
 
-// buildCrossFieldConstraints builds cross-field constraints for all struct fields
+// buildCrossFieldConstraints builds cross-field constraints for all struct fields.
 func (v *Validator[T]) buildCrossFieldConstraints(typ reflect.Type) {
 	// Handle pointer types
 	if typ.Kind() == reflect.Ptr {
@@ -94,14 +96,14 @@ func (v *Validator[T]) buildCrossFieldConstraints(typ reflect.Type) {
 	}
 }
 
-// setFieldValue wraps the deserialize package SetFieldValue for use in validator
+// setFieldValue wraps the deserialize package SetFieldValue for use in validator.
 func (v *Validator[T]) setFieldValue(fieldValue reflect.Value, inValue any, fieldType reflect.Type) error {
 	return deserialize.SetFieldValue(fieldValue, inValue, fieldType, v.setFieldValue)
 }
 
 // Validate validates a struct and returns any validation errors
 // NOTE: 'required' is NOT checked here - it's only checked during Unmarshal
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (v *Validator[T]) Validate(obj *T) error {
 	if obj == nil {
 		return &ValidationError{
@@ -109,10 +111,10 @@ func (v *Validator[T]) Validate(obj *T) error {
 		}
 	}
 
-	var errors []FieldError
+	var fieldErrors []FieldError
 
 	// Validate all fields using struct tags (required is skipped via buildConstraints)
-	errors = append(errors, v.validateValue(reflect.ValueOf(obj).Elem(), "")...)
+	fieldErrors = append(fieldErrors, v.validateValue(reflect.ValueOf(obj).Elem(), "")...)
 
 	// Run cross-field validation
 	structValue := reflect.ValueOf(obj).Elem()
@@ -127,10 +129,11 @@ func (v *Validator[T]) Validate(obj *T) error {
 		// Run each cross-field constraint
 		for _, constraint := range crossConstraints {
 			if err := constraint.ValidateCrossField(fieldValue, structValue, fieldName); err != nil {
-				if valErr, ok := err.(*ValidationError); ok {
-					errors = append(errors, valErr.Errors...)
+				var valErr *ValidationError
+				if errors.As(err, &valErr) {
+					fieldErrors = append(fieldErrors, valErr.Errors...)
 				} else {
-					errors = append(errors, FieldError{
+					fieldErrors = append(fieldErrors, FieldError{
 						Field:   fieldName,
 						Message: err.Error(),
 					})
@@ -143,11 +146,12 @@ func (v *Validator[T]) Validate(obj *T) error {
 	if validatable, ok := any(obj).(Validatable); ok {
 		if err := validatable.Validate(); err != nil {
 			// Check if it's a ValidationError with multiple errors
-			if ve, ok := err.(*ValidationError); ok {
-				errors = append(errors, ve.Errors...)
+			var ve *ValidationError
+			if errors.As(err, &ve) {
+				fieldErrors = append(fieldErrors, ve.Errors...)
 			} else {
 				// Single error or custom error type
-				errors = append(errors, FieldError{
+				fieldErrors = append(fieldErrors, FieldError{
 					Field:   "root",
 					Message: err.Error(),
 				})
@@ -155,14 +159,14 @@ func (v *Validator[T]) Validate(obj *T) error {
 		}
 	}
 
-	if len(errors) == 0 {
+	if len(fieldErrors) == 0 {
 		return nil
 	}
 
-	return &ValidationError{Errors: errors}
+	return &ValidationError{Errors: fieldErrors}
 }
 
-// validateValue wraps the validation package ValidateValue for use in validator
+// validateValue wraps the validation package ValidateValue for use in validator.
 func (v *Validator[T]) validateValue(val reflect.Value, path string) []FieldError {
 	// Create a recursive wrapper that converts return types
 	var recursiveValidate func(reflect.Value, string) []validation.FieldError
@@ -186,7 +190,7 @@ func (v *Validator[T]) validateValue(val reflect.Value, path string) []FieldErro
 	return v.validateValueInternal(val, path, recursiveValidate)
 }
 
-// validateValueInternal is the actual implementation that uses validation.ValidateValue
+// validateValueInternal is the actual implementation that uses validation.ValidateValue.
 func (v *Validator[T]) validateValueInternal(
 	val reflect.Value,
 	path string,
@@ -211,18 +215,18 @@ func (v *Validator[T]) validateValueInternal(
 	)
 
 	// Convert validation.FieldError to pedantigo.FieldError
-	errors := make([]FieldError, len(validationErrors))
+	fieldErrors := make([]FieldError, len(validationErrors))
 	for i, e := range validationErrors {
-		errors[i] = FieldError{
+		fieldErrors[i] = FieldError{
 			Field:   e.Field,
 			Message: e.Message,
 			Value:   e.Value,
 		}
 	}
-	return errors
+	return fieldErrors
 }
 
-// Unmarshal unmarshals JSON data, applies defaults, and validates
+// Unmarshal unmarshals JSON data, applies defaults, and validates.
 func (v *Validator[T]) Unmarshal(data []byte) (*T, error) {
 	// Fast path: skip 2-step flow if StrictMissingFields is disabled
 	if !v.options.StrictMissingFields {
@@ -259,7 +263,7 @@ func (v *Validator[T]) Unmarshal(data []byte) (*T, error) {
 	objValue := reflect.ValueOf(&obj).Elem()
 
 	// Step 3: Apply field deserializers
-	var errors []FieldError
+	var fieldErrors []FieldError
 	for fieldName, deserializer := range v.fieldDeserializers {
 		var inValue any
 		if val, exists := jsonMap[fieldName]; exists {
@@ -269,7 +273,7 @@ func (v *Validator[T]) Unmarshal(data []byte) (*T, error) {
 		}
 
 		if err := deserializer(&objValue, inValue); err != nil {
-			errors = append(errors, FieldError{
+			fieldErrors = append(fieldErrors, FieldError{
 				Field:   fieldName,
 				Message: err.Error(),
 			})
@@ -277,8 +281,8 @@ func (v *Validator[T]) Unmarshal(data []byte) (*T, error) {
 	}
 
 	// Return early if deserialization errors
-	if len(errors) > 0 {
-		return &obj, &ValidationError{Errors: errors}
+	if len(fieldErrors) > 0 {
+		return &obj, &ValidationError{Errors: fieldErrors}
 	}
 
 	// Step 4: Run validation constraints (min, max, email, etc.)
@@ -290,12 +294,12 @@ func (v *Validator[T]) Unmarshal(data []byte) (*T, error) {
 	return &obj, nil
 }
 
-// setDefaultValue wraps the deserialize package SetDefaultValue for use in validator
+// setDefaultValue wraps the deserialize package SetDefaultValue for use in validator.
 func (v *Validator[T]) setDefaultValue(fieldValue reflect.Value, defaultValue string) {
 	deserialize.SetDefaultValue(fieldValue, defaultValue, v.setDefaultValue)
 }
 
-// Marshal validates and marshals struct to JSON
+// Marshal validates and marshals struct to JSON.
 func (v *Validator[T]) Marshal(obj *T) ([]byte, error) {
 	// Validate before marshaling
 	if err := v.Validate(obj); err != nil {
@@ -306,7 +310,7 @@ func (v *Validator[T]) Marshal(obj *T) ([]byte, error) {
 	return json.Marshal(obj)
 }
 
-// Dict converts the object into a dict
+// Dict converts the object into a dict.
 func (v *Validator[T]) Dict(obj *T) (map[string]interface{}, error) {
 	data, _ := json.Marshal(obj)
 	var dict map[string]interface{}

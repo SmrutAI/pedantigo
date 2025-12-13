@@ -6,7 +6,7 @@ import (
 )
 
 // excludedIfConstraint: field must be absent (zero) if another field equals a specific value
-// ValidateCrossField validates the field against another field in the struct
+// ValidateCrossField validates the field against another field in the struct.
 func (c excludedIfConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
 	targetValue := structValue.Field(c.targetFieldIndex).Interface()
 
@@ -20,7 +20,7 @@ func (c excludedIfConstraint) ValidateCrossField(fieldValue any, structValue ref
 }
 
 // excludedUnlessConstraint: field must be absent unless another field equals a specific value
-// ValidateCrossField validates the field against another field in the struct
+// ValidateCrossField validates the field against another field in the struct.
 func (c excludedUnlessConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
 	targetValue := structValue.Field(c.targetFieldIndex).Interface()
 
@@ -34,7 +34,7 @@ func (c excludedUnlessConstraint) ValidateCrossField(fieldValue any, structValue
 }
 
 // excludedWithConstraint: field must be absent if another field is non-zero
-// ValidateCrossField validates the field against another field in the struct
+// ValidateCrossField validates the field against another field in the struct.
 func (c excludedWithConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
 	targetValue := structValue.Field(c.targetFieldIndex).Interface()
 
@@ -48,7 +48,7 @@ func (c excludedWithConstraint) ValidateCrossField(fieldValue any, structValue r
 }
 
 // excludedWithoutConstraint: field must be absent if another field is zero
-// ValidateCrossField validates the field against another field in the struct
+// ValidateCrossField validates the field against another field in the struct.
 func (c excludedWithoutConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
 	targetValue := structValue.Field(c.targetFieldIndex).Interface()
 

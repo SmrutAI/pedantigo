@@ -10,7 +10,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestMaxConstraint tests maxConstraint.Validate() for numeric values
+// checkConstraintError asserts validation errors based on expected outcome.
+func checkConstraintError(t *testing.T, err error, wantErr bool) {
+	t.Helper()
+
+	if wantErr {
+		assert.Error(t, err)
+	} else {
+		assert.NoError(t, err)
+	}
+}
+
+// simpleTestCase is a test case structure for simple constraint tests.
+type simpleTestCase struct {
+	name    string
+	value   any
+	wantErr bool
+}
+
+// runSimpleConstraintTests runs table-driven tests for a simple constraint.
+func runSimpleConstraintTests(t *testing.T, c Constraint, tests []simpleTestCase) {
+	t.Helper()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := c.Validate(tt.value)
+			checkConstraintError(t, err, tt.wantErr)
+		})
+	}
+}
+
+// TestMaxConstraint tests maxConstraint.Validate() for numeric values.
 func TestMaxConstraint(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -72,17 +101,12 @@ func TestMaxConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := maxConstraint{max: tt.max}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestMaxLengthConstraint tests maxLengthConstraint.Validate() for strings
+// TestMaxLengthConstraint tests maxLengthConstraint.Validate() for strings.
 func TestMaxLengthConstraint(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -119,17 +143,12 @@ func TestMaxLengthConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := maxLengthConstraint{maxLength: tt.maxLength}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestLtConstraint tests ltConstraint.Validate() for < threshold
+// TestLtConstraint tests ltConstraint.Validate() for < threshold.
 func TestLtConstraint(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -175,17 +194,12 @@ func TestLtConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := ltConstraint{threshold: tt.threshold}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestLeConstraint tests leConstraint.Validate() for <= threshold
+// TestLeConstraint tests leConstraint.Validate() for <= threshold.
 func TestLeConstraint(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -227,75 +241,47 @@ func TestLeConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := leConstraint{threshold: tt.threshold}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestUrlConstraint tests urlConstraint.Validate() for valid URLs
+// TestUrlConstraint tests urlConstraint.Validate() for valid URLs.
 func TestUrlConstraint(t *testing.T) {
-	tests := []struct {
-		name    string
-		value   any
-		wantErr bool
-	}{
+	runSimpleConstraintTests(t, urlConstraint{}, []simpleTestCase{
 		// Valid HTTP URLs
-		{name: "http URL simple", value: "http://example.com", wantErr: false},
-		{name: "http URL with path", value: "http://example.com/path", wantErr: false},
-		{name: "http URL with query", value: "http://example.com/path?key=value", wantErr: false},
-		{name: "http URL with subdomain", value: "http://api.example.com", wantErr: false},
-		{name: "http URL with port", value: "http://example.com:8080", wantErr: false},
-		{name: "http URL with complex path", value: "http://example.com/path/to/resource?id=123&name=test", wantErr: false},
-
+		{"http URL simple", "http://example.com", false},
+		{"http URL with path", "http://example.com/path", false},
+		{"http URL with query", "http://example.com/path?key=value", false},
+		{"http URL with subdomain", "http://api.example.com", false},
+		{"http URL with port", "http://example.com:8080", false},
+		{"http URL with complex path", "http://example.com/path/to/resource?id=123&name=test", false},
 		// Valid HTTPS URLs
-		{name: "https URL simple", value: "https://example.com", wantErr: false},
-		{name: "https URL with path", value: "https://example.com/path", wantErr: false},
-		{name: "https URL with query", value: "https://example.com/path?key=value", wantErr: false},
-		{name: "https URL with subdomain", value: "https://api.example.com", wantErr: false},
-		{name: "https URL with port", value: "https://example.com:443", wantErr: false},
-
+		{"https URL simple", "https://example.com", false},
+		{"https URL with path", "https://example.com/path", false},
+		{"https URL with query", "https://example.com/path?key=value", false},
+		{"https URL with subdomain", "https://api.example.com", false},
+		{"https URL with port", "https://example.com:443", false},
 		// Empty string - should be skipped
-		{name: "empty string", value: "", wantErr: false},
-
+		{"empty string", "", false},
 		// Invalid schemes
-		{name: "ftp scheme", value: "ftp://example.com", wantErr: true},
-		{name: "file scheme", value: "file:///etc/passwd", wantErr: true},
-		{name: "data scheme", value: "data:text/plain,hello", wantErr: true},
-
+		{"ftp scheme", "ftp://example.com", true},
+		{"file scheme", "file:///etc/passwd", true},
+		{"data scheme", "data:text/plain,hello", true},
 		// Invalid URLs
-		{name: "invalid URL - missing host", value: "http://", wantErr: true},
-		{name: "invalid URL - no scheme", value: "example.com", wantErr: true},
-		{name: "invalid URL - malformed", value: "http://exa mple.com", wantErr: true},
-		{name: "invalid URL - only path", value: "/path/to/resource", wantErr: true},
-
+		{"invalid URL - missing host", "http://", true},
+		{"invalid URL - no scheme", "example.com", true},
+		{"invalid URL - malformed", "http://exa mple.com", true},
+		{"invalid URL - only path", "/path/to/resource", true},
 		// Nil pointer - should skip validation
-		{name: "nil pointer", value: (*string)(nil), wantErr: false},
-
+		{"nil pointer", (*string)(nil), false},
 		// Invalid types
-		{name: "invalid type - int", value: 123, wantErr: true},
-		{name: "invalid type - bool", value: true, wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			constraint := urlConstraint{}
-			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
 }
 
-// TestUuidConstraint tests uuidConstraint.Validate() for valid UUIDs
+// TestUuidConstraint tests uuidConstraint.Validate() for valid UUIDs.
 func TestUuidConstraint(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -338,17 +324,12 @@ func TestUuidConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := uuidConstraint{}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestRegexConstraint tests regexConstraint.Validate() for custom patterns
+// TestRegexConstraint tests regexConstraint.Validate() for custom patterns.
 func TestRegexConstraint(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -397,75 +378,47 @@ func TestRegexConstraint(t *testing.T) {
 			require.NoError(t, err, "failed to compile regex")
 			constraint := regexConstraint{pattern: tt.pattern, regex: regex}
 			err = constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestIpv4Constraint tests ipv4Constraint.Validate() for valid IPv4 addresses
+// TestIpv4Constraint tests ipv4Constraint.Validate() for valid IPv4 addresses.
 func TestIpv4Constraint(t *testing.T) {
-	tests := []struct {
-		name    string
-		value   any
-		wantErr bool
-	}{
+	runSimpleConstraintTests(t, ipv4Constraint{}, []simpleTestCase{
 		// Valid IPv4 addresses
-		{name: "valid IPv4 - localhost", value: "127.0.0.1", wantErr: false},
-		{name: "valid IPv4 - private range", value: "192.168.1.1", wantErr: false},
-		{name: "valid IPv4 - private range 10", value: "10.0.0.1", wantErr: false},
-		{name: "valid IPv4 - private range 172", value: "172.16.0.1", wantErr: false},
-		{name: "valid IPv4 - zeros", value: "0.0.0.0", wantErr: false},
-		{name: "valid IPv4 - broadcast", value: "255.255.255.255", wantErr: false},
-		{name: "valid IPv4 - google DNS", value: "8.8.8.8", wantErr: false},
-		{name: "valid IPv4 - public IP", value: "1.1.1.1", wantErr: false},
-
+		{"valid IPv4 - localhost", "127.0.0.1", false},
+		{"valid IPv4 - private range", "192.168.1.1", false},
+		{"valid IPv4 - private range 10", "10.0.0.1", false},
+		{"valid IPv4 - private range 172", "172.16.0.1", false},
+		{"valid IPv4 - zeros", "0.0.0.0", false},
+		{"valid IPv4 - broadcast", "255.255.255.255", false},
+		{"valid IPv4 - google DNS", "8.8.8.8", false},
+		{"valid IPv4 - public IP", "1.1.1.1", false},
 		// Empty string - should be skipped
-		{name: "empty string", value: "", wantErr: false},
-
+		{"empty string", "", false},
 		// Invalid IPv4 addresses
-		{name: "invalid IPv4 - out of range", value: "256.1.1.1", wantErr: true},
-		{name: "invalid IPv4 - too few octets", value: "192.168.1", wantErr: true},
-		{name: "invalid IPv4 - too many octets", value: "192.168.1.1.1", wantErr: true},
-		{name: "invalid IPv4 - letters", value: "192.168.a.1", wantErr: true},
-		{name: "invalid IPv4 - empty octets", value: "192.168..1", wantErr: true},
-
+		{"invalid IPv4 - out of range", "256.1.1.1", true},
+		{"invalid IPv4 - too few octets", "192.168.1", true},
+		{"invalid IPv4 - too many octets", "192.168.1.1.1", true},
+		{"invalid IPv4 - letters", "192.168.a.1", true},
+		{"invalid IPv4 - empty octets", "192.168..1", true},
 		// IPv6 addresses - should fail
-		{name: "IPv6 address fails", value: "::1", wantErr: true},
-		{name: "IPv6 full address fails", value: "2001:0db8:85a3:0000:0000:8a2e:0370:7334", wantErr: true},
-		{name: "IPv6 compressed fails", value: "2001:db8::1", wantErr: true},
-
+		{"IPv6 address fails", "::1", true},
+		{"IPv6 full address fails", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", true},
+		{"IPv6 compressed fails", "2001:db8::1", true},
 		// Other invalid formats
-		{name: "hostname not IP", value: "example.com", wantErr: true},
-		{name: "CIDR notation not IP", value: "192.168.1.0/24", wantErr: true},
-
+		{"hostname not IP", "example.com", true},
+		{"CIDR notation not IP", "192.168.1.0/24", true},
 		// Nil pointer - should skip validation
-		{name: "nil pointer", value: (*string)(nil), wantErr: false},
-
+		{"nil pointer", (*string)(nil), false},
 		// Invalid types
-		{name: "invalid type - int", value: 123, wantErr: true},
-		{name: "invalid type - bool", value: true, wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			constraint := ipv4Constraint{}
-			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
 }
 
-// TestIpv6Constraint tests ipv6Constraint.Validate() for valid IPv6 addresses
+// TestIpv6Constraint tests ipv6Constraint.Validate() for valid IPv6 addresses.
 func TestIpv6Constraint(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -516,17 +469,12 @@ func TestIpv6Constraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := ipv6Constraint{}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestEnumConstraint tests enumConstraint.Validate() for allowed values
+// TestEnumConstraint tests enumConstraint.Validate() for allowed values.
 func TestEnumConstraint(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -583,17 +531,12 @@ func TestEnumConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := enumConstraint{values: tt.values}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestDefaultConstraint tests defaultConstraint.Validate() - no-op validator
+// TestDefaultConstraint tests defaultConstraint.Validate() - no-op validator.
 func TestDefaultConstraint(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -623,7 +566,7 @@ func TestDefaultConstraint(t *testing.T) {
 
 // TestMinConstraint tests minConstraint.Validate() for numeric values
 // Added to ensure comprehensive coverage of all constraints mentioned
-// TestMinConstraint tests MinConstraint validation
+// TestMinConstraint tests MinConstraint validation.
 func TestMinConstraint(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -666,17 +609,12 @@ func TestMinConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := minConstraint{min: tt.min}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestGtConstraint tests gtConstraint.Validate() for > threshold
+// TestGtConstraint tests gtConstraint.Validate() for > threshold.
 func TestGtConstraint(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -711,17 +649,12 @@ func TestGtConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := gtConstraint{threshold: tt.threshold}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestGeConstraint tests geConstraint.Validate() for >= threshold
+// TestGeConstraint tests geConstraint.Validate() for >= threshold.
 func TestGeConstraint(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -756,17 +689,12 @@ func TestGeConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := geConstraint{threshold: tt.threshold}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestMinLengthConstraint tests minLengthConstraint.Validate() for strings
+// TestMinLengthConstraint tests minLengthConstraint.Validate() for strings.
 func TestMinLengthConstraint(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -800,17 +728,12 @@ func TestMinLengthConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := minLengthConstraint{minLength: tt.minLength}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestEmailConstraint tests emailConstraint.Validate() for email format
+// TestEmailConstraint tests emailConstraint.Validate() for email format.
 func TestEmailConstraint(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -848,17 +771,12 @@ func TestEmailConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := emailConstraint{}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestBuildMaxConstraint tests buildMaxConstraint builder function
+// TestBuildMaxConstraint tests buildMaxConstraint builder function.
 func TestBuildMaxConstraint(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -908,7 +826,7 @@ func TestBuildMaxConstraint(t *testing.T) {
 	}
 }
 
-// TestBuildRegexConstraint tests buildRegexConstraint builder function
+// TestBuildRegexConstraint tests buildRegexConstraint builder function.
 func TestBuildRegexConstraint(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -954,7 +872,7 @@ func TestBuildRegexConstraint(t *testing.T) {
 	}
 }
 
-// TestBuildEnumConstraint tests buildEnumConstraint builder function
+// TestBuildEnumConstraint tests buildEnumConstraint builder function.
 func TestBuildEnumConstraint(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -994,7 +912,7 @@ func TestBuildEnumConstraint(t *testing.T) {
 	}
 }
 
-// TestToFloat64_AllNumericTypes tests toFloat64 with all numeric type cases
+// TestToFloat64_AllNumericTypes tests toFloat64 with all numeric type cases.
 func TestToFloat64_AllNumericTypes(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1024,12 +942,12 @@ func TestToFloat64_AllNumericTypes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			val := reflect.ValueOf(tt.value)
 			result := toFloat64(val)
-			assert.Equal(t, tt.expected, result)
+			assert.InDelta(t, tt.expected, result, 0.0001)
 		})
 	}
 }
 
-// TestCheckTypeCompatibility_BoolAndTime tests missing branches in CheckTypeCompatibility
+// TestCheckTypeCompatibility_BoolAndTime tests missing branches in CheckTypeCompatibility.
 func TestCheckTypeCompatibility_BoolAndTime(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -1061,7 +979,7 @@ func TestCheckTypeCompatibility_BoolAndTime(t *testing.T) {
 	}
 }
 
-// TestDereference_PointerLevels tests Dereference with various pointer levels
+// TestDereference_PointerLevels tests Dereference with various pointer levels.
 func TestDereference_PointerLevels(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1110,7 +1028,7 @@ func TestDereference_PointerLevels(t *testing.T) {
 	}
 }
 
-// TestCompareToString_BoolAndDefault tests missing branches in CompareToString
+// TestCompareToString_BoolAndDefault tests missing branches in CompareToString.
 func TestCompareToString_BoolAndDefault(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1141,7 +1059,7 @@ func TestCompareToString_BoolAndDefault(t *testing.T) {
 	}
 }
 
-// TestBuildConstraints_MissingBranches tests uncovered constraint types in BuildConstraints
+// TestBuildConstraints_MissingBranches tests uncovered constraint types in BuildConstraints.
 func TestBuildConstraints_MissingBranches(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -1281,7 +1199,7 @@ func TestBuildConstraints_MissingBranches(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := BuildConstraints(tt.constraints, tt.fieldType)
-			assert.Equal(t, tt.expectedCount, len(result))
+			assert.Len(t, result, tt.expectedCount)
 
 			// Verify constraint types (order may vary due to map iteration)
 			if len(tt.expectedTypes) > 0 {
@@ -1298,7 +1216,7 @@ func TestBuildConstraints_MissingBranches(t *testing.T) {
 	}
 }
 
-// TestParseConditionalConstraint_ErrorPath tests the false return branch
+// TestParseConditionalConstraint_ErrorPath tests the false return branch.
 func TestParseConditionalConstraint_ErrorPath(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -1360,7 +1278,7 @@ func TestParseConditionalConstraint_ErrorPath(t *testing.T) {
 	}
 }
 
-// TestLenConstraint tests lenConstraint.Validate() for exact string length
+// TestLenConstraint tests lenConstraint.Validate() for exact string length.
 func TestLenConstraint(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -1399,17 +1317,12 @@ func TestLenConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := lenConstraint{length: tt.length}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestAsciiConstraint tests asciiConstraint.Validate() for ASCII-only strings
+// TestAsciiConstraint tests asciiConstraint.Validate() for ASCII-only strings.
 func TestAsciiConstraint(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -1444,59 +1357,34 @@ func TestAsciiConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := asciiConstraint{}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
 func TestAlphaConstraint(t *testing.T) {
-	tests := []struct {
-		name    string
-		value   any
-		wantErr bool
-	}{
+	runSimpleConstraintTests(t, alphaConstraint{}, []simpleTestCase{
 		// Valid cases - alphabetic characters only
-		{name: "lowercase letters", value: "hello", wantErr: false},
-		{name: "uppercase letters", value: "WORLD", wantErr: false},
-		{name: "mixed case", value: "HelloWorld", wantErr: false},
-		{name: "single letter lowercase", value: "a", wantErr: false},
-		{name: "single letter uppercase", value: "Z", wantErr: false},
-		{name: "long alphabetic string", value: "thequickbrownfoxjumpsoverthelazydog", wantErr: false},
-
+		{"lowercase letters", "hello", false},
+		{"uppercase letters", "WORLD", false},
+		{"mixed case", "HelloWorld", false},
+		{"single letter lowercase", "a", false},
+		{"single letter uppercase", "Z", false},
+		{"long alphabetic string", "thequickbrownfoxjumpsoverthelazydog", false},
 		// Invalid cases - non-alphabetic characters
-		{name: "contains digits", value: "hello123", wantErr: true},
-		{name: "contains spaces", value: "hello world", wantErr: true},
-		{name: "contains symbols", value: "hello!", wantErr: true},
-		{name: "only digits", value: "12345", wantErr: true},
-		{name: "unicode accented", value: "café", wantErr: true},
-		{name: "emoji", value: "hello👍", wantErr: true},
-
+		{"contains digits", "hello123", true},
+		{"contains spaces", "hello world", true},
+		{"contains symbols", "hello!", true},
+		{"only digits", "12345", true},
+		{"unicode accented", "café", true},
+		{"emoji", "hello👍", true},
 		// Edge cases
-		{name: "empty string", value: "", wantErr: false},
-		{name: "nil pointer", value: (*string)(nil), wantErr: false},
-
+		{"empty string", "", false},
+		{"nil pointer", (*string)(nil), false},
 		// Invalid types
-		{name: "invalid type - int", value: 123, wantErr: true},
-		{name: "invalid type - bool", value: true, wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			constraint := alphaConstraint{}
-			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
 }
 
 func TestAlphanumConstraint(t *testing.T) {
@@ -1535,12 +1423,7 @@ func TestAlphanumConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := alphanumConstraint{}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
@@ -1586,17 +1469,12 @@ func TestContainsConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := containsConstraint{substring: tt.substring}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestExcludesConstraint tests excludesConstraint.Validate() for substring exclusion
+// TestExcludesConstraint tests excludesConstraint.Validate() for substring exclusion.
 func TestExcludesConstraint(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -1635,201 +1513,136 @@ func TestExcludesConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := excludesConstraint{substring: tt.substring}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestStartswithConstraint tests startswithConstraint.Validate() for prefix validation
-func TestStartswithConstraint(t *testing.T) {
-	tests := []struct {
-		name    string
-		value   any
-		prefix  string
-		wantErr bool
-	}{
+// prefixSuffixTestCase holds test cases for startswith/endswith constraints.
+type prefixSuffixTestCase struct {
+	name    string
+	value   any
+	param   string
+	wantErr bool
+}
+
+// TestStartswithEndswithConstraints tests startswith and endswith constraints together.
+func TestStartswithEndswithConstraints(t *testing.T) {
+	// Common edge cases and invalid types
+	startswithTests := []prefixSuffixTestCase{
 		// Valid cases - starts with prefix
-		{name: "starts with prefix", value: "helloworld", prefix: "hello", wantErr: false},
-		{name: "full match", value: "hello", prefix: "hello", wantErr: false},
-		{name: "single char prefix", value: "hello", prefix: "h", wantErr: false},
-		{name: "numeric prefix", value: "123abc", prefix: "123", wantErr: false},
-		{name: "unicode prefix", value: "café au lait", prefix: "café", wantErr: false},
-		{name: "special char prefix", value: "@user hello", prefix: "@user", wantErr: false},
-
+		{"starts with prefix", "helloworld", "hello", false},
+		{"full match", "hello", "hello", false},
+		{"single char prefix", "hello", "h", false},
+		{"numeric prefix", "123abc", "123", false},
+		{"unicode prefix", "café au lait", "café", false},
+		{"special char prefix", "@user hello", "@user", false},
 		// Invalid cases - doesn't start with prefix
-		{name: "prefix in middle", value: "world hello", prefix: "hello", wantErr: true},
-		{name: "prefix at end", value: "worldhello", prefix: "hello", wantErr: true},
-		{name: "case mismatch", value: "Hello", prefix: "hello", wantErr: true},
-		{name: "prefix not found", value: "hello", prefix: "world", wantErr: true},
-		{name: "prefix longer than string", value: "hi", prefix: "hello", wantErr: true},
-
+		{"prefix in middle", "world hello", "hello", true},
+		{"prefix at end", "worldhello", "hello", true},
+		{"case mismatch", "Hello", "hello", true},
+		{"prefix not found", "hello", "world", true},
+		{"prefix longer than string", "hi", "hello", true},
 		// Edge cases
-		{name: "empty string", value: "", prefix: "test", wantErr: false},
-		{name: "nil pointer", value: (*string)(nil), prefix: "test", wantErr: false},
-
+		{"empty string", "", "test", false},
+		{"nil pointer", (*string)(nil), "test", false},
 		// Invalid types
-		{name: "invalid type - int", value: 123, prefix: "123", wantErr: true},
-		{name: "invalid type - bool", value: true, prefix: "true", wantErr: true},
+		{"invalid type - int", 123, "123", true},
+		{"invalid type - bool", true, "true", true},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			constraint := startswithConstraint{prefix: tt.prefix}
-			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-// TestEndswithConstraint tests endswithConstraint.Validate() for suffix validation
-func TestEndswithConstraint(t *testing.T) {
-	tests := []struct {
-		name    string
-		value   any
-		suffix  string
-		wantErr bool
-	}{
+	endswithTests := []prefixSuffixTestCase{
 		// Valid cases - ends with suffix
-		{name: "ends with suffix", value: "helloworld", suffix: "world", wantErr: false},
-		{name: "full match", value: "world", suffix: "world", wantErr: false},
-		{name: "single char suffix", value: "hello", suffix: "o", wantErr: false},
-		{name: "numeric suffix", value: "abc123", suffix: "123", wantErr: false},
-		{name: "unicode suffix", value: "au lait café", suffix: "café", wantErr: false},
-		{name: "special char suffix", value: "hello @user", suffix: "@user", wantErr: false},
-
+		{"ends with suffix", "helloworld", "world", false},
+		{"full match", "world", "world", false},
+		{"single char suffix", "hello", "o", false},
+		{"numeric suffix", "abc123", "123", false},
+		{"unicode suffix", "au lait café", "café", false},
+		{"special char suffix", "hello @user", "@user", false},
 		// Invalid cases - doesn't end with suffix
-		{name: "suffix in middle", value: "world hello", suffix: "world", wantErr: true},
-		{name: "suffix at start", value: "worldhello", suffix: "world", wantErr: true},
-		{name: "case mismatch", value: "helloWorld", suffix: "world", wantErr: true},
-		{name: "suffix not found", value: "hello", suffix: "world", wantErr: true},
-		{name: "suffix longer than string", value: "hi", suffix: "hello", wantErr: true},
-
+		{"suffix in middle", "world hello", "world", true},
+		{"suffix at start", "worldhello", "world", true},
+		{"case mismatch", "helloWorld", "world", true},
+		{"suffix not found", "hello", "world", true},
+		{"suffix longer than string", "hi", "hello", true},
 		// Edge cases
-		{name: "empty string", value: "", suffix: "test", wantErr: false},
-		{name: "nil pointer", value: (*string)(nil), suffix: "test", wantErr: false},
-
+		{"empty string", "", "test", false},
+		{"nil pointer", (*string)(nil), "test", false},
 		// Invalid types
-		{name: "invalid type - int", value: 123, suffix: "123", wantErr: true},
-		{name: "invalid type - bool", value: true, suffix: "true", wantErr: true},
+		{"invalid type - int", 123, "123", true},
+		{"invalid type - bool", true, "true", true},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			constraint := endswithConstraint{suffix: tt.suffix}
-			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+	t.Run("startswith", func(t *testing.T) {
+		for _, tt := range startswithTests {
+			t.Run(tt.name, func(t *testing.T) {
+				c := startswithConstraint{prefix: tt.param}
+				checkConstraintError(t, c.Validate(tt.value), tt.wantErr)
+			})
+		}
+	})
+	t.Run("endswith", func(t *testing.T) {
+		for _, tt := range endswithTests {
+			t.Run(tt.name, func(t *testing.T) {
+				c := endswithConstraint{suffix: tt.param}
+				checkConstraintError(t, c.Validate(tt.value), tt.wantErr)
+			})
+		}
+	})
 }
 
-// TestLowercaseConstraint tests lowercaseConstraint.Validate() for lowercase validation
+// TestLowercaseConstraint tests lowercaseConstraint.Validate() for lowercase validation.
 func TestLowercaseConstraint(t *testing.T) {
-	tests := []struct {
-		name    string
-		value   any
-		wantErr bool
-	}{
+	runSimpleConstraintTests(t, lowercaseConstraint{}, []simpleTestCase{
 		// Valid cases - all lowercase
-		{name: "all lowercase letters", value: "hello", wantErr: false},
-		{name: "lowercase with numbers", value: "hello123", wantErr: false},
-		{name: "lowercase with spaces", value: "hello world", wantErr: false},
-		{name: "lowercase with special chars", value: "hello@world!", wantErr: false},
-		{name: "lowercase with hyphens", value: "hello-world", wantErr: false},
-		{name: "numbers only", value: "12345", wantErr: false},
-		{name: "special chars only", value: "@#$%", wantErr: false},
-
+		{"all lowercase letters", "hello", false},
+		{"lowercase with numbers", "hello123", false},
+		{"lowercase with spaces", "hello world", false},
+		{"lowercase with special chars", "hello@world!", false},
+		{"lowercase with hyphens", "hello-world", false},
+		{"numbers only", "12345", false},
+		{"special chars only", "@#$%", false},
 		// Invalid cases - contains uppercase
-		{name: "single uppercase", value: "Hello", wantErr: true},
-		{name: "all uppercase", value: "HELLO", wantErr: true},
-		{name: "mixed case", value: "hElLo", wantErr: true},
-		{name: "uppercase at end", value: "hellO", wantErr: true},
-		{name: "camelCase", value: "helloWorld", wantErr: true},
-
+		{"single uppercase", "Hello", true},
+		{"all uppercase", "HELLO", true},
+		{"mixed case", "hElLo", true},
+		{"uppercase at end", "hellO", true},
+		{"camelCase", "helloWorld", true},
 		// Edge cases
-		{name: "empty string", value: "", wantErr: false},
-		{name: "nil pointer", value: (*string)(nil), wantErr: false},
-
+		{"empty string", "", false},
+		{"nil pointer", (*string)(nil), false},
 		// Invalid types
-		{name: "invalid type - int", value: 123, wantErr: true},
-		{name: "invalid type - bool", value: true, wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			constraint := lowercaseConstraint{}
-			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
 }
 
-// TestUppercaseConstraint tests uppercaseConstraint.Validate() for uppercase validation
+// TestUppercaseConstraint tests uppercaseConstraint.Validate() for uppercase validation.
 func TestUppercaseConstraint(t *testing.T) {
-	tests := []struct {
-		name    string
-		value   any
-		wantErr bool
-	}{
+	runSimpleConstraintTests(t, uppercaseConstraint{}, []simpleTestCase{
 		// Valid cases - all uppercase
-		{name: "all uppercase letters", value: "HELLO", wantErr: false},
-		{name: "uppercase with numbers", value: "HELLO123", wantErr: false},
-		{name: "uppercase with spaces", value: "HELLO WORLD", wantErr: false},
-		{name: "uppercase with special chars", value: "HELLO@WORLD!", wantErr: false},
-		{name: "uppercase with hyphens", value: "HELLO-WORLD", wantErr: false},
-		{name: "numbers only", value: "12345", wantErr: false},
-		{name: "special chars only", value: "@#$%", wantErr: false},
-
+		{"all uppercase letters", "HELLO", false},
+		{"uppercase with numbers", "HELLO123", false},
+		{"uppercase with spaces", "HELLO WORLD", false},
+		{"uppercase with special chars", "HELLO@WORLD!", false},
+		{"uppercase with hyphens", "HELLO-WORLD", false},
+		{"numbers only", "12345", false},
+		{"special chars only", "@#$%", false},
 		// Invalid cases - contains lowercase
-		{name: "single lowercase", value: "HELLo", wantErr: true},
-		{name: "all lowercase", value: "hello", wantErr: true},
-		{name: "mixed case", value: "HeLLo", wantErr: true},
-		{name: "lowercase at start", value: "hELLO", wantErr: true},
-		{name: "camelCase", value: "helloWorld", wantErr: true},
-
+		{"single lowercase", "HELLo", true},
+		{"all lowercase", "hello", true},
+		{"mixed case", "HeLLo", true},
+		{"lowercase at start", "hELLO", true},
+		{"camelCase", "helloWorld", true},
 		// Edge cases
-		{name: "empty string", value: "", wantErr: false},
-		{name: "nil pointer", value: (*string)(nil), wantErr: false},
-
+		{"empty string", "", false},
+		{"nil pointer", (*string)(nil), false},
 		// Invalid types
-		{name: "invalid type - int", value: 123, wantErr: true},
-		{name: "invalid type - bool", value: true, wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			constraint := uppercaseConstraint{}
-			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
 }
 
-// TestPositiveConstraint tests positiveConstraint.Validate() for positive number validation
+// TestPositiveConstraint tests positiveConstraint.Validate() for positive number validation.
 func TestPositiveConstraint(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -1867,22 +1680,17 @@ func TestPositiveConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := positiveConstraint{}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// Helper function for int pointers
+// Helper function for int pointers.
 func intPtr(i int) *int {
 	return &i
 }
 
-// TestNegativeConstraint tests negativeConstraint.Validate() for negative number validation
+// TestNegativeConstraint tests negativeConstraint.Validate() for negative number validation.
 func TestNegativeConstraint(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -1920,12 +1728,7 @@ func TestNegativeConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := negativeConstraint{}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
@@ -1977,12 +1780,7 @@ func TestMultipleOfConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := multipleOfConstraint{factor: tt.factor}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
@@ -2032,12 +1830,7 @@ func TestMaxDigitsConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := maxDigitsConstraint{maxDigits: tt.maxDigits}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
@@ -2084,12 +1877,7 @@ func TestDecimalPlacesConstraint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			constraint := decimalPlacesConstraint{maxPlaces: tt.maxPlaces}
 			err := constraint.Validate(tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }

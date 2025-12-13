@@ -11,11 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Test message constants.
+const testMsgIsRequired = "is required"
+
 // ==================== Core Validation Tests ====================
 // NOTE: 'required' is only checked during Unmarshal (missing JSON keys), not Validate()
 // Validate() only checks value constraints (min, max, email, etc.)
 
-// TestValidator_Required_Present tests Validator required present
+// TestValidator_Required_Present tests Validator required present.
 func TestValidator_Required_Present(t *testing.T) {
 	type User struct {
 		Email string `pedantigo:"required"`
@@ -88,7 +91,7 @@ func TestValidator_MinMax_InRange(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// Test type for cross-field validation
+// Test type for cross-field validation.
 type testPasswordChange struct {
 	Password string `pedantigo:"required"`
 	Confirm  string `pedantigo:"required"`
@@ -114,11 +117,11 @@ func TestValidator_CrossField_PasswordConfirmation(t *testing.T) {
 	}
 
 	err := validator.Validate(pwd)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	// Should have cross-field error
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 	foundCrossFieldError := false
 	for _, fieldErr := range ve.Errors {
@@ -130,7 +133,7 @@ func TestValidator_CrossField_PasswordConfirmation(t *testing.T) {
 	assert.True(t, foundCrossFieldError, "expected cross-field validation error")
 }
 
-// TestMarshal_Valid verifies that Marshal returns JSON for valid structs
+// TestMarshal_Valid verifies that Marshal returns JSON for valid structs.
 func TestMarshal_Valid(t *testing.T) {
 	type User struct {
 		Name  string `json:"name" pedantigo:"min=2"`
@@ -154,10 +157,10 @@ func TestMarshal_Valid(t *testing.T) {
 
 	assert.Equal(t, "John Doe", result["name"])
 	assert.Equal(t, "john@example.com", result["email"])
-	assert.Equal(t, float64(25), result["age"])
+	assert.InDelta(t, float64(25), result["age"], 1e-9)
 }
 
-// TestMarshal_Invalid verifies that Marshal returns validation errors for invalid structs
+// TestMarshal_Invalid verifies that Marshal returns validation errors for invalid structs.
 func TestMarshal_Invalid(t *testing.T) {
 	type User struct {
 		Name  string `json:"name" pedantigo:"min=2"`
@@ -179,8 +182,8 @@ func TestMarshal_Invalid(t *testing.T) {
 	assert.Nil(t, data)
 
 	// Verify it's a ValidationError with multiple field errors
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 	assert.Len(t, ve.Errors, 3)
 
@@ -195,7 +198,7 @@ func TestMarshal_Invalid(t *testing.T) {
 	assert.True(t, errorFields["Age"], "expected validation error for Age field")
 }
 
-// TestMarshal_Nil verifies that Marshal handles nil pointer appropriately
+// TestMarshal_Nil verifies that Marshal handles nil pointer appropriately.
 func TestMarshal_Nil(t *testing.T) {
 	type User struct {
 		Name string `json:"name" pedantigo:"min=2"`
@@ -219,7 +222,7 @@ func TestMarshal_Nil(t *testing.T) {
 
 // ==================== Unmarshal Tests ====================
 
-// TestUnmarshal_ValidJSON tests Unmarshal validjson
+// TestUnmarshal_ValidJSON tests Unmarshal validjson.
 func TestUnmarshal_ValidJSON(t *testing.T) {
 	type User struct {
 		Email string `json:"email" pedantigo:"required"`
@@ -230,7 +233,7 @@ func TestUnmarshal_ValidJSON(t *testing.T) {
 	jsonData := []byte(`{"email":"test@example.com","age":25}`)
 
 	user, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, user)
 
 	assert.Equal(t, "test@example.com", user.Email)
@@ -246,7 +249,7 @@ func TestUnmarshal_InvalidJSON(t *testing.T) {
 	jsonData := []byte(`{"email":}`) // Invalid JSON
 
 	user, err := validator.Unmarshal(jsonData)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, user)
 }
 
@@ -264,8 +267,8 @@ func TestUnmarshal_ValidationError(t *testing.T) {
 
 	require.Error(t, err)
 
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 	t.Logf("Got %d errors:", len(ve.Errors))
 	for _, fieldErr := range ve.Errors {
@@ -302,10 +305,10 @@ func TestUnmarshal_DefaultValues(t *testing.T) {
 	jsonData := []byte(`{"email":"test@example.com"}`) // Missing role and status
 
 	user, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, user)
 
-	// Defaults should be applied
+	// Defaults should be applied.
 	assert.Equal(t, "user", user.Role)
 	assert.Equal(t, "active", user.Status)
 }
@@ -327,8 +330,8 @@ func TestUnmarshal_NestedValidation(t *testing.T) {
 	user, err := validator.Unmarshal(jsonData)
 	require.Error(t, err)
 
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 	// Should have error for Address.City
 	foundNestedError := false
@@ -345,7 +348,7 @@ func TestUnmarshal_NestedValidation(t *testing.T) {
 // ==================== Pointer Tests ====================
 
 // Test pointer field with explicit value
-// TestPointer_ExplicitValue tests Pointer explicitvalue
+// TestPointer_ExplicitValue tests Pointer explicitvalue.
 func TestPointer_ExplicitValue(t *testing.T) {
 	type User struct {
 		Name *string `json:"name"`
@@ -356,7 +359,7 @@ func TestPointer_ExplicitValue(t *testing.T) {
 	jsonData := []byte(`{"name":"Alice","age":25}`)
 
 	user, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	require.NotNil(t, user.Name)
 	assert.Equal(t, "Alice", *user.Name)
@@ -366,7 +369,7 @@ func TestPointer_ExplicitValue(t *testing.T) {
 }
 
 // Test pointer field with explicit zero value (should create pointer to zero)
-// TestPointer_ExplicitZero tests Pointer explicitzero
+// TestPointer_ExplicitZero tests Pointer explicitzero.
 func TestPointer_ExplicitZero(t *testing.T) {
 	type Config struct {
 		Port    *int    `json:"port"`
@@ -378,21 +381,21 @@ func TestPointer_ExplicitZero(t *testing.T) {
 	jsonData := []byte(`{"port":0,"enabled":false,"name":""}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Explicit zeros should create pointers to zero values
 	require.NotNil(t, config.Port)
 	assert.Equal(t, 0, *config.Port)
 
 	require.NotNil(t, config.Enabled)
-	assert.Equal(t, false, *config.Enabled)
+	assert.False(t, *config.Enabled)
 
 	require.NotNil(t, config.Name)
-	assert.Equal(t, "", *config.Name)
+	assert.Empty(t, *config.Name)
 }
 
 // Test pointer field with explicit null (should be nil pointer)
-// TestPointer_ExplicitNull tests Pointer explicitnull
+// TestPointer_ExplicitNull tests Pointer explicitnull.
 func TestPointer_ExplicitNull(t *testing.T) {
 	type User struct {
 		Name *string `json:"name"`
@@ -403,15 +406,15 @@ func TestPointer_ExplicitNull(t *testing.T) {
 	jsonData := []byte(`{"name":null,"age":null}`)
 
 	user, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	// Explicit null should result in nil pointers
+	// Explicit null should result in nil pointers.
 	assert.Nil(t, user.Name)
 	assert.Nil(t, user.Age)
 }
 
 // Test pointer field missing from JSON (should be nil pointer)
-// TestPointer_Missing tests Pointer missing
+// TestPointer_Missing tests Pointer missing.
 func TestPointer_Missing(t *testing.T) {
 	type User struct {
 		Name *string `json:"name"`
@@ -422,7 +425,7 @@ func TestPointer_Missing(t *testing.T) {
 	jsonData := []byte(`{}`) // Both fields missing
 
 	user, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Missing fields should result in nil pointers
 	assert.Nil(t, user.Name)
@@ -430,7 +433,7 @@ func TestPointer_Missing(t *testing.T) {
 }
 
 // Test required pointer field with explicit value
-// TestPointer_RequiredWithValue tests Pointer requiredwithvalue
+// TestPointer_RequiredWithValue tests Pointer requiredwithvalue.
 func TestPointer_RequiredWithValue(t *testing.T) {
 	type User struct {
 		Name *string `json:"name" pedantigo:"required"`
@@ -440,14 +443,14 @@ func TestPointer_RequiredWithValue(t *testing.T) {
 	jsonData := []byte(`{"name":"Alice"}`)
 
 	user, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	require.NotNil(t, user.Name)
 	assert.Equal(t, "Alice", *user.Name)
 }
 
 // Test required pointer field missing (should fail)
-// TestPointer_RequiredMissing tests Pointer requiredmissing
+// TestPointer_RequiredMissing tests Pointer requiredmissing.
 func TestPointer_RequiredMissing(t *testing.T) {
 	type User struct {
 		Name *string `json:"name" pedantigo:"required"`
@@ -459,13 +462,13 @@ func TestPointer_RequiredMissing(t *testing.T) {
 	_, err := validator.Unmarshal(jsonData)
 	require.Error(t, err)
 
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 	// Check for required field error
 	foundRequiredError := false
 	for _, fieldErr := range ve.Errors {
-		if fieldErr.Field == "name" && fieldErr.Message == "is required" {
+		if fieldErr.Field == "name" && fieldErr.Message == testMsgIsRequired {
 			foundRequiredError = true
 		}
 	}
@@ -474,7 +477,7 @@ func TestPointer_RequiredMissing(t *testing.T) {
 }
 
 // Test required pointer field with explicit null (should pass - field is present)
-// TestPointer_RequiredWithNull tests Pointer requiredwithnull
+// TestPointer_RequiredWithNull tests Pointer requiredwithnull.
 func TestPointer_RequiredWithNull(t *testing.T) {
 	type User struct {
 		Name *string `json:"name" pedantigo:"required"`
@@ -484,14 +487,14 @@ func TestPointer_RequiredWithNull(t *testing.T) {
 	jsonData := []byte(`{"name":null}`) // Field present but null
 
 	user, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Required means "field must be present", not "value can't be nil"
 	assert.Nil(t, user.Name)
 }
 
 // Test pointer field with default value
-// TestPointer_WithDefault tests Pointer withdefault
+// TestPointer_WithDefault tests Pointer withdefault.
 func TestPointer_WithDefault(t *testing.T) {
 	type Config struct {
 		Port *int `json:"port" pedantigo:"default=8080"`
@@ -501,7 +504,7 @@ func TestPointer_WithDefault(t *testing.T) {
 	jsonData := []byte(`{}`) // Missing port field
 
 	config, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Default should be applied to missing field
 	require.NotNil(t, config.Port)
@@ -509,7 +512,7 @@ func TestPointer_WithDefault(t *testing.T) {
 }
 
 // Test pointer field with explicit zero and default (should keep zero)
-// TestPointer_ExplicitZeroWithDefault tests Pointer explicitzerowithdefault
+// TestPointer_ExplicitZeroWithDefault tests Pointer explicitzerowithdefault.
 func TestPointer_ExplicitZeroWithDefault(t *testing.T) {
 	type Config struct {
 		Port *int `json:"port" pedantigo:"default=8080"`
@@ -519,7 +522,7 @@ func TestPointer_ExplicitZeroWithDefault(t *testing.T) {
 	jsonData := []byte(`{"port":0}`) // Explicit zero
 
 	config, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Explicit zero should be kept, not replaced with default
 	require.NotNil(t, config.Port)
@@ -527,7 +530,7 @@ func TestPointer_ExplicitZeroWithDefault(t *testing.T) {
 }
 
 // Test nested struct with pointer fields
-// TestPointer_NestedStruct tests Pointer nestedstruct
+// TestPointer_NestedStruct tests Pointer nestedstruct.
 func TestPointer_NestedStruct(t *testing.T) {
 	type Address struct {
 		Street *string `json:"street"`
@@ -543,7 +546,7 @@ func TestPointer_NestedStruct(t *testing.T) {
 	jsonData := []byte(`{"name":"Alice","address":{"street":"123 Main St","city":null}}`)
 
 	user, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	require.NotNil(t, user.Address)
 
@@ -557,7 +560,7 @@ func TestPointer_NestedStruct(t *testing.T) {
 // ==================== Deserializer Tests ====================
 
 // Test type for defaultUsingMethod
-// UserWithTimestamp represents the data structure
+// UserWithTimestamp represents the data structure.
 type UserWithTimestamp struct {
 	Email     string    `json:"email" pedantigo:"required"`
 	Role      string    `json:"role" pedantigo:"default=user"`
@@ -565,27 +568,27 @@ type UserWithTimestamp struct {
 }
 
 // Method that provides dynamic default value
-// SetCreationTime sets the field value
+// SetCreationTime sets the field value.
 func (u *UserWithTimestamp) SetCreationTime() (time.Time, error) {
 	// Return a fixed time for testing (not time.Now())
 	return time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), nil
 }
 
 // Test type with invalid method signature (should panic at New() time)
-// InvalidMethodType represents the data structure
+// InvalidMethodType represents the data structure.
 type InvalidMethodType struct {
 	Email     string    `json:"email"`
 	CreatedAt time.Time `json:"created_at" pedantigo:"defaultUsingMethod=WrongSignature"`
 }
 
 // Wrong signature: returns only value, no error
-// WrongSignature implements the method
+// WrongSignature implements the method.
 func (i *InvalidMethodType) WrongSignature() time.Time {
 	return time.Now()
 }
 
 // Test type with non-existent method
-// NonExistentMethodType represents the data structure
+// NonExistentMethodType represents the data structure.
 type NonExistentMethodType struct {
 	Email     string    `json:"email"`
 	CreatedAt time.Time `json:"created_at" pedantigo:"defaultUsingMethod=DoesNotExist"`
@@ -593,7 +596,7 @@ type NonExistentMethodType struct {
 
 // TestDeserializer_UnmarshalBehavior validates deserializer behavior across various scenarios:
 // defaults, missing fields, explicit values, required fields, and validator options.
-// TestDeserializer_UnmarshalBehavior tests Deserializer unmarshalbehavior
+// TestDeserializer_UnmarshalBehavior tests Deserializer unmarshalbehavior.
 func TestDeserializer_UnmarshalBehavior(t *testing.T) {
 	type Config struct {
 		Name    string `json:"name" pedantigo:"required"`
@@ -668,12 +671,12 @@ func TestDeserializer_UnmarshalBehavior(t *testing.T) {
 				// Error case - check error message through direct validation
 				v := New[Settings]()
 				_, err := v.Unmarshal([]byte(`{"name":"test"}`))
-				ve, ok := err.(*ValidationError)
-				require.True(t, ok, "expected *ValidationError, got %T", err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 				foundError := false
 				for _, fieldErr := range ve.Errors {
-					if fieldErr.Field == "active" && fieldErr.Message == "is required" {
+					if fieldErr.Field == "active" && fieldErr.Message == testMsgIsRequired {
 						foundError = true
 					}
 				}
@@ -746,9 +749,9 @@ func TestDeserializer_UnmarshalBehavior(t *testing.T) {
 			result, err := tt.validatorFn()
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if result != nil || !tt.wantErr {
@@ -760,7 +763,7 @@ func TestDeserializer_UnmarshalBehavior(t *testing.T) {
 
 // TestDeserializer_ValidatorSetup validates fail-fast validation during New().
 // Invalid method signatures or non-existent methods should panic at validator creation time.
-// TestDeserializer_ValidatorSetup tests Deserializer validatorsetup
+// TestDeserializer_ValidatorSetup tests Deserializer validatorsetup.
 func TestDeserializer_ValidatorSetup(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -814,7 +817,7 @@ func TestDeserializer_ValidatorSetup(t *testing.T) {
 
 // TestValidatorOptions_StrictMissingFields tests the StrictMissingFields behavior
 // with various configuration combinations and JSON inputs.
-// TestValidatorOptions_StrictMissingFields tests ValidatorOptions strictmissingfields
+// TestValidatorOptions_StrictMissingFields tests ValidatorOptions strictmissingfields.
 func TestValidatorOptions_StrictMissingFields(t *testing.T) {
 	type User struct {
 		Name  string `json:"name" pedantigo:"required,min=2"`
@@ -873,14 +876,14 @@ func TestValidatorOptions_StrictMissingFields(t *testing.T) {
 			user, err := validator.Unmarshal([]byte(tt.jsonInput))
 
 			if tt.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if err != nil && tt.expectErrFields != nil {
-				ve, ok := err.(*ValidationError)
-				require.True(t, ok, "expected *ValidationError, got %T", err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 				assert.Len(t, ve.Errors, len(tt.expectErrFields))
 			}
 
@@ -893,7 +896,7 @@ func TestValidatorOptions_StrictMissingFields(t *testing.T) {
 
 // TestValidatorOptions_PointerFields tests pointer field behavior with StrictMissingFields=false.
 // Pointers to primitive types allow optional fields (nil when missing) while still validating when present.
-// TestValidatorOptions_PointerFields tests ValidatorOptions pointerfields
+// TestValidatorOptions_PointerFields tests ValidatorOptions pointerfields.
 func TestValidatorOptions_PointerFields(t *testing.T) {
 	type Settings struct {
 		Port    *int   `json:"port" pedantigo:"min=1024"`
@@ -918,7 +921,7 @@ func TestValidatorOptions_PointerFields(t *testing.T) {
 				assert.Nil(t, settings.Port)
 				assert.Nil(t, settings.Enabled)
 				// Name should have zero value ""
-				assert.Equal(t, "", settings.Name)
+				assert.Empty(t, settings.Name)
 			},
 		},
 		{
@@ -966,14 +969,14 @@ func TestValidatorOptions_PointerFields(t *testing.T) {
 			settings, err := validator.Unmarshal([]byte(tt.jsonInput))
 
 			if tt.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if err != nil && tt.expectErr {
-				ve, ok := err.(*ValidationError)
-				require.True(t, ok, "expected *ValidationError, got %T", err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 				assert.Len(t, ve.Errors, len(tt.expectErrFields))
 			}
 
@@ -988,7 +991,7 @@ func TestValidatorOptions_PointerFields(t *testing.T) {
 // with StrictMissingFields=false and default/defaultUsingMethod tags panics.
 // These combinations are incompatible because defaults only make sense when
 // StrictMissingFields=true (missing field handling is disabled).
-// TestValidatorOptions_PanicOnIncompatibleTags tests ValidatorOptions paniconincompatibletags
+// TestValidatorOptions_PanicOnIncompatibleTags tests ValidatorOptions paniconincompatibletags.
 func TestValidatorOptions_PanicOnIncompatibleTags(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -1024,7 +1027,7 @@ func TestValidatorOptions_PanicOnIncompatibleTags(t *testing.T) {
 				panicMsg := r.(string)
 				// Verify all expected strings are in panic message
 				for _, expectedStr := range tt.expectPanicStrs {
-					assert.True(t, strings.Contains(panicMsg, expectedStr), "panic message missing '%s', got: %s", expectedStr, panicMsg)
+					assert.Contains(t, panicMsg, expectedStr, "panic message missing '%s', got: %s", expectedStr, panicMsg)
 				}
 				// Verify at least one expected field is mentioned
 				foundField := false
@@ -1221,10 +1224,10 @@ func TestValidator_Dict(t *testing.T) {
 	}
 }
 
-// ErrIntentionalMarshalFailure is a test error for Dict error handling
+// ErrIntentionalMarshalFailure is a test error for Dict error handling.
 var ErrIntentionalMarshalFailure = errors.New("intentional marshal error")
 
-// Helper type with custom MarshalJSON that returns an error
+// Helper type with custom MarshalJSON that returns an error.
 type UnmarshalableStruct struct {
 	Name string
 }
@@ -1233,7 +1236,7 @@ func (u UnmarshalableStruct) MarshalJSON() ([]byte, error) {
 	return nil, ErrIntentionalMarshalFailure
 }
 
-// TestValidator_Dict_UnmarshalableType tests Dict with type that has failing MarshalJSON
+// TestValidator_Dict_UnmarshalableType tests Dict with type that has failing MarshalJSON.
 func TestValidator_Dict_UnmarshalableType(t *testing.T) {
 	validator := New[UnmarshalableStruct]()
 	obj := &UnmarshalableStruct{Name: "test"}

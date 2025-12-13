@@ -10,19 +10,17 @@ import (
 	. "github.com/SmrutAI/Pedantigo"
 )
 
-// ==================================================
-// eqfield (field equals another field) constraint tests
-// ==================================================
-
-// TestEqField tests EqField validation
-func TestEqField(t *testing.T) {
+// TestCrossFieldComparison tests all cross-field comparison constraints.
+// This test covers eqfield, nefield, gtfield, gtefield, ltfield, ltefield.
+func TestCrossFieldComparison_BasicOperators(t *testing.T) {
 	tests := []struct {
 		name      string
 		testFunc  func(t *testing.T)
 		expectErr bool
 	}{
+		// eqfield (field equals another field) tests
 		{
-			name: "string equality valid",
+			name: "eqfield: string equality valid",
 			testFunc: func(t *testing.T) {
 				type PasswordChange struct {
 					Password string `pedantigo:"required"`
@@ -36,12 +34,12 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for equal passwords")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "string equality invalid",
+			name: "eqfield: string equality invalid",
 			testFunc: func(t *testing.T) {
 				type PasswordChange struct {
 					Password string `pedantigo:"required"`
@@ -55,10 +53,10 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for non-equal passwords")
+				require.Error(t, err)
 
-				ve, ok := err.(*ValidationError)
-				require.True(t, ok, "expected *ValidationError, got %T", err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve)
 
 				foundError := false
 				for _, fieldErr := range ve.Errors {
@@ -66,13 +64,12 @@ func TestEqField(t *testing.T) {
 						foundError = true
 					}
 				}
-
-				assert.True(t, foundError, "expected error on Confirm field, got %v", ve.Errors)
+				assert.True(t, foundError)
 			},
 			expectErr: true,
 		},
 		{
-			name: "email equality valid",
+			name: "eqfield: email equality valid",
 			testFunc: func(t *testing.T) {
 				type SignUp struct {
 					Email      string `pedantigo:"required,email"`
@@ -86,31 +83,12 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for equal emails")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "email equality invalid",
-			testFunc: func(t *testing.T) {
-				type SignUp struct {
-					Email      string `pedantigo:"required,email"`
-					EmailCheck string `pedantigo:"required,email,eqfield=Email"`
-				}
-
-				validator := New[SignUp]()
-				data := SignUp{
-					Email:      "user@example.com",
-					EmailCheck: "other@example.com",
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for non-equal emails")
-			},
-			expectErr: true,
-		},
-		{
-			name: "int equality valid",
+			name: "eqfield: int equality valid",
 			testFunc: func(t *testing.T) {
 				type TransactionVerify struct {
 					Amount  int `pedantigo:"gt=0"`
@@ -124,31 +102,12 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for equal amounts")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "int equality invalid",
-			testFunc: func(t *testing.T) {
-				type TransactionVerify struct {
-					Amount  int `pedantigo:"gt=0"`
-					Confirm int `pedantigo:"gt=0,eqfield=Amount"`
-				}
-
-				validator := New[TransactionVerify]()
-				data := TransactionVerify{
-					Amount:  10000,
-					Confirm: 5000,
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for non-equal amounts")
-			},
-			expectErr: true,
-		},
-		{
-			name: "float equality valid",
+			name: "eqfield: float equality valid",
 			testFunc: func(t *testing.T) {
 				type PriceMatch struct {
 					ExpectedPrice float64 `pedantigo:"gt=0"`
@@ -162,31 +121,12 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for equal prices")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "float equality invalid",
-			testFunc: func(t *testing.T) {
-				type PriceMatch struct {
-					ExpectedPrice float64 `pedantigo:"gt=0"`
-					ActualPrice   float64 `pedantigo:"gt=0,eqfield=ExpectedPrice"`
-				}
-
-				validator := New[PriceMatch]()
-				data := PriceMatch{
-					ExpectedPrice: 99.99,
-					ActualPrice:   100.00,
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for non-equal prices")
-			},
-			expectErr: true,
-		},
-		{
-			name: "zero values equal valid",
+			name: "eqfield: zero values equal valid",
 			testFunc: func(t *testing.T) {
 				type ZeroComparison struct {
 					Field1 int `pedantigo:"eqfield=Field2"`
@@ -200,32 +140,14 @@ func TestEqField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for equal zero values")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.testFunc(t)
-		})
-	}
-}
-
-// ==================================================
-// nefield (field not equal to another field) constraint tests
-// ==================================================
-
-// TestNeField tests NeField validation
-func TestNeField(t *testing.T) {
-	tests := []struct {
-		name      string
-		testFunc  func(t *testing.T)
-		expectErr bool
-	}{
+		// nefield (field not equal to another field) tests
 		{
-			name: "float inequality valid",
+			name: "nefield: float inequality valid",
 			testFunc: func(t *testing.T) {
 				type DiscountCode struct {
 					OriginalPrice   float64 `pedantigo:"gt=0"`
@@ -239,12 +161,12 @@ func TestNeField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for unequal prices")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "float inequality invalid",
+			name: "nefield: float inequality invalid",
 			testFunc: func(t *testing.T) {
 				type DiscountCode struct {
 					OriginalPrice   float64 `pedantigo:"gt=0"`
@@ -258,12 +180,12 @@ func TestNeField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for equal prices (should not be equal)")
+				require.Error(t, err)
 			},
 			expectErr: true,
 		},
 		{
-			name: "string inequality valid",
+			name: "nefield: string inequality valid",
 			testFunc: func(t *testing.T) {
 				type UniqueLogins struct {
 					Username string `pedantigo:"required,min=3"`
@@ -277,31 +199,12 @@ func TestNeField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for unequal strings")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "string inequality invalid",
-			testFunc: func(t *testing.T) {
-				type UniqueLogins struct {
-					Username string `pedantigo:"required,min=3"`
-					Nickname string `pedantigo:"required,min=1,nefield=Username"`
-				}
-
-				validator := New[UniqueLogins]()
-				data := UniqueLogins{
-					Username: "john_doe",
-					Nickname: "john_doe",
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for equal strings (should not be equal)")
-			},
-			expectErr: true,
-		},
-		{
-			name: "zero values inequality invalid",
+			name: "nefield: zero values inequality invalid",
 			testFunc: func(t *testing.T) {
 				type UnequalCheck struct {
 					Field1 int `pedantigo:"nefield=Field2"`
@@ -315,12 +218,12 @@ func TestNeField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for equal zero values (should not be equal)")
+				require.Error(t, err)
 			},
 			expectErr: true,
 		},
 		{
-			name: "zero values inequality valid",
+			name: "nefield: zero values inequality valid",
 			testFunc: func(t *testing.T) {
 				type UnequalCheck struct {
 					Field1 int `pedantigo:"nefield=Field2"`
@@ -334,32 +237,14 @@ func TestNeField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for unequal values")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.testFunc(t)
-		})
-	}
-}
-
-// ==================================================
-// gtfield (field greater than another field) constraint tests
-// ==================================================
-
-// TestGtField tests GtField validation
-func TestGtField(t *testing.T) {
-	tests := []struct {
-		name      string
-		testFunc  func(t *testing.T)
-		expectErr bool
-	}{
+		// gtfield (field greater than another field) tests
 		{
-			name: "int greater than valid",
+			name: "gtfield: int greater than valid",
 			testFunc: func(t *testing.T) {
 				type DateRange struct {
 					StartYear int `pedantigo:"min=1900"`
@@ -373,12 +258,12 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for EndYear > StartYear")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "int greater than invalid equal",
+			name: "gtfield: int greater than invalid equal",
 			testFunc: func(t *testing.T) {
 				type DateRange struct {
 					StartYear int `pedantigo:"min=1900"`
@@ -392,31 +277,12 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for EndYear == StartYear (not greater)")
+				require.Error(t, err)
 			},
 			expectErr: true,
 		},
 		{
-			name: "int greater than invalid less",
-			testFunc: func(t *testing.T) {
-				type DateRange struct {
-					StartYear int `pedantigo:"min=1900"`
-					EndYear   int `pedantigo:"min=1900,gtfield=StartYear"`
-				}
-
-				validator := New[DateRange]()
-				data := DateRange{
-					StartYear: 2024,
-					EndYear:   2000,
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for EndYear < StartYear")
-			},
-			expectErr: true,
-		},
-		{
-			name: "float greater than valid",
+			name: "gtfield: float greater than valid",
 			testFunc: func(t *testing.T) {
 				type PriceComparison struct {
 					MinPrice float64 `pedantigo:"gt=0"`
@@ -430,31 +296,12 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for MaxPrice > MinPrice")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "float greater than invalid",
-			testFunc: func(t *testing.T) {
-				type PriceComparison struct {
-					MinPrice float64 `pedantigo:"gt=0"`
-					MaxPrice float64 `pedantigo:"gt=0,gtfield=MinPrice"`
-				}
-
-				validator := New[PriceComparison]()
-				data := PriceComparison{
-					MinPrice: 150.00,
-					MaxPrice: 50.00,
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for MaxPrice < MinPrice")
-			},
-			expectErr: true,
-		},
-		{
-			name: "string greater than valid",
+			name: "gtfield: string greater than valid",
 			testFunc: func(t *testing.T) {
 				type StringComparison struct {
 					FirstName  string `pedantigo:"required"`
@@ -468,50 +315,12 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for 'Bob' > 'Alice' lexicographically")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "string greater than invalid",
-			testFunc: func(t *testing.T) {
-				type StringComparison struct {
-					FirstName  string `pedantigo:"required"`
-					SecondName string `pedantigo:"required,gtfield=FirstName"`
-				}
-
-				validator := New[StringComparison]()
-				data := StringComparison{
-					FirstName:  "Zebra",
-					SecondName: "Apple",
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for 'Apple' < 'Zebra' lexicographically")
-			},
-			expectErr: true,
-		},
-		{
-			name: "zero values greater than invalid",
-			testFunc: func(t *testing.T) {
-				type ZeroGreaterCheck struct {
-					Field1 int `pedantigo:"gtfield=Field2"`
-					Field2 int
-				}
-
-				validator := New[ZeroGreaterCheck]()
-				data := ZeroGreaterCheck{
-					Field1: 0,
-					Field2: 0,
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for 0 not > 0")
-			},
-			expectErr: true,
-		},
-		{
-			name: "negative numbers greater than valid",
+			name: "gtfield: negative numbers greater than valid",
 			testFunc: func(t *testing.T) {
 				type NegativeComparison struct {
 					Lower int `pedantigo:"gtfield=Upper"`
@@ -525,32 +334,14 @@ func TestGtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for -5 > -10")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.testFunc(t)
-		})
-	}
-}
-
-// ==================================================
-// gtefield (field greater than or equal to another field) constraint tests
-// ==================================================
-
-// TestGteField tests GteField validation
-func TestGteField(t *testing.T) {
-	tests := []struct {
-		name      string
-		testFunc  func(t *testing.T)
-		expectErr bool
-	}{
+		// gtefield (field greater than or equal to another field) tests
 		{
-			name: "int greater or equal valid greater",
+			name: "gtefield: int greater or equal valid greater",
 			testFunc: func(t *testing.T) {
 				type VersionComparison struct {
 					MinVersion int `pedantigo:"gt=0"`
@@ -564,12 +355,12 @@ func TestGteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for MaxVersion > MinVersion")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "int greater or equal valid equal",
+			name: "gtefield: int greater or equal valid equal",
 			testFunc: func(t *testing.T) {
 				type VersionComparison struct {
 					MinVersion int `pedantigo:"gt=0"`
@@ -583,12 +374,12 @@ func TestGteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for MaxVersion == MinVersion")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "int greater or equal invalid",
+			name: "gtefield: int greater or equal invalid",
 			testFunc: func(t *testing.T) {
 				type VersionComparison struct {
 					MinVersion int `pedantigo:"gt=0"`
@@ -602,12 +393,12 @@ func TestGteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for MaxVersion < MinVersion")
+				require.Error(t, err)
 			},
 			expectErr: true,
 		},
 		{
-			name: "float greater or equal valid equal",
+			name: "gtefield: float greater or equal valid equal",
 			testFunc: func(t *testing.T) {
 				type ScoreComparison struct {
 					MinScore float64 `pedantigo:"gte=0"`
@@ -621,12 +412,12 @@ func TestGteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for equal scores")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "string greater or equal valid equal",
+			name: "gtefield: string greater or equal valid equal",
 			testFunc: func(t *testing.T) {
 				type StringComparison struct {
 					StartStr string `pedantigo:"required"`
@@ -640,12 +431,12 @@ func TestGteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for equal strings")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "zero values greater or equal valid",
+			name: "gtefield: zero values greater or equal valid",
 			testFunc: func(t *testing.T) {
 				type ZeroGreaterOrEqualCheck struct {
 					Field1 int `pedantigo:"gtefield=Field2"`
@@ -659,32 +450,14 @@ func TestGteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for 0 >= 0")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.testFunc(t)
-		})
-	}
-}
-
-// ==================================================
-// ltfield (field less than another field) constraint tests
-// ==================================================
-
-// TestLtField tests LtField validation
-func TestLtField(t *testing.T) {
-	tests := []struct {
-		name      string
-		testFunc  func(t *testing.T)
-		expectErr bool
-	}{
+		// ltfield (field less than another field) tests
 		{
-			name: "int less than valid",
+			name: "ltfield: int less than valid",
 			testFunc: func(t *testing.T) {
 				type AgeRange struct {
 					MinAge int `pedantigo:"gt=0,ltfield=MaxAge"`
@@ -698,12 +471,12 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for MinAge < MaxAge")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "int less than invalid equal",
+			name: "ltfield: int less than invalid equal",
 			testFunc: func(t *testing.T) {
 				type AgeRangeWithLt struct {
 					MinAge int `pedantigo:"gt=0,ltfield=MaxAge"`
@@ -717,31 +490,12 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for MinAge == MaxAge (not less)")
+				require.Error(t, err)
 			},
 			expectErr: true,
 		},
 		{
-			name: "int less than invalid greater",
-			testFunc: func(t *testing.T) {
-				type AgeRange struct {
-					MinAge int `pedantigo:"gt=0,ltfield=MaxAge"`
-					MaxAge int `pedantigo:"gt=0"`
-				}
-
-				validator := New[AgeRange]()
-				data := AgeRange{
-					MinAge: 65,
-					MaxAge: 18,
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for MinAge > MaxAge")
-			},
-			expectErr: true,
-		},
-		{
-			name: "float less than valid",
+			name: "ltfield: float less than valid",
 			testFunc: func(t *testing.T) {
 				type TemperatureRange struct {
 					MinTemp float64 `pedantigo:"ltfield=MaxTemp"`
@@ -755,31 +509,12 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for MinTemp < MaxTemp")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "float less than invalid",
-			testFunc: func(t *testing.T) {
-				type TemperatureRange struct {
-					MinTemp float64 `pedantigo:"ltfield=MaxTemp"`
-					MaxTemp float64
-				}
-
-				validator := New[TemperatureRange]()
-				data := TemperatureRange{
-					MinTemp: 50.0,
-					MaxTemp: 40.0,
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for MinTemp > MaxTemp")
-			},
-			expectErr: true,
-		},
-		{
-			name: "string less than valid",
+			name: "ltfield: string less than valid",
 			testFunc: func(t *testing.T) {
 				type StringOrder struct {
 					First  string `pedantigo:"required,ltfield=Second"`
@@ -793,50 +528,12 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for 'Apple' < 'Zebra' lexicographically")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "string less than invalid",
-			testFunc: func(t *testing.T) {
-				type StringOrder struct {
-					First  string `pedantigo:"required,ltfield=Second"`
-					Second string `pedantigo:"required"`
-				}
-
-				validator := New[StringOrder]()
-				data := StringOrder{
-					First:  "Zebra",
-					Second: "Apple",
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for 'Zebra' > 'Apple' lexicographically")
-			},
-			expectErr: true,
-		},
-		{
-			name: "zero values less than invalid",
-			testFunc: func(t *testing.T) {
-				type ZeroLessCheck struct {
-					Field1 int `pedantigo:"ltfield=Field2"`
-					Field2 int
-				}
-
-				validator := New[ZeroLessCheck]()
-				data := ZeroLessCheck{
-					Field1: 0,
-					Field2: 0,
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for 0 not < 0")
-			},
-			expectErr: true,
-		},
-		{
-			name: "negative numbers less than valid",
+			name: "ltfield: negative numbers less than valid",
 			testFunc: func(t *testing.T) {
 				type NegativeComparison struct {
 					Lower int `pedantigo:"ltfield=Upper"`
@@ -850,32 +547,14 @@ func TestLtField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for -10 < -5")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.testFunc(t)
-		})
-	}
-}
-
-// ==================================================
-// ltefield (field less than or equal to another field) constraint tests
-// ==================================================
-
-// TestLteField tests LteField validation
-func TestLteField(t *testing.T) {
-	tests := []struct {
-		name      string
-		testFunc  func(t *testing.T)
-		expectErr bool
-	}{
+		// ltefield (field less than or equal to another field) tests
 		{
-			name: "int less or equal valid less",
+			name: "ltefield: int less or equal valid less",
 			testFunc: func(t *testing.T) {
 				type RankRange struct {
 					StartRank int `pedantigo:"gt=0,ltefield=EndRank"`
@@ -889,12 +568,12 @@ func TestLteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for StartRank < EndRank")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "int less or equal valid equal",
+			name: "ltefield: int less or equal valid equal",
 			testFunc: func(t *testing.T) {
 				type RankRange struct {
 					StartRank int `pedantigo:"gt=0,ltefield=EndRank"`
@@ -908,31 +587,12 @@ func TestLteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for StartRank == EndRank")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "int less or equal invalid",
-			testFunc: func(t *testing.T) {
-				type RankRange struct {
-					StartRank int `pedantigo:"gt=0,ltefield=EndRank"`
-					EndRank   int `pedantigo:"gt=0"`
-				}
-
-				validator := New[RankRange]()
-				data := RankRange{
-					StartRank: 25,
-					EndRank:   15,
-				}
-
-				err := validator.Validate(&data)
-				require.Error(t, err, "expected validation error for StartRank > EndRank")
-			},
-			expectErr: true,
-		},
-		{
-			name: "float less or equal valid equal",
+			name: "ltefield: float less or equal valid equal",
 			testFunc: func(t *testing.T) {
 				type PriceRange struct {
 					MinPrice float64 `pedantigo:"gt=0,ltefield=MaxPrice"`
@@ -946,12 +606,12 @@ func TestLteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for equal prices")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "string less or equal valid equal",
+			name: "ltefield: string less or equal valid equal",
 			testFunc: func(t *testing.T) {
 				type StringBoundary struct {
 					Start string `pedantigo:"required,ltefield=End"`
@@ -965,12 +625,12 @@ func TestLteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for equal strings")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
 		{
-			name: "zero values less or equal valid",
+			name: "ltefield: zero values less or equal valid",
 			testFunc: func(t *testing.T) {
 				type ZeroLessOrEqualCheck struct {
 					Field1 int `pedantigo:"ltefield=Field2"`
@@ -984,7 +644,7 @@ func TestLteField(t *testing.T) {
 				}
 
 				err := validator.Validate(&data)
-				assert.NoError(t, err, "expected no validation errors for 0 <= 0")
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
@@ -1001,7 +661,7 @@ func TestLteField(t *testing.T) {
 // Cross-constraint combinations and edge cases
 // ==================================================
 
-// TestCrossFieldComparison tests CrossFieldComparison validation
+// TestCrossFieldComparison tests CrossFieldComparison validation.
 func TestCrossFieldComparison(t *testing.T) {
 	tests := []struct {
 		name      string

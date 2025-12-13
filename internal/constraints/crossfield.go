@@ -8,12 +8,12 @@ import (
 	"time"
 )
 
-// CrossFieldConstraint represents a validation constraint that compares two fields
+// CrossFieldConstraint represents a validation constraint that compares two fields.
 type CrossFieldConstraint interface {
 	ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error
 }
 
-// Cross-field constraint types
+// Cross-field constraint types.
 type (
 	eqFieldConstraint struct {
 		targetFieldName  string
@@ -77,7 +77,7 @@ type (
 	}
 )
 
-// BuildCrossFieldConstraintsForField builds cross-field constraint instances from parsed tags
+// BuildCrossFieldConstraintsForField builds cross-field constraint instances from parsed tags.
 func BuildCrossFieldConstraintsForField(constraints map[string]string, structType reflect.Type, fieldIndex int) []CrossFieldConstraint {
 	var result []CrossFieldConstraint
 
@@ -141,7 +141,7 @@ func BuildCrossFieldConstraintsForField(constraints map[string]string, structTyp
 	return result
 }
 
-// resolveFieldIndexSilent resolves a field name to its index, returning -1 if not found
+// resolveFieldIndexSilent resolves a field name to its index, returning -1 if not found.
 func resolveFieldIndexSilent(structType reflect.Type, fieldName string) int {
 	for i := 0; i < structType.NumField(); i++ {
 		field := structType.Field(i)
@@ -157,7 +157,7 @@ func resolveFieldIndexSilent(structType reflect.Type, fieldName string) int {
 // Helper Functions for Cross-Field Validation
 // ============================================================================
 
-// CheckTypeCompatibility checks if two values can be compared
+// CheckTypeCompatibility checks if two values can be compared.
 func CheckTypeCompatibility(a, b any) error {
 	aType := Dereference(reflect.TypeOf(a))
 	bType := Dereference(reflect.TypeOf(b))
@@ -202,7 +202,7 @@ func CheckTypeCompatibility(a, b any) error {
 	return fmt.Errorf("cannot compare types %v and %v", aType, bType)
 }
 
-// Dereference removes pointer indirection from a type
+// Dereference removes pointer indirection from a type.
 func Dereference(t reflect.Type) reflect.Type {
 	for t != nil && t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -210,7 +210,7 @@ func Dereference(t reflect.Type) reflect.Type {
 	return t
 }
 
-// IsNumericType checks if a type is numeric
+// IsNumericType checks if a type is numeric.
 func IsNumericType(t reflect.Type) bool {
 	if t == nil {
 		return false
@@ -226,7 +226,7 @@ func IsNumericType(t reflect.Type) bool {
 
 // Compare returns -1 if a < b, 0 if a == b, 1 if a > b
 // This works for strings and numeric types
-// Compare compares two values
+// Compare compares two values.
 func Compare(a, b any) int {
 	aVal := reflect.ValueOf(a)
 	bVal := reflect.ValueOf(b)
@@ -296,7 +296,7 @@ func Compare(a, b any) int {
 	return 0
 }
 
-// CompareToString converts any value to string for comparison
+// CompareToString converts any value to string for comparison.
 func CompareToString(value any) string {
 	val := reflect.ValueOf(value)
 
@@ -324,8 +324,8 @@ func CompareToString(value any) string {
 	}
 }
 
-// resolveAndValidateField resolves a field, validates it exists and is not self-referencing, panics on error
-func resolveAndValidateField(structType reflect.Type, targetFieldName string, currentFieldIndex int, currentFieldName string, constraintName string) int {
+// resolveAndValidateField resolves a field, validates it exists and is not self-referencing, panics on error.
+func resolveAndValidateField(structType reflect.Type, targetFieldName string, currentFieldIndex int, currentFieldName, constraintName string) int {
 	targetIdx := resolveFieldIndexSilent(structType, targetFieldName)
 	if targetIdx == -1 {
 		panic(fmt.Sprintf("field %s references non-existent field %s in %s constraint", currentFieldName, targetFieldName, constraintName))
@@ -336,9 +336,9 @@ func resolveAndValidateField(structType reflect.Type, targetFieldName string, cu
 	return targetIdx
 }
 
-// parseConditionalConstraint parses "field:value" or "field value" syntax
-// Returns (fieldName, compareValue, true) on success, ("", "", false) on failure
-func parseConditionalConstraint(value string, separator string) (string, string, bool) {
+// parseConditionalConstraint parses "field:value" or "field value" syntax.
+// Returns (fieldName, compareValue, true) on success, ("", "", false) on failure.
+func parseConditionalConstraint(value, separator string) (fieldName, compareValue string, ok bool) {
 	parts := strings.SplitN(value, separator, 2)
 	if len(parts) != 2 {
 		return "", "", false

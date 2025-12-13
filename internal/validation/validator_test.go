@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SmrutAI/Pedantigo/internal/constraints"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/SmrutAI/Pedantigo/internal/constraints"
 )
 
-// parseTestTag is a test helper that parses pedantigo:"..." tags
+// parseTestTag is a test helper that parses pedantigo:"..." tags.
 func parseTestTag(tag reflect.StructTag) map[string]string {
 	tagStr := tag.Get("pedantigo")
 	if tagStr == "" {
@@ -31,7 +32,7 @@ func parseTestTag(tag reflect.StructTag) map[string]string {
 	return result
 }
 
-// buildTestConstraints wraps constraints.BuildConstraints to return ConstraintValidator
+// buildTestConstraints wraps constraints.BuildConstraints to return ConstraintValidator.
 func buildTestConstraints(constraintsMap map[string]string, fieldType reflect.Type) []ConstraintValidator {
 	builtConstraints := constraints.BuildConstraints(constraintsMap, fieldType)
 	validators := make([]ConstraintValidator, len(builtConstraints))
@@ -41,7 +42,7 @@ func buildTestConstraints(constraintsMap map[string]string, fieldType reflect.Ty
 	return validators
 }
 
-// splitTagPairs splits comma-separated tag pairs, handling values with commas
+// splitTagPairs splits comma-separated tag pairs, handling values with commas.
 func splitTagPairs(tag string) []string {
 	var pairs []string
 	var current string
@@ -49,18 +50,19 @@ func splitTagPairs(tag string) []string {
 
 	for i := 0; i < len(tag); i++ {
 		c := tag[i]
-		if c == '=' {
+		switch {
+		case c == '=':
 			inValue = true
 			current += string(c)
-		} else if c == ',' && !inValue {
+		case c == ',' && !inValue:
 			if current != "" {
 				pairs = append(pairs, current)
 				current = ""
 			}
-		} else {
+		default:
 			if c == ',' && inValue {
-				// Check if this comma is really the end of a value
-				// Simple heuristic: if next char is a letter, it's a new pair
+				// Check if this comma is really the end of a value.
+				// Simple heuristic: if next char is a letter, it's a new pair.
 				if i+1 < len(tag) && isLetter(tag[i+1]) {
 					pairs = append(pairs, current)
 					current = ""
@@ -86,8 +88,8 @@ func isLetter(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 
-// parseTagPair splits a single tag pair (e.g., "min=18" or "required")
-func parseTagPair(pair string) (string, string) {
+// parseTagPair splits a single tag pair (e.g., "min=18" or "required").
+func parseTagPair(pair string) (key, value string) {
 	pair = trimSpace(pair)
 	if pair == "" {
 		return "", ""
@@ -113,7 +115,7 @@ func trimSpace(s string) string {
 	return s[start:end]
 }
 
-// TestValidate_FlatStruct tests validation of simple structs with multiple constraints
+// TestValidate_FlatStruct tests validation of simple structs with multiple constraints.
 func TestValidate_FlatStruct(t *testing.T) {
 	type Person struct {
 		Name  string `pedantigo:"required,min=2"`
@@ -137,7 +139,7 @@ func TestValidate_FlatStruct(t *testing.T) {
 			input:    Person{Name: "J", Email: "john@example.com", Age: 25},
 			wantErrs: 1,
 			errCheck: func(t *testing.T, errs []FieldError) {
-				require.Greater(t, len(errs), 0)
+				require.NotEmpty(t, errs)
 				assert.Equal(t, "Name", errs[0].Field)
 			},
 		},
@@ -146,7 +148,7 @@ func TestValidate_FlatStruct(t *testing.T) {
 			input:    Person{Name: "John", Email: "john@example.com", Age: 10},
 			wantErrs: 1,
 			errCheck: func(t *testing.T, errs []FieldError) {
-				require.Greater(t, len(errs), 0)
+				require.NotEmpty(t, errs)
 				assert.Equal(t, "Age", errs[0].Field)
 			},
 		},
@@ -155,7 +157,7 @@ func TestValidate_FlatStruct(t *testing.T) {
 			input:    Person{Name: "John", Email: "john@example.com", Age: 150},
 			wantErrs: 1,
 			errCheck: func(t *testing.T, errs []FieldError) {
-				require.Greater(t, len(errs), 0)
+				require.NotEmpty(t, errs)
 				assert.Equal(t, "Age", errs[0].Field)
 			},
 		},
@@ -164,7 +166,7 @@ func TestValidate_FlatStruct(t *testing.T) {
 			input:    Person{Name: "John", Email: "invalid-email", Age: 25},
 			wantErrs: 1,
 			errCheck: func(t *testing.T, errs []FieldError) {
-				require.Greater(t, len(errs), 0)
+				require.NotEmpty(t, errs)
 				assert.Equal(t, "Email", errs[0].Field)
 			},
 		},
@@ -212,7 +214,7 @@ func TestValidate_FlatStruct(t *testing.T) {
 	}
 }
 
-// TestValidate_NestedStruct tests recursive validation of nested structs
+// TestValidate_NestedStruct tests recursive validation of nested structs.
 func TestValidate_NestedStruct(t *testing.T) {
 	type Address struct {
 		City    string `pedantigo:"required,min=2"`
@@ -252,7 +254,7 @@ func TestValidate_NestedStruct(t *testing.T) {
 			},
 			wantErrs: 1,
 			errCheck: func(t *testing.T, errs []FieldError) {
-				require.Greater(t, len(errs), 0)
+				require.NotEmpty(t, errs)
 				assert.Equal(t, "Address.City", errs[0].Field)
 			},
 		},
@@ -283,7 +285,7 @@ func TestValidate_NestedStruct(t *testing.T) {
 			},
 			wantErrs: 1,
 			errCheck: func(t *testing.T, errs []FieldError) {
-				require.Greater(t, len(errs), 0)
+				require.NotEmpty(t, errs)
 				assert.Equal(t, "Name", errs[0].Field)
 			},
 		},
@@ -318,7 +320,7 @@ func TestValidate_NestedStruct(t *testing.T) {
 	}
 }
 
-// TestValidate_Slices tests validation of slice elements
+// TestValidate_Slices tests validation of slice elements.
 func TestValidate_Slices(t *testing.T) {
 	type Team struct {
 		Members []string `pedantigo:"min=1"`
@@ -384,7 +386,7 @@ func TestValidate_Slices(t *testing.T) {
 	}
 }
 
-// TestValidate_SliceOfStructs tests validation of slice elements that are structs
+// TestValidate_SliceOfStructs tests validation of slice elements that are structs.
 func TestValidate_SliceOfStructs(t *testing.T) {
 	type Item struct {
 		Name string `pedantigo:"required,min=2"`
@@ -416,7 +418,7 @@ func TestValidate_SliceOfStructs(t *testing.T) {
 			}},
 			wantErrs: 1,
 			errCheck: func(t *testing.T, errs []FieldError) {
-				require.Greater(t, len(errs), 0)
+				require.NotEmpty(t, errs)
 				assert.Equal(t, "Items[1].Name", errs[0].Field)
 			},
 		},
@@ -449,7 +451,7 @@ func TestValidate_SliceOfStructs(t *testing.T) {
 	}
 }
 
-// TestValidate_Maps tests validation of map values
+// TestValidate_Maps tests validation of map values.
 func TestValidate_Maps(t *testing.T) {
 	type Scores struct {
 		Values map[string]int `pedantigo:"min=0,max=100"`
@@ -471,7 +473,7 @@ func TestValidate_Maps(t *testing.T) {
 			input:    Scores{Values: map[string]int{"Alice": 95, "Bob": -5}},
 			wantErrs: 1,
 			errCheck: func(t *testing.T, errs []FieldError) {
-				require.Greater(t, len(errs), 0)
+				require.NotEmpty(t, errs)
 				assert.Equal(t, "Values[Bob]", errs[0].Field)
 			},
 		},
@@ -480,7 +482,7 @@ func TestValidate_Maps(t *testing.T) {
 			input:    Scores{Values: map[string]int{"Alice": 150, "Bob": 87}},
 			wantErrs: 1,
 			errCheck: func(t *testing.T, errs []FieldError) {
-				require.Greater(t, len(errs), 0)
+				require.NotEmpty(t, errs)
 				assert.Equal(t, "Values[Alice]", errs[0].Field)
 			},
 		},
@@ -523,7 +525,7 @@ func TestValidate_Maps(t *testing.T) {
 	}
 }
 
-// TestValidate_MapOfStructs tests validation of map values that are structs
+// TestValidate_MapOfStructs tests validation of map values that are structs.
 func TestValidate_MapOfStructs(t *testing.T) {
 	type Entry struct {
 		Value string `pedantigo:"required,min=2"`
@@ -555,7 +557,7 @@ func TestValidate_MapOfStructs(t *testing.T) {
 			}},
 			wantErrs: 1,
 			errCheck: func(t *testing.T, errs []FieldError) {
-				require.Greater(t, len(errs), 0)
+				require.NotEmpty(t, errs)
 				assert.Equal(t, "Entries[key2].Value", errs[0].Field)
 			},
 		},
@@ -579,7 +581,7 @@ func TestValidate_MapOfStructs(t *testing.T) {
 	}
 }
 
-// TestValidate_ErrorAggregation tests that all validation errors are collected
+// TestValidate_ErrorAggregation tests that all validation errors are collected.
 func TestValidate_ErrorAggregation(t *testing.T) {
 	type Person struct {
 		FirstName string `pedantigo:"required,min=2"`
@@ -670,7 +672,7 @@ func TestValidate_ErrorAggregation(t *testing.T) {
 	}
 }
 
-// TestValidate_CrossFieldValidation tests time range validation with constraints
+// TestValidate_CrossFieldValidation tests time range validation with constraints.
 func TestValidate_CrossFieldValidation(t *testing.T) {
 	type DateRange struct {
 		Start time.Time `pedantigo:"required"`
@@ -733,7 +735,7 @@ func TestValidate_CrossFieldValidation(t *testing.T) {
 	}
 }
 
-// TestValidate_NestedCollections tests deeply nested slices and maps
+// TestValidate_NestedCollections tests deeply nested slices and maps.
 func TestValidate_NestedCollections(t *testing.T) {
 	type Config struct {
 		Name  string `pedantigo:"required,min=2"`
@@ -770,7 +772,7 @@ func TestValidate_NestedCollections(t *testing.T) {
 			},
 			wantErrs: 1,
 			errCheck: func(t *testing.T, errs []FieldError) {
-				require.Greater(t, len(errs), 0)
+				require.NotEmpty(t, errs)
 				assert.Equal(t, "Configs[0].Name", errs[0].Field)
 			},
 		},
@@ -805,7 +807,7 @@ func TestValidate_NestedCollections(t *testing.T) {
 	}
 }
 
-// TestValidate_PointerFields tests validation of pointer fields
+// TestValidate_PointerFields tests validation of pointer fields.
 func TestValidate_PointerFields(t *testing.T) {
 	type User struct {
 		Name  string  `pedantigo:"required,min=2"`
@@ -863,7 +865,7 @@ func TestValidate_PointerFields(t *testing.T) {
 	}
 }
 
-// TestValidate_ConstraintTypes tests various constraint types
+// TestValidate_ConstraintTypes tests various constraint types.
 func TestValidate_ConstraintTypes(t *testing.T) {
 	type Record struct {
 		Age    int    `pedantigo:"min=0,max=150"`
@@ -923,7 +925,7 @@ func TestValidate_ConstraintTypes(t *testing.T) {
 	}
 }
 
-// TestValidate_UnexportedFields tests that unexported fields are skipped
+// TestValidate_UnexportedFields tests that unexported fields are skipped.
 func TestValidate_UnexportedFields(t *testing.T) {
 	type Data struct {
 		Public  string `pedantigo:"required,min=2"`
@@ -965,7 +967,7 @@ func TestValidate_UnexportedFields(t *testing.T) {
 	}
 }
 
-// TestValidate_NoConstraints tests fields without validation constraints
+// TestValidate_NoConstraints tests fields without validation constraints.
 func TestValidate_NoConstraints(t *testing.T) {
 	type Document struct {
 		ID    string
@@ -1008,7 +1010,7 @@ func TestValidate_NoConstraints(t *testing.T) {
 	}
 }
 
-// TestValidateNestedElements tests the validateNestedElements helper function
+// TestValidateNestedElements tests the validateNestedElements helper function.
 func TestValidateNestedElements(t *testing.T) {
 	type Item struct {
 		Name string `pedantigo:"required,min=2"`
@@ -1070,7 +1072,7 @@ func TestValidateNestedElements(t *testing.T) {
 	}
 }
 
-// TestValidate_EmptyStruct tests validation of empty structs
+// TestValidate_EmptyStruct tests validation of empty structs.
 func TestValidate_EmptyStruct(t *testing.T) {
 	type Empty struct{}
 
@@ -1104,7 +1106,7 @@ func TestValidate_EmptyStruct(t *testing.T) {
 	}
 }
 
-// TestValidate_PathConstruction tests that field paths are constructed correctly
+// TestValidate_PathConstruction tests that field paths are constructed correctly.
 func TestValidate_PathConstruction(t *testing.T) {
 	type Level3 struct {
 		Value string `pedantigo:"required,min=2"`
@@ -1143,7 +1145,7 @@ func TestValidate_PathConstruction(t *testing.T) {
 
 			errs := validateFunc(reflect.ValueOf(tt.input), "")
 
-			require.Greater(t, len(errs), 0)
+			require.NotEmpty(t, errs)
 			assert.Equal(t, tt.wantPath, errs[0].Field)
 		})
 	}

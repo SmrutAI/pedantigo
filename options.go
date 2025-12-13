@@ -1,6 +1,6 @@
 package pedantigo
 
-// ValidatorOptions configures validator behavior
+// ValidatorOptions configures validator behavior.
 type ValidatorOptions struct {
 	// StrictMissingFields controls whether missing fields without defaults are errors
 	// When true (default): missing fields without defaults cause validation errors
@@ -8,7 +8,7 @@ type ValidatorOptions struct {
 	StrictMissingFields bool
 }
 
-// DefaultValidatorOptions returns the default validator options
+// DefaultValidatorOptions returns the default validator options.
 func DefaultValidatorOptions() ValidatorOptions {
 	return ValidatorOptions{
 		StrictMissingFields: true,

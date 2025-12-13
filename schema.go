@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"reflect"
 
+	"github.com/invopop/jsonschema"
+
 	"github.com/SmrutAI/Pedantigo/internal/tags"
 	"github.com/SmrutAI/Pedantigo/schemagen"
-	"github.com/invopop/jsonschema"
 )
 
 // Schema generates a JSON Schema from the validator's type T
 // The schema includes all validation constraints mapped to JSON Schema properties
-// Schema implements the method
+// Schema implements the method.
 func (v *Validator[T]) Schema() *jsonschema.Schema {
 	// Fast path: read lock check for cached schema
 	v.schemaMu.RLock()
@@ -45,7 +46,7 @@ func (v *Validator[T]) Schema() *jsonschema.Schema {
 // SchemaJSON generates JSON Schema as JSON bytes for LLM APIs
 // Returns expanded schema with nested objects inlined (no $ref/$defs)
 // Use this for: OpenAI function calling, Anthropic tool use, Claude structured outputs
-// SchemaJSON implements the method
+// SchemaJSON implements the method.
 func (v *Validator[T]) SchemaJSON() ([]byte, error) {
 	// Fast path: read lock check for cached JSON
 	v.schemaMu.RLock()
@@ -121,7 +122,7 @@ func (v *Validator[T]) SchemaJSON() ([]byte, error) {
 // SchemaOpenAPI generates a JSON Schema with $ref support for OpenAPI/Swagger specs
 // Returns schema with $ref/$defs for type reusability and cleaner documentation
 // Use this for: OpenAPI 3.0 specs, Swagger documentation, API documentation tools
-// SchemaOpenAPI implements the method
+// SchemaOpenAPI implements the method.
 func (v *Validator[T]) SchemaOpenAPI() *jsonschema.Schema {
 	// Fast path: read lock check for cached OpenAPI schema
 	v.schemaMu.RLock()
@@ -156,10 +157,10 @@ func (v *Validator[T]) SchemaOpenAPI() *jsonschema.Schema {
 	return baseSchema
 }
 
-// SchemaJSONOpenAPI generates JSON Schema as JSON bytes for OpenAPI/Swagger specs
-// Returns schema with $ref/$defs for type reusability
-// Use this for: OpenAPI 3.0 specs, Swagger documentation, API documentation tools
-// SchemaJSONOpenAPI implements the method
+// SchemaJSONOpenAPI generates JSON Schema as JSON bytes for OpenAPI/Swagger specs.
+// Returns schema with $ref/$defs for type reusability.
+// Use this for: OpenAPI 3.0 specs, Swagger documentation, API documentation tools.
+// SchemaJSONOpenAPI implements the method.
 func (v *Validator[T]) SchemaJSONOpenAPI() ([]byte, error) {
 	// Fast path: read lock check for cached OpenAPI JSON
 	v.schemaMu.RLock()
@@ -221,7 +222,7 @@ func (v *Validator[T]) SchemaJSONOpenAPI() ([]byte, error) {
 	return jsonBytes, nil
 }
 
-// enhanceSchemaWithDefs enhances both root schema and all definitions
+// enhanceSchemaWithDefs enhances both root schema and all definitions.
 func (v *Validator[T]) enhanceSchemaWithDefs(schema *jsonschema.Schema, typ reflect.Type) {
 	// Clear the required fields set by jsonschema library
 	// We'll add our own based on pedantigo:"required" tags
@@ -240,7 +241,7 @@ func (v *Validator[T]) enhanceSchemaWithDefs(schema *jsonschema.Schema, typ refl
 	}
 }
 
-// findTypeForDefinition finds the reflect.Type for a definition by name
+// findTypeForDefinition finds the reflect.Type for a definition by name.
 func (v *Validator[T]) findTypeForDefinition(typ reflect.Type, defName string) reflect.Type {
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.Elem()
@@ -294,7 +295,7 @@ func (v *Validator[T]) findTypeForDefinition(typ reflect.Type, defName string) r
 	return nil
 }
 
-// searchSliceType searches for a type within slice element types
+// searchSliceType searches for a type within slice element types.
 func (v *Validator[T]) searchSliceType(fieldType reflect.Type, defName string) reflect.Type {
 	elemType := fieldType.Elem()
 	if elemType.Kind() == reflect.Ptr {
@@ -311,7 +312,7 @@ func (v *Validator[T]) searchSliceType(fieldType reflect.Type, defName string) r
 	return nil
 }
 
-// searchMapType searches for a type within map value types
+// searchMapType searches for a type within map value types.
 func (v *Validator[T]) searchMapType(fieldType reflect.Type, defName string) reflect.Type {
 	valueType := fieldType.Elem()
 	if valueType.Kind() == reflect.Ptr {

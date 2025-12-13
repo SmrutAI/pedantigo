@@ -7,27 +7,27 @@ import (
 
 // FieldError represents a validation error for a specific field
 // This is a copy of the root package's FieldError to avoid circular imports
-// FieldError represents an error condition
+// FieldError represents an error condition.
 type FieldError struct {
 	Field   string
 	Message string
 	Value   any
 }
 
-// ConstraintValidator is the interface for validation constraints
+// ConstraintValidator is the interface for validation constraints.
 type ConstraintValidator interface {
 	Validate(value any) error
 }
 
-// TagParser is a function type for parsing struct tags
+// TagParser is a function type for parsing struct tags.
 type TagParser func(tag reflect.StructTag) map[string]string
 
-// ConstraintBuilder is a function type for building constraint validators
+// ConstraintBuilder is a function type for building constraint validators.
 type ConstraintBuilder func(constraints map[string]string, fieldType reflect.Type) []ConstraintValidator
 
-// ValidateValue recursively validates a reflected value
-// NOTE: 'required' constraint is skipped (not built in BuildConstraints)
-// ValidateValue implements the functionality
+// ValidateValue recursively validates a reflected value.
+// NOTE: 'required' constraint is skipped (not built in BuildConstraints).
+// ValidateValue implements the functionality.
 func ValidateValue(
 	val reflect.Value,
 	path string,
@@ -101,12 +101,13 @@ func ValidateValue(
 		validators := buildConstraintsFunc(constraintsMap, field.Type)
 
 		// For slices, validate each element instead of the slice itself
-		if fieldValue.Kind() == reflect.Slice {
+		switch fieldValue.Kind() {
+		case reflect.Slice:
 			errors = append(errors, validateSliceElements(fieldValue, fieldPath, validators, recursiveValidateFunc)...)
-		} else if fieldValue.Kind() == reflect.Map {
+		case reflect.Map:
 			// For maps, validate each value instead of the map itself
 			errors = append(errors, validateMapElements(fieldValue, fieldPath, validators, recursiveValidateFunc)...)
-		} else {
+		default:
 			// For non-slice/map fields, apply constraints directly
 			errors = append(errors, validateScalarField(fieldValue, fieldPath, validators, recursiveValidateFunc)...)
 		}
@@ -119,13 +120,13 @@ func validateNestedElements(fieldValue reflect.Value,
 	recursiveValidateFunc func(val reflect.Value, path string) []FieldError,
 	fieldPath string,
 ) []FieldError {
-
 	fieldErrors := make([]FieldError, 0)
 
-	if fieldValue.Kind() == reflect.Struct {
+	switch fieldValue.Kind() {
+	case reflect.Struct:
 		fieldErrors = append(fieldErrors, recursiveValidateFunc(fieldValue, fieldPath)...)
-	} else if fieldValue.Kind() == reflect.Slice {
-		// Recursively validate struct elements in slices
+	case reflect.Slice:
+		// Recursively validate struct elements in slices.
 		for i := 0; i < fieldValue.Len(); i++ {
 			elemValue := fieldValue.Index(i)
 			elemPath := fmt.Sprintf("%s[%d]", fieldPath, i)
@@ -133,8 +134,8 @@ func validateNestedElements(fieldValue reflect.Value,
 				fieldErrors = append(fieldErrors, recursiveValidateFunc(elemValue, elemPath)...)
 			}
 		}
-	} else if fieldValue.Kind() == reflect.Map {
-		// Recursively validate struct values in maps
+	case reflect.Map:
+		// Recursively validate struct values in maps.
 		iter := fieldValue.MapRange()
 		for iter.Next() {
 			mapKey := iter.Key()

@@ -3,16 +3,34 @@ package constraints_test
 import (
 	"testing"
 
-	"github.com/SmrutAI/Pedantigo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	pedantigo "github.com/SmrutAI/Pedantigo"
 )
+
+// checkValidationErrorWithField verifies validation errors and optionally checks the first error's field.
+func checkValidationErrorWithField(t *testing.T, err error, wantErr bool, wantField string) {
+	t.Helper()
+
+	if wantErr {
+		require.Error(t, err, "expected validation error")
+		var ve *pedantigo.ValidationError
+		require.ErrorAs(t, err, &ve, "expected ValidationError, got %T", err)
+		require.NotEmpty(t, ve.Errors, "expected errors list")
+		if wantField != "" {
+			assert.Equal(t, wantField, ve.Errors[0].Field)
+		}
+	} else {
+		require.NoError(t, err, "expected no errors")
+	}
+}
 
 // ============================================================================
 // required_if Tests
 // ============================================================================
 
-// TestRequiredIf tests RequiredIf validation
+// TestRequiredIf tests RequiredIf validation.
 func TestRequiredIf(t *testing.T) {
 	type FormStringCondition struct {
 		Country string `json:"country"`
@@ -113,42 +131,42 @@ func TestRequiredIf(t *testing.T) {
 				err := validator.Validate(form)
 				if tt.wantErr {
 					require.Error(t, err, "expected validation error")
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected ValidationError, got %T", err)
+					var ve *pedantigo.ValidationError
+					require.ErrorAs(t, err, &ve, "expected ValidationError, got %T", err)
 					require.NotEmpty(t, ve.Errors, "expected errors list")
 					if tt.wantField != "" {
 						assert.Equal(t, tt.wantField, ve.Errors[0].Field)
 					}
 				} else {
-					assert.NoError(t, err, "expected no errors")
+					require.NoError(t, err, "expected no errors")
 				}
 			case *FormBoolCondition:
 				validator := pedantigo.New[FormBoolCondition]()
 				err := validator.Validate(form)
 				if tt.wantErr {
 					require.Error(t, err, "expected validation error")
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected ValidationError, got %T", err)
+					var ve *pedantigo.ValidationError
+					require.ErrorAs(t, err, &ve, "expected ValidationError, got %T", err)
 					require.NotEmpty(t, ve.Errors, "expected errors list")
 					if tt.wantField != "" {
 						assert.Equal(t, tt.wantField, ve.Errors[0].Field)
 					}
 				} else {
-					assert.NoError(t, err, "expected no errors")
+					require.NoError(t, err, "expected no errors")
 				}
 			case *FormIntCondition:
 				validator := pedantigo.New[FormIntCondition]()
 				err := validator.Validate(form)
 				if tt.wantErr {
 					require.Error(t, err, "expected validation error")
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected ValidationError, got %T", err)
+					var ve *pedantigo.ValidationError
+					require.ErrorAs(t, err, &ve, "expected ValidationError, got %T", err)
 					require.NotEmpty(t, ve.Errors, "expected errors list")
 					if tt.wantField != "" {
 						assert.Equal(t, tt.wantField, ve.Errors[0].Field)
 					}
 				} else {
-					assert.NoError(t, err, "expected no errors")
+					require.NoError(t, err, "expected no errors")
 				}
 			case *FormMultiple:
 				validator := pedantigo.New[FormMultiple]()
@@ -156,7 +174,7 @@ func TestRequiredIf(t *testing.T) {
 				if tt.wantErr {
 					require.Error(t, err, "expected validation error")
 				} else {
-					assert.NoError(t, err, "expected no errors")
+					require.NoError(t, err, "expected no errors")
 				}
 			}
 		})
@@ -167,7 +185,7 @@ func TestRequiredIf(t *testing.T) {
 // required_unless Tests
 // ============================================================================
 
-// TestRequiredUnless tests RequiredUnless validation
+// TestRequiredUnless tests RequiredUnless validation.
 func TestRequiredUnless(t *testing.T) {
 	type FormStringCondition struct {
 		Status   string `json:"status"`
@@ -251,14 +269,14 @@ func TestRequiredUnless(t *testing.T) {
 				err := validator.Validate(form)
 				if tt.wantErr {
 					require.Error(t, err, "expected validation error")
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected ValidationError, got %T", err)
+					var ve *pedantigo.ValidationError
+					require.ErrorAs(t, err, &ve, "expected ValidationError, got %T", err)
 					require.NotEmpty(t, ve.Errors, "expected errors list")
 					if tt.wantField != "" {
 						assert.Equal(t, tt.wantField, ve.Errors[0].Field)
 					}
 				} else {
-					assert.NoError(t, err, "expected no errors")
+					require.NoError(t, err, "expected no errors")
 				}
 			case *FormBoolCondition:
 				validator := pedantigo.New[FormBoolCondition]()
@@ -266,7 +284,7 @@ func TestRequiredUnless(t *testing.T) {
 				if tt.wantErr {
 					require.Error(t, err, "expected validation error")
 				} else {
-					assert.NoError(t, err, "expected no errors")
+					require.NoError(t, err, "expected no errors")
 				}
 			case *FormMultiple:
 				validator := pedantigo.New[FormMultiple]()
@@ -274,7 +292,7 @@ func TestRequiredUnless(t *testing.T) {
 				if tt.wantErr {
 					require.Error(t, err, "expected validation error")
 				} else {
-					assert.NoError(t, err, "expected no errors")
+					require.NoError(t, err, "expected no errors")
 				}
 			}
 		})
@@ -285,7 +303,7 @@ func TestRequiredUnless(t *testing.T) {
 // required_with Tests
 // ============================================================================
 
-// TestRequiredWith tests RequiredWith validation
+// TestRequiredWith tests RequiredWith validation.
 func TestRequiredWith(t *testing.T) {
 	type FormStringCondition struct {
 		Method string `json:"method"`
@@ -396,41 +414,19 @@ func TestRequiredWith(t *testing.T) {
 			case *FormStringCondition:
 				validator := pedantigo.New[FormStringCondition]()
 				err := validator.Validate(form)
-				if tt.wantErr {
-					require.Error(t, err, "expected validation error")
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected ValidationError, got %T", err)
-					require.NotEmpty(t, ve.Errors, "expected errors list")
-					if tt.wantField != "" {
-						assert.Equal(t, tt.wantField, ve.Errors[0].Field)
-					}
-				} else {
-					assert.NoError(t, err, "expected no errors")
-				}
+				checkValidationErrorWithField(t, err, tt.wantErr, tt.wantField)
 			case *FormIntCondition:
 				validator := pedantigo.New[FormIntCondition]()
 				err := validator.Validate(form)
-				if tt.wantErr {
-					require.Error(t, err, "expected validation error")
-				} else {
-					assert.NoError(t, err, "expected no errors")
-				}
+				checkValidationErrorWithField(t, err, tt.wantErr, "")
 			case *FormBoolCondition:
 				validator := pedantigo.New[FormBoolCondition]()
 				err := validator.Validate(form)
-				if tt.wantErr {
-					require.Error(t, err, "expected validation error")
-				} else {
-					assert.NoError(t, err, "expected no errors")
-				}
+				checkValidationErrorWithField(t, err, tt.wantErr, "")
 			case *FormMultiple:
 				validator := pedantigo.New[FormMultiple]()
 				err := validator.Validate(form)
-				if tt.wantErr {
-					require.Error(t, err, "expected validation error")
-				} else {
-					assert.NoError(t, err, "expected no errors")
-				}
+				checkValidationErrorWithField(t, err, tt.wantErr, "")
 			}
 		})
 	}
@@ -440,7 +436,7 @@ func TestRequiredWith(t *testing.T) {
 // required_without Tests
 // ============================================================================
 
-// TestRequiredWithout tests RequiredWithout validation
+// TestRequiredWithout tests RequiredWithout validation.
 func TestRequiredWithout(t *testing.T) {
 	type FormStringCondition struct {
 		DefaultAddress string `json:"default_address"`
@@ -560,41 +556,19 @@ func TestRequiredWithout(t *testing.T) {
 			case *FormStringCondition:
 				validator := pedantigo.New[FormStringCondition]()
 				err := validator.Validate(form)
-				if tt.wantErr {
-					require.Error(t, err, "expected validation error")
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected ValidationError, got %T", err)
-					require.NotEmpty(t, ve.Errors, "expected errors list")
-					if tt.wantField != "" {
-						assert.Equal(t, tt.wantField, ve.Errors[0].Field)
-					}
-				} else {
-					assert.NoError(t, err, "expected no errors")
-				}
+				checkValidationErrorWithField(t, err, tt.wantErr, tt.wantField)
 			case *FormIntCondition:
 				validator := pedantigo.New[FormIntCondition]()
 				err := validator.Validate(form)
-				if tt.wantErr {
-					require.Error(t, err, "expected validation error")
-				} else {
-					assert.NoError(t, err, "expected no errors")
-				}
+				checkValidationErrorWithField(t, err, tt.wantErr, "")
 			case *FormBoolCondition:
 				validator := pedantigo.New[FormBoolCondition]()
 				err := validator.Validate(form)
-				if tt.wantErr {
-					require.Error(t, err, "expected validation error")
-				} else {
-					assert.NoError(t, err, "expected no errors")
-				}
+				checkValidationErrorWithField(t, err, tt.wantErr, "")
 			case *FormMultiple:
 				validator := pedantigo.New[FormMultiple]()
 				err := validator.Validate(form)
-				if tt.wantErr {
-					require.Error(t, err, "expected validation error")
-				} else {
-					assert.NoError(t, err, "expected no errors")
-				}
+				checkValidationErrorWithField(t, err, tt.wantErr, "")
 			}
 		})
 	}
@@ -604,7 +578,7 @@ func TestRequiredWithout(t *testing.T) {
 // Cross-Constraint Integration Tests
 // ============================================================================
 
-// TestCrossFieldConstraints tests CrossFieldConstraints validation
+// TestCrossFieldConstraints tests CrossFieldConstraints validation.
 func TestCrossFieldConstraints(t *testing.T) {
 	t.Run("complex scenario - valid business account", func(t *testing.T) {
 		type UserProfile struct {
@@ -626,7 +600,7 @@ func TestCrossFieldConstraints(t *testing.T) {
 			BackupEmail:      "backup@acme.com",
 			NotificationPref: "email",
 		})
-		assert.NoError(t, err, "expected no errors")
+		require.NoError(t, err, "expected no errors")
 	})
 
 	t.Run("complex scenario - business without BusinessName", func(t *testing.T) {
@@ -672,7 +646,7 @@ func TestCrossFieldConstraints(t *testing.T) {
 			BackupEmail:      "",
 			NotificationPref: "",
 		})
-		assert.NoError(t, err, "expected no errors")
+		require.NoError(t, err, "expected no errors")
 	})
 
 	t.Run("complex scenario - missing NotificationPref for BackupEmail", func(t *testing.T) {

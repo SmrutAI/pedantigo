@@ -12,7 +12,16 @@ import (
 	"github.com/invopop/jsonschema"
 )
 
-// GenerateBaseSchema creates base JSON schema for a type (all nested structs inlined)
+// Format constraint name constants.
+const (
+	fmtEmail = "email"
+	fmtURL   = "url"
+	fmtUUID  = "uuid"
+	fmtIPv4  = "ipv4"
+	fmtIPv6  = "ipv6"
+)
+
+// GenerateBaseSchema creates base JSON schema for a type (all nested structs inlined).
 func GenerateBaseSchema[T any]() *jsonschema.Schema {
 	var zero T
 	reflector := jsonschema.Reflector{
@@ -41,7 +50,7 @@ func GenerateBaseSchema[T any]() *jsonschema.Schema {
 	return actualSchema
 }
 
-// GenerateOpenAPIBaseSchema creates base JSON schema with $ref support for OpenAPI
+// GenerateOpenAPIBaseSchema creates base JSON schema with $ref support for OpenAPI.
 func GenerateOpenAPIBaseSchema[T any]() *jsonschema.Schema {
 	var zero T
 	reflector := jsonschema.Reflector{
@@ -54,7 +63,7 @@ func GenerateOpenAPIBaseSchema[T any]() *jsonschema.Schema {
 // EnhanceSchema recursively enhances a JSON Schema with validation constraints
 // parseTagFunc should parse struct tags and return constraint map, or nil if no constraints
 // typReflect is the reflect.Type of the struct being enhanced
-// EnhanceSchema implements the functionality
+// EnhanceSchema implements the functionality.
 func EnhanceSchema(schema *jsonschema.Schema, typ reflect.Type, parseTagFunc func(reflect.StructTag) map[string]string) {
 	// Handle pointer types
 	if typ.Kind() == reflect.Ptr {
@@ -125,7 +134,7 @@ func EnhanceSchema(schema *jsonschema.Schema, typ reflect.Type, parseTagFunc fun
 	}
 }
 
-// EnhanceNestedTypes handles nested structs, slices, and maps
+// EnhanceNestedTypes handles nested structs, slices, and maps.
 func EnhanceNestedTypes(schema *jsonschema.Schema, typ reflect.Type, parseTagFunc func(reflect.StructTag) map[string]string) {
 	switch typ.Kind() {
 	case reflect.Struct:
@@ -160,7 +169,7 @@ func EnhanceNestedTypes(schema *jsonschema.Schema, typ reflect.Type, parseTagFun
 	}
 }
 
-// ApplyConstraints applies validation constraints to a JSON Schema
+// ApplyConstraints applies validation constraints to a JSON Schema.
 func ApplyConstraints(schema *jsonschema.Schema, constraintsMap map[string]string, fieldType reflect.Type) {
 	for name, value := range constraintsMap {
 		switch name {
@@ -190,7 +199,7 @@ func ApplyConstraints(schema *jsonschema.Schema, constraintsMap map[string]strin
 			// lte → maximum (inclusive)
 			schema.Maximum = json.Number(value)
 
-		case "email", "url", "uuid", "ipv4", "ipv6":
+		case fmtEmail, fmtURL, fmtUUID, fmtIPv4, fmtIPv6:
 			applyFormatConstraint(schema, name)
 
 		case "regexp":
@@ -208,8 +217,8 @@ func ApplyConstraints(schema *jsonschema.Schema, constraintsMap map[string]strin
 
 		case "len":
 			// len → minLength + maxLength (exact length)
-			if length, err := strconv.Atoi(value); err == nil {
-				l := uint64(length)
+			if length, err := strconv.Atoi(value); err == nil && length >= 0 {
+				l := uint64(length) //nolint:gosec // bounds checked above
 				schema.MinLength = &l
 				schema.MaxLength = &l
 			}
@@ -287,21 +296,21 @@ func ApplyConstraints(schema *jsonschema.Schema, constraintsMap map[string]strin
 	}
 }
 
-// ApplyConstraintsToItems applies constraints to array items or map values
+// ApplyConstraintsToItems applies constraints to array items or map values.
 func ApplyConstraintsToItems(schema *jsonschema.Schema, constraintsMap map[string]string, elemType reflect.Type) {
-	// Skip constraints that don't apply to elements
+	// Skip constraints that don't apply to elements.
 	for name, value := range constraintsMap {
 		switch name {
-		case "email":
-			schema.Format = "email"
-		case "url":
+		case fmtEmail:
+			schema.Format = fmtEmail
+		case fmtURL:
 			schema.Format = "uri"
-		case "uuid":
-			schema.Format = "uuid"
-		case "ipv4":
-			schema.Format = "ipv4"
-		case "ipv6":
-			schema.Format = "ipv6"
+		case fmtUUID:
+			schema.Format = fmtUUID
+		case fmtIPv4:
+			schema.Format = fmtIPv4
+		case fmtIPv6:
+			schema.Format = fmtIPv6
 		case "regexp":
 			schema.Pattern = value
 		case "oneof":
@@ -315,8 +324,8 @@ func ApplyConstraintsToItems(schema *jsonschema.Schema, constraintsMap map[strin
 			// Context-aware for element type
 			kind := elemType.Kind()
 			if kind == reflect.String {
-				if minLength, err := strconv.Atoi(value); err == nil {
-					ml := uint64(minLength)
+				if minLength, err := strconv.Atoi(value); err == nil && minLength >= 0 {
+					ml := uint64(minLength) //nolint:gosec // bounds checked above
 					schema.MinLength = &ml
 				}
 			} else {
@@ -326,8 +335,8 @@ func ApplyConstraintsToItems(schema *jsonschema.Schema, constraintsMap map[strin
 			// Context-aware for element type
 			kind := elemType.Kind()
 			if kind == reflect.String {
-				if maxLength, err := strconv.Atoi(value); err == nil {
-					ml := uint64(maxLength)
+				if maxLength, err := strconv.Atoi(value); err == nil && maxLength >= 0 {
+					ml := uint64(maxLength) //nolint:gosec // bounds checked above
 					schema.MaxLength = &ml
 				}
 			} else {
@@ -345,7 +354,7 @@ func ApplyConstraintsToItems(schema *jsonschema.Schema, constraintsMap map[strin
 	}
 }
 
-// ParseDefaultValue converts a string default value to the appropriate type
+// ParseDefaultValue converts a string default value to the appropriate type.
 func ParseDefaultValue(value string, typ reflect.Type) any {
 	switch typ.Kind() {
 	case reflect.String:
@@ -370,8 +379,8 @@ func ParseDefaultValue(value string, typ reflect.Type) any {
 	return value
 }
 
-// applyMinConstraint applies min constraint context-aware to field type
-// For strings/arrays: sets minLength, for numbers: sets minimum
+// applyMinConstraint applies min constraint context-aware to field type.
+// For strings/arrays: sets minLength, for numbers: sets minimum.
 func applyMinConstraint(schema *jsonschema.Schema, value string, fieldType reflect.Type) {
 	checkType := fieldType
 	if checkType.Kind() == reflect.Ptr {
@@ -380,8 +389,8 @@ func applyMinConstraint(schema *jsonschema.Schema, value string, fieldType refle
 	kind := checkType.Kind()
 	if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
 		// min → minLength for strings/arrays
-		if minLength, err := strconv.Atoi(value); err == nil {
-			ml := uint64(minLength)
+		if minLength, err := strconv.Atoi(value); err == nil && minLength >= 0 {
+			ml := uint64(minLength) //nolint:gosec // bounds checked above
 			schema.MinLength = &ml
 		}
 	} else {
@@ -390,8 +399,8 @@ func applyMinConstraint(schema *jsonschema.Schema, value string, fieldType refle
 	}
 }
 
-// applyMaxConstraint applies max constraint context-aware to field type
-// For strings/arrays: sets maxLength, for numbers: sets maximum
+// applyMaxConstraint applies max constraint context-aware to field type.
+// For strings/arrays: sets maxLength, for numbers: sets maximum.
 func applyMaxConstraint(schema *jsonschema.Schema, value string, fieldType reflect.Type) {
 	checkType := fieldType
 	if checkType.Kind() == reflect.Ptr {
@@ -400,8 +409,8 @@ func applyMaxConstraint(schema *jsonschema.Schema, value string, fieldType refle
 	kind := checkType.Kind()
 	if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
 		// max → maxLength for strings/arrays
-		if maxLength, err := strconv.Atoi(value); err == nil {
-			ml := uint64(maxLength)
+		if maxLength, err := strconv.Atoi(value); err == nil && maxLength >= 0 {
+			ml := uint64(maxLength) //nolint:gosec // bounds checked above
 			schema.MaxLength = &ml
 		}
 	} else {
@@ -410,18 +419,18 @@ func applyMaxConstraint(schema *jsonschema.Schema, value string, fieldType refle
 	}
 }
 
-// applyFormatConstraint maps constraint names to JSON Schema format values
+// applyFormatConstraint maps constraint names to JSON Schema format values.
 func applyFormatConstraint(schema *jsonschema.Schema, constraintName string) {
 	switch constraintName {
-	case "email":
-		schema.Format = "email"
-	case "url":
+	case fmtEmail:
+		schema.Format = fmtEmail
+	case fmtURL:
 		schema.Format = "uri"
-	case "uuid":
-		schema.Format = "uuid"
-	case "ipv4":
-		schema.Format = "ipv4"
-	case "ipv6":
-		schema.Format = "ipv6"
+	case fmtUUID:
+		schema.Format = fmtUUID
+	case fmtIPv4:
+		schema.Format = fmtIPv4
+	case fmtIPv6:
+		schema.Format = fmtIPv6
 	}
 }

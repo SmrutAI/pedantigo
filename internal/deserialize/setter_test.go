@@ -11,7 +11,7 @@ import (
 
 // ==================== Primitive Types ====================
 
-// TestSetFieldValue_PrimitiveTypes tests SetFieldValue primitivetypes
+// TestSetFieldValue_PrimitiveTypes tests SetFieldValue primitivetypes.
 func TestSetFieldValue_PrimitiveTypes(t *testing.T) {
 	type TestStruct struct {
 		Name   string
@@ -69,7 +69,7 @@ func TestSetFieldValue_PrimitiveTypes(t *testing.T) {
 				case "Age":
 					assert.Equal(t, int64(tt.value.(int)), field.Int())
 				case "Score":
-					assert.Equal(t, tt.value.(float64), field.Float())
+					assert.InDelta(t, tt.value.(float64), field.Float(), 1e-9)
 				case "Active":
 					assert.Equal(t, tt.value.(bool), field.Bool())
 				}
@@ -80,7 +80,7 @@ func TestSetFieldValue_PrimitiveTypes(t *testing.T) {
 
 // ==================== Integer Types ====================
 
-// TestSetFieldValue_IntegerTypes tests SetFieldValue integertypes
+// TestSetFieldValue_IntegerTypes tests SetFieldValue integertypes.
 func TestSetFieldValue_IntegerTypes(t *testing.T) {
 	type TestStruct struct {
 		Int8Field   int8
@@ -136,7 +136,7 @@ func TestSetFieldValue_IntegerTypes(t *testing.T) {
 
 // ==================== Pointer Types ====================
 
-// TestSetFieldValue_Pointers tests SetFieldValue pointers
+// TestSetFieldValue_Pointers tests SetFieldValue pointers.
 func TestSetFieldValue_Pointers(t *testing.T) {
 	type TestStruct struct {
 		StringPtr *string
@@ -195,7 +195,7 @@ func TestSetFieldValue_Pointers(t *testing.T) {
 
 // ==================== Slice Types ====================
 
-// TestSetFieldValue_Slices tests SetFieldValue slices
+// TestSetFieldValue_Slices tests SetFieldValue slices.
 func TestSetFieldValue_Slices(t *testing.T) {
 	type TestStruct struct {
 		StringSlice []string
@@ -246,7 +246,7 @@ func TestSetFieldValue_Slices(t *testing.T) {
 
 // ==================== Map Types ====================
 
-// TestSetFieldValue_Maps tests SetFieldValue maps
+// TestSetFieldValue_Maps tests SetFieldValue maps.
 func TestSetFieldValue_Maps(t *testing.T) {
 	type TestStruct struct {
 		StringMap map[string]string
@@ -291,7 +291,7 @@ func TestSetFieldValue_Maps(t *testing.T) {
 
 // ==================== Type Conversion ====================
 
-// TestSetFieldValue_TypeConversion tests SetFieldValue typeconversion
+// TestSetFieldValue_TypeConversion tests SetFieldValue typeconversion.
 func TestSetFieldValue_TypeConversion(t *testing.T) {
 	type TestStruct struct {
 		IntField     int
@@ -351,7 +351,7 @@ func TestSetFieldValue_TypeConversion(t *testing.T) {
 
 // ==================== Time Type ====================
 
-// TestSetFieldValue_TimeType tests SetFieldValue timetype
+// TestSetFieldValue_TimeType tests SetFieldValue timetype.
 func TestSetFieldValue_TimeType(t *testing.T) {
 	type TestStruct struct {
 		CreatedAt time.Time
@@ -412,7 +412,7 @@ func TestSetFieldValue_TimeType(t *testing.T) {
 
 // ==================== Struct Types ====================
 
-// TestSetFieldValue_NestedStruct tests SetFieldValue nestedstruct
+// TestSetFieldValue_NestedStruct tests SetFieldValue nestedstruct.
 func TestSetFieldValue_NestedStruct(t *testing.T) {
 	type Address struct {
 		Street string `json:"street"`
@@ -476,7 +476,7 @@ func TestSetFieldValue_NestedStruct(t *testing.T) {
 
 // ==================== Unset Field Handling ====================
 
-// TestSetFieldValue_UnsetField tests SetFieldValue unsetfield
+// TestSetFieldValue_UnsetField tests SetFieldValue unsetfield.
 func TestSetFieldValue_UnsetField(t *testing.T) {
 	type TestStruct struct {
 		_unexported string //nolint:unused // unexported field for testing CanSet()
@@ -514,7 +514,7 @@ func TestSetFieldValue_UnsetField(t *testing.T) {
 
 // ==================== Slice of Structs ====================
 
-// TestSetFieldValue_SliceOfStructs tests SetFieldValue sliceofstructs
+// TestSetFieldValue_SliceOfStructs tests SetFieldValue sliceofstructs.
 func TestSetFieldValue_SliceOfStructs(t *testing.T) {
 	type Item struct {
 		ID   int    `json:"id"`
@@ -573,7 +573,7 @@ func TestSetFieldValue_SliceOfStructs(t *testing.T) {
 
 // ==================== Map with Struct Values ====================
 
-// TestSetFieldValue_MapWithStructValues tests SetFieldValue mapwithstructvalues
+// TestSetFieldValue_MapWithStructValues tests SetFieldValue mapwithstructvalues.
 func TestSetFieldValue_MapWithStructValues(t *testing.T) {
 	type User struct {
 		Name string `json:"name"`
@@ -632,7 +632,7 @@ func TestSetFieldValue_MapWithStructValues(t *testing.T) {
 
 // ==================== Edge Cases ====================
 
-// TestSetFieldValue_EdgeCases tests SetFieldValue edgecases
+// TestSetFieldValue_EdgeCases tests SetFieldValue edgecases.
 func TestSetFieldValue_EdgeCases(t *testing.T) {
 	type TestStruct struct {
 		String string
@@ -679,7 +679,7 @@ func TestSetFieldValue_EdgeCases(t *testing.T) {
 
 // ==================== Pointer Slice ====================
 
-// TestSetFieldValue_PointerSlice tests SetFieldValue pointerslice
+// TestSetFieldValue_PointerSlice tests SetFieldValue pointerslice.
 func TestSetFieldValue_PointerSlice(t *testing.T) {
 	type TestStruct struct {
 		StringPtrs []*string
@@ -737,7 +737,7 @@ func TestSetFieldValue_PointerSlice(t *testing.T) {
 
 // ==================== Pointer Pointer ====================
 
-// TestSetFieldValue_PointerPointer tests SetFieldValue pointerpointer
+// TestSetFieldValue_PointerPointer tests SetFieldValue pointerpointer.
 func TestSetFieldValue_PointerPointer(t *testing.T) {
 	type TestStruct struct {
 		DoublePtr **string
@@ -770,7 +770,7 @@ func TestSetFieldValue_PointerPointer(t *testing.T) {
 
 // ==================== SetDefaultValue Tests ====================
 
-// TestSetDefaultValue_StringDefaults tests SetDefaultValue stringdefaults
+// TestSetDefaultValue_StringDefaults tests SetDefaultValue stringdefaults.
 func TestSetDefaultValue_StringDefaults(t *testing.T) {
 	type TestStruct struct {
 		Name    string
@@ -908,7 +908,7 @@ func TestSetDefaultValue_FloatDefaults(t *testing.T) {
 
 			SetDefaultValue(field, tt.defaultValue, recursiveSetDefault)
 
-			assert.Equal(t, tt.expected, field.Float())
+			assert.InDelta(t, tt.expected, field.Float(), 1e-9)
 		})
 	}
 }
@@ -1030,20 +1030,20 @@ func TestSetDefaultValue_UnsettableField(t *testing.T) {
 
 // ==================== Helper Functions ====================
 
-// recursiveSetFuncNoop is a no-op recursive set function for testing
+// recursiveSetFuncNoop is a no-op recursive set function for testing.
 func recursiveSetFuncNoop(fieldValue reflect.Value, inValue any, fieldType reflect.Type) error {
 	// For primitive types, delegate to SetFieldValue
 	return SetFieldValue(fieldValue, inValue, fieldType, recursiveSetFuncNoop)
 }
 
-// recursiveSetDefault is a helper for SetDefaultValue recursive calls
+// recursiveSetDefault is a helper for SetDefaultValue recursive calls.
 func recursiveSetDefault(fieldValue reflect.Value, defaultValue string) {
 	SetDefaultValue(fieldValue, defaultValue, recursiveSetDefault)
 }
 
 // ==================== isValidConversion Tests ====================
 
-// Test_isValidConversion tests  isvalidconversion
+// Test_isValidConversion tests  isvalidconversion.
 func Test_isValidConversion(t *testing.T) {
 	tests := []struct {
 		name     string

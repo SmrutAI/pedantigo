@@ -12,7 +12,7 @@ import (
 )
 
 // Test structs
-// SimpleStruct represents the data structure
+// SimpleStruct represents the data structure.
 type SimpleStruct struct {
 	Name  string `json:"name" pedantigo:"required,min=3,max=50"`
 	Age   int    `json:"age" pedantigo:"min=18,max=100"`
@@ -47,7 +47,7 @@ type ConstraintsStruct struct {
 }
 
 // Test containers for nested types
-// SliceContainer represents the data structure
+// SliceContainer represents the data structure.
 type SliceContainer struct {
 	Items []SimpleStruct `json:"items"`
 }
@@ -111,8 +111,7 @@ func TestGenerateBaseSchema(t *testing.T) {
 			}
 
 			// Check required count
-			assert.
-				Equal(t, tt.wantRequired, len(schema.Required))
+			assert.Len(t, schema.Required, tt.wantRequired)
 
 			// Optional: check specific property types
 			for propName, expectedType := range tt.checkPropType {
@@ -746,7 +745,7 @@ func TestFullIntegration(t *testing.T) {
 	t.Logf("Generated schema:\n%s", string(jsonData))
 }
 
-// Helper functions for simple tag parsing
+// Helper functions for simple tag parsing.
 func splitConstraints(tag string) []string {
 	var parts []string
 	current := ""

@@ -7,13 +7,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Test message constants.
+const (
+	errMsgValidEmail    = "must be a valid email address"
+	errMsgAtLeast3Chars = "must be at least 3 characters"
+	errMsgAtLeast5Chars = "must be at least 5 characters"
+	errMsgRequired      = "is required"
+)
+
 // ==================== Slice Validation Tests ====================
 
 // ==================================================
 // slice element validation tests
 // ==================================================
 
-// TestSlice_ValidEmails tests Slice validemails
+// TestSlice_ValidEmails tests Slice validemails.
 func TestSlice_ValidEmails(t *testing.T) {
 	type Config struct {
 		Admins []string `json:"admins" pedantigo:"email"`
@@ -23,7 +31,7 @@ func TestSlice_ValidEmails(t *testing.T) {
 	jsonData := []byte(`{"admins":["alice@example.com","bob@example.com"]}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, config.Admins, 2)
 }
 
@@ -38,12 +46,12 @@ func TestSlice_InvalidEmail_SingleElement(t *testing.T) {
 	_, err := validator.Unmarshal(jsonData)
 	require.Error(t, err)
 
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 	foundError := false
 	for _, fieldErr := range ve.Errors {
-		if fieldErr.Field == "Admins[0]" && fieldErr.Message == "must be a valid email address" {
+		if fieldErr.Field == "Admins[0]" && fieldErr.Message == errMsgValidEmail {
 			foundError = true
 		}
 	}
@@ -62,14 +70,14 @@ func TestSlice_InvalidEmail_MultipleElements(t *testing.T) {
 	_, err := validator.Unmarshal(jsonData)
 	require.Error(t, err)
 
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 	assert.Len(t, ve.Errors, 2)
 
 	// Check first error at index 1
 	foundError1 := false
 	for _, fieldErr := range ve.Errors {
-		if fieldErr.Field == "Admins[1]" && fieldErr.Message == "must be a valid email address" {
+		if fieldErr.Field == "Admins[1]" && fieldErr.Message == errMsgValidEmail {
 			foundError1 = true
 		}
 	}
@@ -78,7 +86,7 @@ func TestSlice_InvalidEmail_MultipleElements(t *testing.T) {
 	// Check second error at index 3
 	foundError2 := false
 	for _, fieldErr := range ve.Errors {
-		if fieldErr.Field == "Admins[3]" && fieldErr.Message == "must be a valid email address" {
+		if fieldErr.Field == "Admins[3]" && fieldErr.Message == errMsgValidEmail {
 			foundError2 = true
 		}
 	}
@@ -96,13 +104,13 @@ func TestSlice_MinLength(t *testing.T) {
 	_, err := validator.Unmarshal(jsonData)
 	require.Error(t, err)
 
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 	assert.Len(t, ve.Errors, 1)
 
 	foundError := false
 	for _, fieldErr := range ve.Errors {
-		if fieldErr.Field == "Tags[1]" && fieldErr.Message == "must be at least 3 characters" {
+		if fieldErr.Field == "Tags[1]" && fieldErr.Message == errMsgAtLeast3Chars {
 			foundError = true
 		}
 	}
@@ -126,14 +134,14 @@ func TestSlice_NestedStructValidation(t *testing.T) {
 	_, err := validator.Unmarshal(jsonData)
 	require.Error(t, err)
 
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 	assert.Len(t, ve.Errors, 2)
 
 	// Check for missing city at index 1
 	foundError1 := false
 	for _, fieldErr := range ve.Errors {
-		if fieldErr.Field == "Addresses[1].City" && fieldErr.Message == "is required" {
+		if fieldErr.Field == "Addresses[1].City" && fieldErr.Message == errMsgRequired {
 			foundError1 = true
 		}
 	}
@@ -142,7 +150,7 @@ func TestSlice_NestedStructValidation(t *testing.T) {
 	// Check for short zip at index 1
 	foundError2 := false
 	for _, fieldErr := range ve.Errors {
-		if fieldErr.Field == "Addresses[1].Zip" && fieldErr.Message == "must be at least 5 characters" {
+		if fieldErr.Field == "Addresses[1].Zip" && fieldErr.Message == errMsgAtLeast5Chars {
 			foundError2 = true
 		}
 	}
@@ -158,8 +166,8 @@ func TestSlice_EmptySlice(t *testing.T) {
 	jsonData := []byte(`{"admins":[]}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
-	assert.Len(t, config.Admins, 0)
+	require.NoError(t, err)
+	assert.Empty(t, config.Admins)
 }
 
 func TestSlice_NilSlice(t *testing.T) {
@@ -171,7 +179,7 @@ func TestSlice_NilSlice(t *testing.T) {
 	jsonData := []byte(`{"admins":null}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, config.Admins)
 }
 
@@ -181,7 +189,7 @@ func TestSlice_NilSlice(t *testing.T) {
 // map value validation tests
 // ==================================================
 
-// TestMap_ValidEmails tests Map validemails
+// TestMap_ValidEmails tests Map validemails.
 func TestMap_ValidEmails(t *testing.T) {
 	type Config struct {
 		Contacts map[string]string `json:"contacts" pedantigo:"email"`
@@ -191,7 +199,7 @@ func TestMap_ValidEmails(t *testing.T) {
 	jsonData := []byte(`{"contacts":{"admin":"alice@example.com","support":"bob@example.com"}}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, config.Contacts, 2)
 }
 
@@ -206,12 +214,12 @@ func TestMap_InvalidEmail_SingleValue(t *testing.T) {
 	_, err := validator.Unmarshal(jsonData)
 	require.Error(t, err)
 
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 	foundError := false
 	for _, fieldErr := range ve.Errors {
-		if fieldErr.Field == "Contacts[admin]" && fieldErr.Message == "must be a valid email address" {
+		if fieldErr.Field == "Contacts[admin]" && fieldErr.Message == errMsgValidEmail {
 			foundError = true
 		}
 	}
@@ -230,14 +238,14 @@ func TestMap_InvalidEmail_MultipleValues(t *testing.T) {
 	_, err := validator.Unmarshal(jsonData)
 	require.Error(t, err)
 
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 	assert.Len(t, ve.Errors, 2)
 
 	// Check that we have errors for the invalid keys (exact keys may vary due to map iteration order)
 	invalidKeys := map[string]bool{"support": false, "sales": false}
 	for _, fieldErr := range ve.Errors {
-		if fieldErr.Message == "must be a valid email address" {
+		if fieldErr.Message == errMsgValidEmail {
 			switch fieldErr.Field {
 			case "Contacts[support]":
 				invalidKeys["support"] = true
@@ -262,13 +270,13 @@ func TestMap_MinLength(t *testing.T) {
 	_, err := validator.Unmarshal(jsonData)
 	require.Error(t, err)
 
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 	assert.Len(t, ve.Errors, 1)
 
 	foundError := false
 	for _, fieldErr := range ve.Errors {
-		if fieldErr.Field == "Tags[type]" && fieldErr.Message == "must be at least 3 characters" {
+		if fieldErr.Field == "Tags[type]" && fieldErr.Message == errMsgAtLeast3Chars {
 			foundError = true
 		}
 	}
@@ -292,14 +300,14 @@ func TestMap_NestedStructValidation(t *testing.T) {
 	_, err := validator.Unmarshal(jsonData)
 	require.Error(t, err)
 
-	ve, ok := err.(*ValidationError)
-	require.True(t, ok, "expected *ValidationError, got %T", err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 	assert.Len(t, ve.Errors, 2)
 
 	// Check for missing city at branch office
 	foundError1 := false
 	for _, fieldErr := range ve.Errors {
-		if fieldErr.Field == "Offices[branch].City" && fieldErr.Message == "is required" {
+		if fieldErr.Field == "Offices[branch].City" && fieldErr.Message == errMsgRequired {
 			foundError1 = true
 		}
 	}
@@ -308,7 +316,7 @@ func TestMap_NestedStructValidation(t *testing.T) {
 	// Check for short zip at branch office
 	foundError2 := false
 	for _, fieldErr := range ve.Errors {
-		if fieldErr.Field == "Offices[branch].Zip" && fieldErr.Message == "must be at least 5 characters" {
+		if fieldErr.Field == "Offices[branch].Zip" && fieldErr.Message == errMsgAtLeast5Chars {
 			foundError2 = true
 		}
 	}
@@ -324,8 +332,8 @@ func TestMap_EmptyMap(t *testing.T) {
 	jsonData := []byte(`{"contacts":{}}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
-	assert.Len(t, config.Contacts, 0)
+	require.NoError(t, err)
+	assert.Empty(t, config.Contacts)
 }
 
 func TestMap_NilMap(t *testing.T) {
@@ -337,6 +345,6 @@ func TestMap_NilMap(t *testing.T) {
 	jsonData := []byte(`{"contacts":null}`)
 
 	config, err := validator.Unmarshal(jsonData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, config.Contacts)
 }

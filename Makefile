@@ -53,11 +53,15 @@ vet:
 	@echo "Running go vet..."
 	go vet ./...
 
-# Format code
-fmt:
+# Format code (uses goimports for import grouping)
+fix_fmt:
 	@echo "Formatting code..."
+	@which goimports > /dev/null || (echo "goimports not installed. Install with: go install golang.org/x/tools/cmd/goimports@latest" && exit 1)
+	goimports -w -local github.com/SmrutAI/Pedantigo .
 	gofmt -s -w .
-	go fmt ./...
+
+# Format code (alias for compatibility)
+fmt: fix_fmt
 
 # Run linter (requires golangci-lint)
 lint:

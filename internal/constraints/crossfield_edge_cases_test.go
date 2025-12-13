@@ -5,9 +5,26 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/SmrutAI/Pedantigo"
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/SmrutAI/Pedantigo"
 )
+
+// runPanicTest runs a test function and checks for expected panic.
+func runPanicTest(t *testing.T, testFunc func() interface{}, expectPanic bool) {
+	t.Helper()
+
+	if expectPanic {
+		defer func() {
+			r := recover()
+			assert.NotNil(t, r, "expected panic for invalid field reference")
+		}()
+	}
+	_ = testFunc()
+	if expectPanic {
+		assert.Fail(t, "should have panicked before reaching here")
+	}
+}
 
 // ==================================================
 // Cross-Field Constraint Edge Case Tests (Table-Driven)
@@ -22,17 +39,30 @@ import (
 // - Some tests check validator creation (fail-fast patterns)
 // - Tests cover error conditions and boundary cases
 
+// panicTestCase defines a test case for panic testing.
+type panicTestCase struct {
+	name        string
+	testFunc    func() interface{}
+	expectPanic bool
+}
+
+// runPanicTestCases executes a slice of panic test cases.
+func runPanicTestCases(t *testing.T, tests []panicTestCase) {
+	t.Helper()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runPanicTest(t, tt.testFunc, tt.expectPanic)
+		})
+	}
+}
+
 // ==================================================
 // Edge Case 1: Nonexistent Target Field
 // ==================================================
 
-// TestCrossField_NonexistentField tests CrossField nonexistentfield
+// TestCrossField_NonexistentField tests CrossField nonexistentfield.
 func TestCrossField_NonexistentField(t *testing.T) {
-	tests := []struct {
-		name        string
-		testFunc    func() interface{} // Returns validator or nil for panic tests
-		expectPanic bool
-	}{
+	runPanicTestCases(t, []panicTestCase{
 		{
 			name: "eqfield with nonexistent target field",
 			testFunc: func() interface{} {
@@ -66,29 +96,14 @@ func TestCrossField_NonexistentField(t *testing.T) {
 			},
 			expectPanic: true,
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.expectPanic {
-				defer func() {
-					r := recover()
-					assert.NotNil(t, r, "expected panic for nonexistent field reference")
-				}()
-			}
-			_ = tt.testFunc()
-			if tt.expectPanic {
-				assert.Fail(t, "should have panicked before reaching here")
-			}
-		})
-	}
+	})
 }
 
 // ==================================================
 // Edge Case 2: Type Incompatibility
 // ==================================================
 
-// TestCrossField_TypeIncompatibility tests CrossField typeincompatibility
+// TestCrossField_TypeIncompatibility tests CrossField typeincompatibility.
 func TestCrossField_TypeIncompatibility(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -154,7 +169,7 @@ func TestCrossField_TypeIncompatibility(t *testing.T) {
 // Edge Case 3: Nil Pointer Fields
 // ==================================================
 
-// TestCrossField_NilPointer tests CrossField nilpointer
+// TestCrossField_NilPointer tests CrossField nilpointer.
 func TestCrossField_NilPointer(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -219,13 +234,9 @@ func TestCrossField_NilPointer(t *testing.T) {
 // Edge Case 4: Case Sensitivity in Field Names
 // ==================================================
 
-// TestCrossField_CaseSensitivity tests CrossField casesensitivity
+// TestCrossField_CaseSensitivity tests CrossField casesensitivity.
 func TestCrossField_CaseSensitivity(t *testing.T) {
-	tests := []struct {
-		name        string
-		testFunc    func() interface{}
-		expectPanic bool
-	}{
+	runPanicTestCases(t, []panicTestCase{
 		{
 			name: "lowercase field reference (case mismatch)",
 			testFunc: func() interface{} {
@@ -259,29 +270,14 @@ func TestCrossField_CaseSensitivity(t *testing.T) {
 			},
 			expectPanic: false,
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.expectPanic {
-				defer func() {
-					r := recover()
-					assert.NotNil(t, r, "expected panic for case-sensitive field name mismatch")
-				}()
-			}
-			_ = tt.testFunc()
-			if tt.expectPanic {
-				assert.Fail(t, "should have panicked before reaching here")
-			}
-		})
-	}
+	})
 }
 
 // ==================================================
 // Edge Case 5: Nested Structs (Skipped for future)
 // ==================================================
 
-// TestCrossField_NestedStruct tests CrossField nestedstruct
+// TestCrossField_NestedStruct tests CrossField nestedstruct.
 func TestCrossField_NestedStruct(t *testing.T) {
 	tests := []struct {
 		name string
@@ -310,7 +306,7 @@ func TestCrossField_NestedStruct(t *testing.T) {
 // Edge Case 6: Multiple Cross-Field Constraints
 // ==================================================
 
-// TestCrossField_MultipleConstraints tests CrossField multipleconstraints
+// TestCrossField_MultipleConstraints tests CrossField multipleconstraints.
 func TestCrossField_MultipleConstraints(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -388,7 +384,7 @@ func TestCrossField_MultipleConstraints(t *testing.T) {
 // Edge Case 7: Self-Reference
 // ==================================================
 
-// TestCrossField_SelfReference tests CrossField selfreference
+// TestCrossField_SelfReference tests CrossField selfreference.
 func TestCrossField_SelfReference(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -433,7 +429,7 @@ func TestCrossField_SelfReference(t *testing.T) {
 // Edge Case 8: Circular Dependencies
 // ==================================================
 
-// TestCrossField_CircularDependency tests CrossField circulardependency
+// TestCrossField_CircularDependency tests CrossField circulardependency.
 func TestCrossField_CircularDependency(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -468,7 +464,7 @@ func TestCrossField_CircularDependency(t *testing.T) {
 // Edge Case 9: Zero Value Comparison
 // ==================================================
 
-// TestCrossField_ZeroValue tests CrossField zerovalue
+// TestCrossField_ZeroValue tests CrossField zerovalue.
 func TestCrossField_ZeroValue(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -533,7 +529,7 @@ func TestCrossField_ZeroValue(t *testing.T) {
 // Edge Case 10: Numeric Type Compatibility
 // ==================================================
 
-// TestCrossField_NumericTypeCompatibility tests CrossField numerictypecompatibility
+// TestCrossField_NumericTypeCompatibility tests CrossField numerictypecompatibility.
 func TestCrossField_NumericTypeCompatibility(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -592,7 +588,7 @@ func TestCrossField_NumericTypeCompatibility(t *testing.T) {
 // Edge Case 11: Empty String Comparisons
 // ==================================================
 
-// TestCrossField_EmptyString tests CrossField emptystring
+// TestCrossField_EmptyString tests CrossField emptystring.
 func TestCrossField_EmptyString(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -644,7 +640,7 @@ func TestCrossField_EmptyString(t *testing.T) {
 // Edge Case 12: Time.Time Comparisons
 // ==================================================
 
-// TestCrossField_TimeComparison tests CrossField timecomparison
+// TestCrossField_TimeComparison tests CrossField timecomparison.
 func TestCrossField_TimeComparison(t *testing.T) {
 	now := time.Now()
 	tests := []struct {
@@ -707,7 +703,7 @@ func TestCrossField_TimeComparison(t *testing.T) {
 // Edge Case 13: All Comparison Operators
 // ==================================================
 
-// TestCrossField_AllOperators tests CrossField alloperators
+// TestCrossField_AllOperators tests CrossField alloperators.
 func TestCrossField_AllOperators(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -802,7 +798,7 @@ func TestCrossField_AllOperators(t *testing.T) {
 // Edge Case 14: Boundary Values
 // ==================================================
 
-// TestCrossField_BoundaryValues tests CrossField boundaryvalues
+// TestCrossField_BoundaryValues tests CrossField boundaryvalues.
 func TestCrossField_BoundaryValues(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -861,7 +857,7 @@ func TestCrossField_BoundaryValues(t *testing.T) {
 // Edge Case 15: Boolean and Complex Types
 // ==================================================
 
-// TestCrossField_BooleanAndComplexTypes tests CrossField booleanandcomplextypes
+// TestCrossField_BooleanAndComplexTypes tests CrossField booleanandcomplextypes.
 func TestCrossField_BooleanAndComplexTypes(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -908,7 +904,7 @@ func TestCrossField_BooleanAndComplexTypes(t *testing.T) {
 // Edge Case 16: Unexported Fields (Should be skipped)
 // ==================================================
 
-// TestCrossField_UnexportedField tests CrossField unexportedfield
+// TestCrossField_UnexportedField tests CrossField unexportedfield.
 func TestCrossField_UnexportedField(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -943,7 +939,7 @@ func TestCrossField_UnexportedField(t *testing.T) {
 // Edge Case 17: Pointer to Different Types
 // ==================================================
 
-// TestCrossField_PointerTypes tests CrossField pointertypes
+// TestCrossField_PointerTypes tests CrossField pointertypes.
 func TestCrossField_PointerTypes(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -993,7 +989,7 @@ func TestCrossField_PointerTypes(t *testing.T) {
 // Edge Case 18: Field Order Independence
 // ==================================================
 
-// TestCrossField_FieldOrder tests CrossField fieldorder
+// TestCrossField_FieldOrder tests CrossField fieldorder.
 func TestCrossField_FieldOrder(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -1028,7 +1024,7 @@ func TestCrossField_FieldOrder(t *testing.T) {
 // Edge Case 19: Multiple Cross-Field Validators on Different Fields
 // ==================================================
 
-// TestCrossField_ChainedConstraints tests CrossField chainedconstraints
+// TestCrossField_ChainedConstraints tests CrossField chainedconstraints.
 func TestCrossField_ChainedConstraints(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -1064,7 +1060,7 @@ func TestCrossField_ChainedConstraints(t *testing.T) {
 // Edge Case 20: Special Values (NaN, Infinity for floats)
 // ==================================================
 
-// TestCrossField_FloatSpecialValues tests CrossField floatspecialvalues
+// TestCrossField_FloatSpecialValues tests CrossField floatspecialvalues.
 func TestCrossField_FloatSpecialValues(t *testing.T) {
 	tests := []struct {
 		name      string

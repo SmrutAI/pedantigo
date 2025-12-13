@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCompareValues_Numeric(t *testing.T) {
@@ -67,9 +68,9 @@ func TestCompareValues_Numeric(t *testing.T) {
 			res, err := CompareValues(tt.op, tt.left, tt.right)
 
 			if tt.wantErr {
-				assert.Error(t, err, "expected error for %s", tt.name)
+				require.Error(t, err, "expected error for %s", tt.name)
 			} else {
-				assert.NoError(t, err, "unexpected error for %s", tt.name)
+				require.NoError(t, err, "unexpected error for %s", tt.name)
 			}
 			assert.Equal(t, tt.wantRes, res, "result mismatch for %s", tt.name)
 		})
@@ -103,7 +104,7 @@ func TestCompareValues_String(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			res, err := CompareValues(tt.op, tt.left, tt.right)
 
-			assert.NoError(t, err, "unexpected error for %s", tt.name)
+			require.NoError(t, err, "unexpected error for %s", tt.name)
 			assert.Equal(t, tt.wantRes, res, "result mismatch for %s", tt.name)
 		})
 	}
@@ -139,7 +140,7 @@ func TestCompareValues_Time(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			res, err := CompareValues(tt.op, tt.left, tt.right)
 
-			assert.NoError(t, err, "unexpected error for %s", tt.name)
+			require.NoError(t, err, "unexpected error for %s", tt.name)
 			assert.Equal(t, tt.wantRes, res, "result mismatch for %s", tt.name)
 		})
 	}
@@ -174,9 +175,9 @@ func TestCompareValues_Nil(t *testing.T) {
 			res, err := CompareValues(tt.op, tt.left, tt.right)
 
 			if tt.wantErr {
-				assert.Error(t, err, "expected error for %s", tt.name)
+				require.Error(t, err, "expected error for %s", tt.name)
 			} else {
-				assert.NoError(t, err, "unexpected error for %s", tt.name)
+				require.NoError(t, err, "unexpected error for %s", tt.name)
 			}
 			assert.Equal(t, tt.wantRes, res, "result mismatch for %s", tt.name)
 		})
@@ -275,10 +276,10 @@ func TestIsZeroValue(t *testing.T) {
 		{name: "bool true", value: true, wantZero: false},
 		{name: "float zero", value: 0.0, wantZero: true},
 		{name: "float non-zero", value: 3.14, wantZero: false},
-		{name: "slice nil", value: ([]int)(nil), wantZero: true},
+		{name: "slice nil", value: []int(nil), wantZero: true},
 		{name: "slice empty", value: []int{}, wantZero: false},
 		{name: "slice non-empty", value: []int{1, 2}, wantZero: false},
-		{name: "map nil", value: (map[string]int)(nil), wantZero: true},
+		{name: "map nil", value: map[string]int(nil), wantZero: true},
 		{name: "map empty", value: map[string]int{}, wantZero: false},
 		{name: "time zero", value: time.Time{}, wantZero: true},
 		{name: "time non-zero", value: time.Now(), wantZero: false},

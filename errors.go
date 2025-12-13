@@ -2,7 +2,7 @@ package pedantigo
 
 import "fmt"
 
-// FieldError represents a single field validation error
+// FieldError represents a single field validation error.
 type FieldError struct {
 	Field   string // Field path (e.g., "user.email")
 	Message string // Human-readable error message
@@ -11,12 +11,12 @@ type FieldError struct {
 
 // ValidationError represents one or more validation errors
 // It implements the error interface for idiomatic Go error handling
-// ValidationError represents an error condition
+// ValidationError represents an error condition.
 type ValidationError struct {
 	Errors []FieldError
 }
 
-// Error implements the error interface
+// Error implements the error interface.
 func (e *ValidationError) Error() string {
 	if len(e.Errors) == 0 {
 		return "validation failed"

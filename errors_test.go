@@ -161,7 +161,7 @@ func TestValidationError(t *testing.T) {
 			assert.Equal(t, tt.wantErrorMsg, ve.Error())
 
 			// Test error count
-			assert.Equal(t, tt.wantErrorCount, len(ve.Errors))
+			assert.Len(t, ve.Errors, tt.wantErrorCount)
 
 			// Run additional validations if provided
 			if tt.validateErrors != nil {

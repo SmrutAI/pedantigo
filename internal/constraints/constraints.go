@@ -12,12 +12,12 @@ import (
 	"strings"
 )
 
-// Constraint represents a validation constraint
+// Constraint represents a validation constraint.
 type Constraint interface {
 	Validate(value any) error
 }
 
-// Built-in constraint types
+// Built-in constraint types.
 type (
 	minConstraint       struct{ min int }
 	maxConstraint       struct{ max int }
@@ -62,109 +62,152 @@ var (
 	alphanumRegex = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 )
 
-// minConstraint validates that a numeric value is >= min
-// Validate checks if the value satisfies the constraint
-func (c minConstraint) Validate(value any) error {
+// extractNumericValue converts a reflect.Value to a float64 for numeric comparisons.
+// Returns (float64, error) where error is non-nil if the value is not numeric.
+func extractNumericValue(v reflect.Value) (float64, error) {
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(v.Int()), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(v.Uint()), nil
+	case reflect.Float32, reflect.Float64:
+		return v.Float(), nil
+	default:
+		return 0, fmt.Errorf("unsupported numeric type: %s", v.Kind())
+	}
+}
+
+// derefValue dereferences a pointer value, returning the underlying value or nil if invalid.
+// Returns (reflect.Value, bool) where bool is false if the value is nil or invalid.
+func derefValue(value any) (reflect.Value, bool) {
 	v := reflect.ValueOf(value)
 	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+		return reflect.Value{}, false
 	}
 
-	// Handle pointer types
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
-			return nil // Skip validation for nil pointers
+			return reflect.Value{}, false
 		}
 		v = v.Elem()
 	}
 
-	switch v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if v.Int() < int64(c.min) {
-			return fmt.Errorf("must be at least %d", c.min)
-		}
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if v.Uint() < uint64(c.min) {
-			return fmt.Errorf("must be at least %d", c.min)
-		}
-	case reflect.Float32, reflect.Float64:
-		if v.Float() < float64(c.min) {
-			return fmt.Errorf("must be at least %d", c.min)
-		}
-	case reflect.String:
-		if len(v.String()) < c.min {
-			return fmt.Errorf("must be at least %d characters", c.min)
-		}
-	default:
-		return fmt.Errorf("min constraint not supported for type %s", v.Kind())
-	}
-
-	return nil
+	return v, true
 }
 
-// maxConstraint validates that a numeric value is <= max
-// Validate checks if the value satisfies the constraint
-func (c maxConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+// extractString extracts a string value from reflect.Value, checking type and dereferencing.
+// Returns (string, isValid, error) where isValid is false for nil/invalid values.
+func extractString(value any) (str string, isValid bool, err error) {
+	v, ok := derefValue(value)
+	if !ok {
+		return "", false, nil // nil/invalid values should skip validation
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
+	if v.Kind() != reflect.String {
+		return "", true, fmt.Errorf("requires string value")
 	}
 
+	return v.String(), true, nil
+}
+
+// boundMode distinguishes between min (lower bound) and max (upper bound) checks.
+type boundMode int
+
+const (
+	boundMin boundMode = iota
+	boundMax
+)
+
+// validateBound is a helper that validates numeric bounds (min or max).
+// For min: value must be >= bound. For max: value must be <= bound.
+func validateBound(value any, bound int, mode boundMode) error {
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
+	}
+
+	var failed bool
+	var constraintName string
+
+	switch mode {
+	case boundMin:
+		constraintName = "min"
+		failed = checkMinViolation(v, bound)
+	case boundMax:
+		constraintName = "max"
+		failed = checkMaxViolation(v, bound)
+	}
+
+	if !failed {
+		return nil
+	}
+	return formatBoundError(v.Kind(), bound, mode, constraintName)
+}
+
+func checkMinViolation(v reflect.Value, bound int) bool {
 	switch v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if v.Int() > int64(c.max) {
-			return fmt.Errorf("must be at most %d", c.max)
-		}
+		return v.Int() < int64(bound)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if v.Uint() > uint64(c.max) {
-			return fmt.Errorf("must be at most %d", c.max)
-		}
+		return bound >= 0 && v.Uint() < uint64(bound) //nolint:gosec // bounds checked
 	case reflect.Float32, reflect.Float64:
-		if v.Float() > float64(c.max) {
-			return fmt.Errorf("must be at most %d", c.max)
-		}
+		return v.Float() < float64(bound)
 	case reflect.String:
-		if len(v.String()) > c.max {
-			return fmt.Errorf("must be at most %d characters", c.max)
-		}
-	default:
-		return fmt.Errorf("max constraint not supported for type %s", v.Kind())
+		return len(v.String()) < bound
 	}
-
-	return nil
+	return true // unsupported type is a violation
 }
+
+func checkMaxViolation(v reflect.Value, bound int) bool {
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int() > int64(bound)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return bound >= 0 && v.Uint() > uint64(bound) //nolint:gosec // bounds checked
+	case reflect.Float32, reflect.Float64:
+		return v.Float() > float64(bound)
+	case reflect.String:
+		return len(v.String()) > bound
+	}
+	return true // unsupported type is a violation
+}
+
+func formatBoundError(kind reflect.Kind, bound int, mode boundMode, constraintName string) error {
+	msgWord := "at least"
+	if mode == boundMax {
+		msgWord = "at most"
+	}
+	switch kind {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return fmt.Errorf("must be %s %d", msgWord, bound)
+	case reflect.String:
+		return fmt.Errorf("must be %s %d characters", msgWord, bound)
+	default:
+		return fmt.Errorf("%s constraint not supported for type %s", constraintName, kind)
+	}
+}
+
+// minConstraint validates that a numeric value is >= min.
+func (c minConstraint) Validate(value any) error { return validateBound(value, c.min, boundMin) }
+
+// maxConstraint validates that a numeric value is <= max.
+func (c maxConstraint) Validate(value any) error { return validateBound(value, c.max, boundMax) }
 
 // minLengthConstraint validates that a string has at least minLength characters
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c minLengthConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// Ensure we have a string
 	if v.Kind() != reflect.String {
 		return fmt.Errorf("min_length constraint requires string value")
 	}
 
-	str := v.String()
-	if len(str) < c.minLength {
+	if len(v.String()) < c.minLength {
 		return fmt.Errorf("must be at least %d characters", c.minLength)
 	}
 
@@ -172,28 +215,18 @@ func (c minLengthConstraint) Validate(value any) error {
 }
 
 // maxLengthConstraint validates that a string has at most maxLength characters
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c maxLengthConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// Ensure we have a string
 	if v.Kind() != reflect.String {
 		return fmt.Errorf("max_length constraint requires string value")
 	}
 
-	str := v.String()
-	if len(str) > c.maxLength {
+	if len(v.String()) > c.maxLength {
 		return fmt.Errorf("must be at most %d characters", c.maxLength)
 	}
 
@@ -201,30 +234,15 @@ func (c maxLengthConstraint) Validate(value any) error {
 }
 
 // gtConstraint validates that a numeric value is > threshold
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c gtConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	var numValue float64
-	switch v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		numValue = float64(v.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		numValue = float64(v.Uint())
-	case reflect.Float32, reflect.Float64:
-		numValue = v.Float()
-	default:
+	numValue, err := extractNumericValue(v)
+	if err != nil {
 		return fmt.Errorf("gt constraint requires numeric value")
 	}
 
@@ -236,30 +254,15 @@ func (c gtConstraint) Validate(value any) error {
 }
 
 // geConstraint validates that a numeric value is >= threshold
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c geConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	var numValue float64
-	switch v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		numValue = float64(v.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		numValue = float64(v.Uint())
-	case reflect.Float32, reflect.Float64:
-		numValue = v.Float()
-	default:
+	numValue, err := extractNumericValue(v)
+	if err != nil {
 		return fmt.Errorf("ge constraint requires numeric value")
 	}
 
@@ -271,30 +274,15 @@ func (c geConstraint) Validate(value any) error {
 }
 
 // ltConstraint validates that a numeric value is < threshold
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c ltConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	var numValue float64
-	switch v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		numValue = float64(v.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		numValue = float64(v.Uint())
-	case reflect.Float32, reflect.Float64:
-		numValue = v.Float()
-	default:
+	numValue, err := extractNumericValue(v)
+	if err != nil {
 		return fmt.Errorf("lt constraint requires numeric value")
 	}
 
@@ -306,30 +294,15 @@ func (c ltConstraint) Validate(value any) error {
 }
 
 // leConstraint validates that a numeric value is <= threshold
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c leConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	var numValue float64
-	switch v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		numValue = float64(v.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		numValue = float64(v.Uint())
-	case reflect.Float32, reflect.Float64:
-		numValue = v.Float()
-	default:
+	numValue, err := extractNumericValue(v)
+	if err != nil {
 		return fmt.Errorf("le constraint requires numeric value")
 	}
 
@@ -341,7 +314,7 @@ func (c leConstraint) Validate(value any) error {
 }
 
 // emailConstraint validates that a string is a valid email format
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c emailConstraint) Validate(value any) error {
 	str, ok := value.(string)
 	if !ok {
@@ -360,27 +333,16 @@ func (c emailConstraint) Validate(value any) error {
 }
 
 // urlConstraint validates that a string is a valid URL (http or https only)
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c urlConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("url constraint %w", err)
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// Ensure we have a string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("url constraint requires string value")
-	}
-
-	str := v.String()
 	if str == "" {
 		return nil // Empty strings are handled by required constraint
 	}
@@ -405,27 +367,16 @@ func (c urlConstraint) Validate(value any) error {
 }
 
 // uuidConstraint validates that a string is a valid UUID
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c uuidConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("uuid constraint %w", err)
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// Ensure we have a string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("uuid constraint requires string value")
-	}
-
-	str := v.String()
 	if str == "" {
 		return nil // Empty strings are handled by required constraint
 	}
@@ -439,27 +390,16 @@ func (c uuidConstraint) Validate(value any) error {
 }
 
 // regexConstraint validates that a string matches a custom regex pattern
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c regexConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("regex constraint %w", err)
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// Ensure we have a string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("regex constraint requires string value")
-	}
-
-	str := v.String()
 	if str == "" {
 		return nil // Empty strings are handled by required constraint
 	}
@@ -473,27 +413,16 @@ func (c regexConstraint) Validate(value any) error {
 }
 
 // ipv4Constraint validates that a string is a valid IPv4 address
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c ipv4Constraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("ipv4 constraint %w", err)
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// Ensure we have a string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("ipv4 constraint requires string value")
-	}
-
-	str := v.String()
 	if str == "" {
 		return nil // Empty strings are handled by required constraint
 	}
@@ -514,27 +443,16 @@ func (c ipv4Constraint) Validate(value any) error {
 }
 
 // ipv6Constraint validates that a string is a valid IPv6 address
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c ipv6Constraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("ipv6 constraint %w", err)
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// Ensure we have a string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("ipv6 constraint requires string value")
-	}
-
-	str := v.String()
 	if str == "" {
 		return nil // Empty strings are handled by required constraint
 	}
@@ -555,19 +473,11 @@ func (c ipv6Constraint) Validate(value any) error {
 }
 
 // enumConstraint validates that value is one of the allowed values
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c enumConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
-	}
-
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
 	// Convert value to string for comparison
@@ -597,39 +507,28 @@ func (c enumConstraint) Validate(value any) error {
 	return fmt.Errorf("must be one of: %s", strings.Join(c.values, ", "))
 }
 
-// Validate for defaultConstraint is not a validator - it's handled during unmarshaling
+// Validate for defaultConstraint is not a validator - it's handled during unmarshaling.
 func (c defaultConstraint) Validate(value any) error {
 	return nil // No-op for validation
 }
 
-// Validate for lenConstraint validates that a string has exact length
+// Validate for lenConstraint validates that a string has exact length.
 func (c lenConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Type check - ensure string
 	if v.Kind() != reflect.String {
 		return fmt.Errorf("len constraint requires string value")
 	}
 
-	// 4. Get string value
 	str := v.String()
 
-	// 5. Note: len constraint validates empty strings (len=0 is valid)
+	// Note: len constraint validates empty strings (len=0 is valid)
 	// Do NOT skip empty strings like other constraints
 
-	// 6. Validation logic - count runes, not bytes (for Unicode support)
+	// Validation logic - count runes, not bytes (for Unicode support)
 	runeCount := len([]rune(str))
 	if runeCount != c.length {
 		return fmt.Errorf("must be exactly %d characters", c.length)
@@ -639,36 +538,21 @@ func (c lenConstraint) Validate(value any) error {
 }
 
 // asciiConstraint validates that a string contains only ASCII characters
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c asciiConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("ascii constraint %w", err)
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Type check - ensure string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("ascii constraint requires string value")
-	}
-
-	// 4. Get string value
-	str := v.String()
-
-	// 5. Skip empty strings
 	if str == "" {
-		return nil
+		return nil // Skip empty strings
 	}
 
-	// 6. Validation logic - check all runes are ASCII (0-127)
+	// Check all runes are ASCII (0-127)
 	for _, r := range str {
 		if r > 127 {
 			return fmt.Errorf("must contain only ASCII characters")
@@ -679,36 +563,21 @@ func (c asciiConstraint) Validate(value any) error {
 }
 
 // alphaConstraint validates that a string contains only alphabetic characters
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c alphaConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("alpha constraint %w", err)
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Type check - ensure string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("alpha constraint requires string value")
-	}
-
-	// 4. Get string value
-	str := v.String()
-
-	// 5. Skip empty strings
 	if str == "" {
-		return nil
+		return nil // Skip empty strings
 	}
 
-	// 6. Validation logic - check if string matches alphabetic pattern
+	// Check if string matches alphabetic pattern
 	if !alphaRegex.MatchString(str) {
 		return fmt.Errorf("must contain only alphabetic characters")
 	}
@@ -717,36 +586,21 @@ func (c alphaConstraint) Validate(value any) error {
 }
 
 // alphanumConstraint validates that a string contains only alphanumeric characters
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c alphanumConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("alphanum constraint %w", err)
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Type check - ensure string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("alphanum constraint requires string value")
-	}
-
-	// 4. Get string value
-	str := v.String()
-
-	// 5. Skip empty strings
 	if str == "" {
-		return nil
+		return nil // Skip empty strings
 	}
 
-	// 6. Validation logic - check if string matches alphanumeric pattern
+	// Check if string matches alphanumeric pattern
 	if !alphanumRegex.MatchString(str) {
 		return fmt.Errorf("must contain only alphanumeric characters")
 	}
@@ -755,36 +609,22 @@ func (c alphanumConstraint) Validate(value any) error {
 }
 
 // containsConstraint validates that a string contains a specific substring
-// Validate checks if the value satisfies the constraint
+// Validate checks if the value satisfies the constraint.
 func (c containsConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("contains constraint %w", err)
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Type check - ensure string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("contains constraint requires string value")
-	}
-
-	// 4. Get string value
-	str := v.String()
-
-	// 5. Skip empty strings only if substring is non-empty
+	// Skip empty strings only if substring is non-empty
 	if str == "" && c.substring != "" {
 		return fmt.Errorf("must contain '%s'", c.substring)
 	}
 
-	// 6. Validation logic - check if string contains substring
+	// Check if string contains substring
 	if !strings.Contains(str, c.substring) {
 		return fmt.Errorf("must contain '%s'", c.substring)
 	}
@@ -792,36 +632,21 @@ func (c containsConstraint) Validate(value any) error {
 	return nil
 }
 
-// Validate for excludesConstraint validates that a string does NOT contain a specific substring
+// Validate for excludesConstraint validates that a string does NOT contain a specific substring.
 func (c excludesConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("excludes constraint %w", err)
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Type check - ensure string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("excludes constraint requires string value")
-	}
-
-	// 4. Get string value
-	str := v.String()
-
-	// 5. Skip empty strings
 	if str == "" {
-		return nil
+		return nil // Skip empty strings
 	}
 
-	// 6. Validation logic - check if string does NOT contain substring
+	// Check if string does NOT contain substring
 	if strings.Contains(str, c.substring) {
 		return fmt.Errorf("must not contain '%s'", c.substring)
 	}
@@ -829,36 +654,21 @@ func (c excludesConstraint) Validate(value any) error {
 	return nil
 }
 
-// Validate for startswithConstraint validates that a string starts with a specific prefix
+// Validate for startswithConstraint validates that a string starts with a specific prefix.
 func (c startswithConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("startswith constraint %w", err)
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Type check - ensure string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("startswith constraint requires string value")
-	}
-
-	// 4. Get string value
-	str := v.String()
-
-	// 5. Skip empty strings
 	if str == "" {
-		return nil
+		return nil // Skip empty strings
 	}
 
-	// 6. Validation logic - check if string starts with prefix
+	// Check if string starts with prefix
 	if !strings.HasPrefix(str, c.prefix) {
 		return fmt.Errorf("must start with '%s'", c.prefix)
 	}
@@ -866,36 +676,21 @@ func (c startswithConstraint) Validate(value any) error {
 	return nil
 }
 
-// Validate for endswithConstraint validates that a string ends with a specific suffix
+// Validate for endswithConstraint validates that a string ends with a specific suffix.
 func (c endswithConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("endswith constraint %w", err)
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Type check - ensure string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("endswith constraint requires string value")
-	}
-
-	// 4. Get string value
-	str := v.String()
-
-	// 5. Skip empty strings
 	if str == "" {
-		return nil
+		return nil // Skip empty strings
 	}
 
-	// 6. Validation logic - check if string ends with suffix
+	// Check if string ends with suffix
 	if !strings.HasSuffix(str, c.suffix) {
 		return fmt.Errorf("must end with '%s'", c.suffix)
 	}
@@ -903,36 +698,21 @@ func (c endswithConstraint) Validate(value any) error {
 	return nil
 }
 
-// Validate for lowercaseConstraint validates that a string is all lowercase
+// Validate for lowercaseConstraint validates that a string is all lowercase.
 func (c lowercaseConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("lowercase constraint %w", err)
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Type check - ensure string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("lowercase constraint requires string value")
-	}
-
-	// 4. Get string value
-	str := v.String()
-
-	// 5. Skip empty strings
 	if str == "" {
-		return nil
+		return nil // Skip empty strings
 	}
 
-	// 6. Validation logic - check if string is all lowercase
+	// Check if string is all lowercase
 	if str != strings.ToLower(str) {
 		return fmt.Errorf("must be all lowercase")
 	}
@@ -940,36 +720,21 @@ func (c lowercaseConstraint) Validate(value any) error {
 	return nil
 }
 
-// Validate for uppercaseConstraint validates that a string is all uppercase
+// Validate for uppercaseConstraint validates that a string is all uppercase.
 func (c uppercaseConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("uppercase constraint %w", err)
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Type check - ensure string
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("uppercase constraint requires string value")
-	}
-
-	// 4. Get string value
-	str := v.String()
-
-	// 5. Skip empty strings
 	if str == "" {
-		return nil
+		return nil // Skip empty strings
 	}
 
-	// 6. Validation logic - check if string is all uppercase
+	// Check if string is all uppercase
 	if str != strings.ToUpper(str) {
 		return fmt.Errorf("must be all uppercase")
 	}
@@ -977,30 +742,15 @@ func (c uppercaseConstraint) Validate(value any) error {
 	return nil
 }
 
-// Validate for positiveConstraint validates that a numeric value is greater than 0
+// Validate for positiveConstraint validates that a numeric value is greater than 0.
 func (c positiveConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	var numValue float64
-	switch v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		numValue = float64(v.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		numValue = float64(v.Uint())
-	case reflect.Float32, reflect.Float64:
-		numValue = v.Float()
-	default:
+	numValue, err := extractNumericValue(v)
+	if err != nil {
 		return fmt.Errorf("positive constraint requires numeric value")
 	}
 
@@ -1011,30 +761,15 @@ func (c positiveConstraint) Validate(value any) error {
 	return nil
 }
 
-// Validate for negativeConstraint validates that a numeric value is less than 0
+// Validate for negativeConstraint validates that a numeric value is less than 0.
 func (c negativeConstraint) Validate(value any) error {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
-	// Handle pointer types
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	var numValue float64
-	switch v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		numValue = float64(v.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		numValue = float64(v.Uint())
-	case reflect.Float32, reflect.Float64:
-		numValue = v.Float()
-	default:
+	numValue, err := extractNumericValue(v)
+	if err != nil {
 		return fmt.Errorf("negative constraint requires numeric value")
 	}
 
@@ -1045,36 +780,19 @@ func (c negativeConstraint) Validate(value any) error {
 	return nil
 }
 
-// Validate for multipleOfConstraint validates that a numeric value is divisible by factor
+// Validate for multipleOfConstraint validates that a numeric value is divisible by factor.
 func (c multipleOfConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Get numeric value
-	var numValue float64
-	switch v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		numValue = float64(v.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		numValue = float64(v.Uint())
-	case reflect.Float32, reflect.Float64:
-		numValue = v.Float()
-	default:
+	numValue, err := extractNumericValue(v)
+	if err != nil {
 		return fmt.Errorf("multiple_of constraint requires numeric value")
 	}
 
-	// 4. Validation logic - check if value is divisible by factor
+	// Check if value is divisible by factor
 	remainder := math.Mod(numValue, c.factor)
 	// Use small epsilon for floating point comparison
 	if math.Abs(remainder) > 1e-9 && math.Abs(remainder-c.factor) > 1e-9 {
@@ -1084,23 +802,14 @@ func (c multipleOfConstraint) Validate(value any) error {
 	return nil
 }
 
-// Validate for maxDigitsConstraint validates that a numeric value has at most maxDigits digits
+// Validate for maxDigitsConstraint validates that a numeric value has at most maxDigits digits.
 func (c maxDigitsConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Get numeric value as string
+	// Get numeric value as string
 	var str string
 	switch v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -1113,7 +822,7 @@ func (c maxDigitsConstraint) Validate(value any) error {
 		return fmt.Errorf("max_digits constraint requires numeric value")
 	}
 
-	// 4. Count digits (exclude minus sign and decimal point)
+	// Count digits (exclude minus sign and decimal point)
 	digitCount := 0
 	for _, r := range str {
 		if r >= '0' && r <= '9' {
@@ -1121,7 +830,6 @@ func (c maxDigitsConstraint) Validate(value any) error {
 		}
 	}
 
-	// 5. Validation logic
 	if digitCount > c.maxDigits {
 		return fmt.Errorf("must have at most %d digits", c.maxDigits)
 	}
@@ -1129,23 +837,14 @@ func (c maxDigitsConstraint) Validate(value any) error {
 	return nil
 }
 
-// Validate for decimalPlacesConstraint validates that a numeric value has at most maxPlaces decimal places
+// Validate for decimalPlacesConstraint validates that a numeric value has at most maxPlaces decimal places.
 func (c decimalPlacesConstraint) Validate(value any) error {
-	// 1. Get reflect.Value
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return nil // Skip validation for invalid values
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for invalid/nil values
 	}
 
-	// 2. Handle pointer indirection
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil // Skip validation for nil pointers
-		}
-		v = v.Elem()
-	}
-
-	// 3. Get numeric value as string
+	// Get numeric value as string
 	var str string
 	switch v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -1160,13 +859,12 @@ func (c decimalPlacesConstraint) Validate(value any) error {
 		return fmt.Errorf("decimal_places constraint requires numeric value")
 	}
 
-	// 4. Find decimal point and count places
+	// Find decimal point and count places
 	decimalPlaces := 0
 	if idx := strings.Index(str, "."); idx >= 0 {
 		decimalPlaces = len(str) - idx - 1
 	}
 
-	// 5. Validation logic
 	if decimalPlaces > c.maxPlaces {
 		return fmt.Errorf("must have at most %d decimal places", c.maxPlaces)
 	}
@@ -1174,7 +872,7 @@ func (c decimalPlacesConstraint) Validate(value any) error {
 	return nil
 }
 
-// BuildConstraints creates constraint instances from parsed tag map
+// BuildConstraints creates constraint instances from parsed tag map.
 func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []Constraint {
 	var result []Constraint
 
@@ -1279,7 +977,7 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 // buildMinConstraint creates a min constraint, handling context-aware type checking.
 // Returns (constraint, true) on success or (nil, false) if parsing fails.
 func buildMinConstraint(value string, fieldType reflect.Type) (Constraint, bool) {
-	min, err := strconv.Atoi(value)
+	minVal, err := strconv.Atoi(value)
 	if err != nil {
 		return nil, false
 	}
@@ -1291,15 +989,15 @@ func buildMinConstraint(value string, fieldType reflect.Type) (Constraint, bool)
 	}
 	kind := checkType.Kind()
 	if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
-		return minLengthConstraint{minLength: min}, true
+		return minLengthConstraint{minLength: minVal}, true
 	}
-	return minConstraint{min: min}, true
+	return minConstraint{min: minVal}, true
 }
 
 // buildMaxConstraint creates a max constraint, handling context-aware type checking.
 // Returns (constraint, true) on success or (nil, false) if parsing fails.
 func buildMaxConstraint(value string, fieldType reflect.Type) (Constraint, bool) {
-	max, err := strconv.Atoi(value)
+	maxVal, err := strconv.Atoi(value)
 	if err != nil {
 		return nil, false
 	}
@@ -1311,9 +1009,9 @@ func buildMaxConstraint(value string, fieldType reflect.Type) (Constraint, bool)
 	}
 	kind := checkType.Kind()
 	if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
-		return maxLengthConstraint{maxLength: max}, true
+		return maxLengthConstraint{maxLength: maxVal}, true
 	}
-	return maxConstraint{max: max}, true
+	return maxConstraint{max: maxVal}, true
 }
 
 // buildRegexConstraint compiles a regex pattern constraint.
@@ -1342,7 +1040,7 @@ func buildLenConstraint(value string) (Constraint, bool) {
 	return lenConstraint{length: length}, true
 }
 
-// buildContainsConstraint creates a contains constraint with the specified substring
+// buildContainsConstraint creates a contains constraint with the specified substring.
 func buildContainsConstraint(value string) (Constraint, bool) {
 	if value == "" {
 		return nil, false // Empty substring is invalid
@@ -1350,7 +1048,7 @@ func buildContainsConstraint(value string) (Constraint, bool) {
 	return containsConstraint{substring: value}, true
 }
 
-// buildExcludesConstraint creates an excludes constraint with the specified substring
+// buildExcludesConstraint creates an excludes constraint with the specified substring.
 func buildExcludesConstraint(value string) (Constraint, bool) {
 	if value == "" {
 		return nil, false // Empty substring is invalid
@@ -1358,7 +1056,7 @@ func buildExcludesConstraint(value string) (Constraint, bool) {
 	return excludesConstraint{substring: value}, true
 }
 
-// buildStartswithConstraint creates a startswith constraint with the specified prefix
+// buildStartswithConstraint creates a startswith constraint with the specified prefix.
 func buildStartswithConstraint(value string) (Constraint, bool) {
 	if value == "" {
 		return nil, false // Empty prefix is invalid
@@ -1366,7 +1064,7 @@ func buildStartswithConstraint(value string) (Constraint, bool) {
 	return startswithConstraint{prefix: value}, true
 }
 
-// buildEndswithConstraint creates an endswith constraint with the specified suffix
+// buildEndswithConstraint creates an endswith constraint with the specified suffix.
 func buildEndswithConstraint(value string) (Constraint, bool) {
 	if value == "" {
 		return nil, false // Empty suffix is invalid
@@ -1374,7 +1072,7 @@ func buildEndswithConstraint(value string) (Constraint, bool) {
 	return endswithConstraint{suffix: value}, true
 }
 
-// buildMultipleOfConstraint creates a multiple_of constraint with the specified factor
+// buildMultipleOfConstraint creates a multiple_of constraint with the specified factor.
 func buildMultipleOfConstraint(value string) (Constraint, bool) {
 	factor, err := strconv.ParseFloat(value, 64)
 	if err != nil || factor == 0 {
@@ -1383,7 +1081,7 @@ func buildMultipleOfConstraint(value string) (Constraint, bool) {
 	return multipleOfConstraint{factor: factor}, true
 }
 
-// buildMaxDigitsConstraint creates a max_digits constraint with the specified maximum
+// buildMaxDigitsConstraint creates a max_digits constraint with the specified maximum.
 func buildMaxDigitsConstraint(value string) (Constraint, bool) {
 	maxDigits, err := strconv.Atoi(value)
 	if err != nil || maxDigits <= 0 {
@@ -1392,7 +1090,7 @@ func buildMaxDigitsConstraint(value string) (Constraint, bool) {
 	return maxDigitsConstraint{maxDigits: maxDigits}, true
 }
 
-// buildDecimalPlacesConstraint creates a decimal_places constraint with the specified maximum
+// buildDecimalPlacesConstraint creates a decimal_places constraint with the specified maximum.
 func buildDecimalPlacesConstraint(value string) (Constraint, bool) {
 	maxPlaces, err := strconv.Atoi(value)
 	if err != nil || maxPlaces < 0 {

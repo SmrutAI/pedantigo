@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestBuildFieldDeserializers_BasicTypes tests deserializer creation for primitive types
+// TestBuildFieldDeserializers_BasicTypes tests deserializer creation for primitive types.
 func TestBuildFieldDeserializers_BasicTypes(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -110,7 +110,7 @@ func TestBuildFieldDeserializers_BasicTypes(t *testing.T) {
 			typ := reflect.TypeOf(tt.structType)
 			deserializers := BuildFieldDeserializers(typ, opts, nil, nil)
 
-			assert.Equal(t, tt.expectedFieldCount, len(deserializers), "deserializer count mismatch")
+			assert.Len(t, deserializers, tt.expectedFieldCount, "deserializer count mismatch")
 
 			for _, fieldName := range tt.expectedFields {
 				_, exists := deserializers[fieldName]
@@ -120,7 +120,7 @@ func TestBuildFieldDeserializers_BasicTypes(t *testing.T) {
 	}
 }
 
-// TestBuildFieldDeserializers_JSONTags tests JSON tag handling
+// TestBuildFieldDeserializers_JSONTags tests JSON tag handling.
 func TestBuildFieldDeserializers_JSONTags(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -174,7 +174,7 @@ func TestBuildFieldDeserializers_JSONTags(t *testing.T) {
 			typ := reflect.TypeOf(tt.structType)
 			deserializers := BuildFieldDeserializers(typ, opts, nil, nil)
 
-			assert.Equal(t, len(tt.expectedFields), len(deserializers), "deserializer count mismatch")
+			assert.Len(t, deserializers, len(tt.expectedFields), "deserializer count mismatch")
 
 			for _, fieldName := range tt.expectedFields {
 				_, exists := deserializers[fieldName]
@@ -184,7 +184,7 @@ func TestBuildFieldDeserializers_JSONTags(t *testing.T) {
 	}
 }
 
-// TestBuildFieldDeserializers_UnexportedFields tests that unexported fields are skipped
+// TestBuildFieldDeserializers_UnexportedFields tests that unexported fields are skipped.
 func TestBuildFieldDeserializers_UnexportedFields(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -224,7 +224,7 @@ func TestBuildFieldDeserializers_UnexportedFields(t *testing.T) {
 			typ := reflect.TypeOf(tt.structType)
 			deserializers := BuildFieldDeserializers(typ, opts, nil, nil)
 
-			assert.Equal(t, len(tt.expectedFields), len(deserializers), "expected %d deserializers, got %d; got fields: %v", len(tt.expectedFields), len(deserializers), getMapKeys(deserializers))
+			assert.Len(t, deserializers, len(tt.expectedFields), "expected %d deserializers; got fields: %v", len(tt.expectedFields), getMapKeys(deserializers))
 
 			for _, fieldName := range tt.expectedFields {
 				_, exists := deserializers[fieldName]
@@ -234,7 +234,7 @@ func TestBuildFieldDeserializers_UnexportedFields(t *testing.T) {
 	}
 }
 
-// TestBuildFieldDeserializers_Defaults tests default value handling
+// TestBuildFieldDeserializers_Defaults tests default value handling.
 func TestBuildFieldDeserializers_Defaults(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -322,7 +322,7 @@ func TestBuildFieldDeserializers_Defaults(t *testing.T) {
 	}
 }
 
-// TestBuildFieldDeserializers_DefaultUsingMethod tests defaultUsingMethod tag handling
+// TestBuildFieldDeserializers_DefaultUsingMethod tests defaultUsingMethod tag handling.
 func TestBuildFieldDeserializers_DefaultUsingMethod(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -365,7 +365,7 @@ func TestBuildFieldDeserializers_DefaultUsingMethod(t *testing.T) {
 	}
 }
 
-// TestBuildFieldDeserializers_Collections tests slice and map handling
+// TestBuildFieldDeserializers_Collections tests slice and map handling.
 func TestBuildFieldDeserializers_Collections(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -449,7 +449,7 @@ func TestBuildFieldDeserializers_Collections(t *testing.T) {
 			typ := reflect.TypeOf(tt.structType)
 			deserializers := BuildFieldDeserializers(typ, opts, nil, nil)
 
-			assert.Equal(t, tt.expectedFieldCount, len(deserializers), "deserializer count mismatch")
+			assert.Len(t, deserializers, tt.expectedFieldCount, "deserializer count mismatch")
 
 			for _, fieldName := range tt.expectedFields {
 				_, exists := deserializers[fieldName]
@@ -459,7 +459,7 @@ func TestBuildFieldDeserializers_Collections(t *testing.T) {
 	}
 }
 
-// TestBuildFieldDeserializers_NonStructType tests handling of non-struct types
+// TestBuildFieldDeserializers_NonStructType tests handling of non-struct types.
 func TestBuildFieldDeserializers_NonStructType(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -495,12 +495,12 @@ func TestBuildFieldDeserializers_NonStructType(t *testing.T) {
 			typ := reflect.TypeOf(tt.inputType)
 			deserializers := BuildFieldDeserializers(typ, opts, nil, nil)
 
-			assert.Equal(t, tt.expectedFieldCount, len(deserializers), "deserializer count mismatch")
+			assert.Len(t, deserializers, tt.expectedFieldCount, "deserializer count mismatch")
 		})
 	}
 }
 
-// TestBuildFieldDeserializers_FieldDeserializerCallable tests that deserializers are callable
+// TestBuildFieldDeserializers_FieldDeserializerCallable tests that deserializers are callable.
 func TestBuildFieldDeserializers_FieldDeserializerCallable(t *testing.T) {
 	type TestStruct struct {
 		Name string
@@ -527,17 +527,17 @@ func TestBuildFieldDeserializers_FieldDeserializerCallable(t *testing.T) {
 	require.True(t, exists, "expected Name deserializer to exist")
 
 	err := nameDeserializer(&outPtr, "John")
-	assert.NoError(t, err, "unexpected error calling deserializer")
+	require.NoError(t, err, "unexpected error calling deserializer")
 	assert.True(t, mockSetFieldCalled, "expected setFieldValueFunc to be called")
 
 	// Test that deserializer can be called with missing field (sentinel)
 	mockSetFieldCalled = false
 	err = nameDeserializer(&outPtr, FieldMissingSentinel)
-	assert.NoError(t, err, "unexpected error calling deserializer with sentinel")
+	require.NoError(t, err, "unexpected error calling deserializer with sentinel")
 	assert.False(t, mockSetFieldCalled, "expected setFieldValueFunc NOT to be called for missing field")
 }
 
-// TestBuildFieldDeserializers_RequiredFieldValidation tests required field tag validation
+// TestBuildFieldDeserializers_RequiredFieldValidation tests required field tag validation.
 func TestBuildFieldDeserializers_RequiredFieldValidation(t *testing.T) {
 	type TestStruct struct {
 		Name string `pedantigo:"required"`
@@ -596,7 +596,7 @@ func TestBuildFieldDeserializers_RequiredFieldValidation(t *testing.T) {
 	}
 }
 
-// TestBuildFieldDeserializers_ConstraintsParsed tests that constraints are parsed from tags
+// TestBuildFieldDeserializers_ConstraintsParsed tests that constraints are parsed from tags.
 func TestBuildFieldDeserializers_ConstraintsParsed(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -648,7 +648,7 @@ func TestBuildFieldDeserializers_ConstraintsParsed(t *testing.T) {
 	}
 }
 
-// TestBuildFieldDeserializers_EdgeCases tests various edge cases
+// TestBuildFieldDeserializers_EdgeCases tests various edge cases.
 func TestBuildFieldDeserializers_EdgeCases(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -700,7 +700,7 @@ func TestBuildFieldDeserializers_EdgeCases(t *testing.T) {
 			typ := reflect.TypeOf(tt.structType)
 			deserializers := BuildFieldDeserializers(typ, opts, nil, nil)
 
-			assert.Equal(t, tt.expectedFieldCount, len(deserializers), "deserializer count mismatch")
+			assert.Len(t, deserializers, tt.expectedFieldCount, "deserializer count mismatch")
 
 			for _, fieldName := range tt.expectedFields {
 				_, exists := deserializers[fieldName]
@@ -710,7 +710,7 @@ func TestBuildFieldDeserializers_EdgeCases(t *testing.T) {
 	}
 }
 
-// TestValidateDefaultMethod_ValidMethod tests valid method validation
+// TestValidateDefaultMethod_ValidMethod tests valid method validation.
 func TestValidateDefaultMethod_ValidMethod(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -745,7 +745,7 @@ func TestValidateDefaultMethod_ValidMethod(t *testing.T) {
 	}
 }
 
-// TestValidateDefaultMethod_SignatureValidation tests method signature validation
+// TestValidateDefaultMethod_SignatureValidation tests method signature validation.
 func TestValidateDefaultMethod_SignatureValidation(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -789,7 +789,7 @@ func TestValidateDefaultMethod_SignatureValidation(t *testing.T) {
 }
 
 // Test types for ValidateDefaultMethod tests
-// ValidMethodStruct represents the data structure
+// ValidMethodStruct represents the data structure.
 type ValidMethodStruct struct{ Name string }
 
 func (v *ValidMethodStruct) GetName() (string, error) { return "test", nil }
@@ -808,15 +808,14 @@ func (w *WrongFirstReturnStruct) GetID() (string, error) { return "", nil } // R
 
 type WrongSecondReturnStruct struct{ Count int }
 
-func (w *WrongSecondReturnStruct) GetCount() (int, string) { return 0, "" } // Returns string instead of error
+func (w *WrongSecondReturnStruct) GetCount() (count int, errMsg string) { return 0, "" } // Returns string instead of error
 
 type ThreeReturnsStruct struct{ Data string }
 
 func (t *ThreeReturnsStruct) GetData() (string, error, bool) { return "", nil, false }
 
-// TestValidateDefaultMethod_ComprehensiveCases tests all validation paths
+// TestValidateDefaultMethod_ComprehensiveCases tests all validation paths.
 func TestValidateDefaultMethod_ComprehensiveCases(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		structType  any

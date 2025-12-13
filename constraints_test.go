@@ -8,174 +8,313 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Test field name constants.
+const testFieldUsername = "Username"
+
+// assertValidationError checks if a ValidationError contains the expected field and message.
+func assertValidationError(t *testing.T, err error, expectedField, expectedMessage string) {
+	t.Helper()
+	require.Error(t, err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
+	foundError := false
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == expectedField && fieldErr.Message == expectedMessage {
+			foundError = true
+			break
+		}
+	}
+	assert.True(t, foundError, "expected error field=%s msg=%s, got %v", expectedField, expectedMessage, ve.Errors)
+}
+
+// assertNoValidationError checks that no error occurred.
+func assertNoValidationError(t *testing.T, err error) {
+	t.Helper()
+	require.NoError(t, err)
+}
+
+// assertNumericValidationError checks if a ValidationError contains the expected numeric field and message.
+func assertNumericValidationError(t *testing.T, err error, expectedField, expectedMessage string) {
+	t.Helper()
+	require.Error(t, err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
+	foundError := false
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == expectedField && fieldErr.Message == expectedMessage {
+			foundError = true
+			break
+		}
+	}
+	assert.True(t, foundError, "expected error field=%s msg=%s, got %v", expectedField, expectedMessage, ve.Errors)
+}
+
 // ==================== Format Constraints ====================
 
-// ==================================================
-// url constraint tests
-// ==================================================
+// formatTestCase defines the structure for format constraint tests.
+type formatTestCase struct {
+	name       string
+	json       string
+	usePointer bool
+	expectErr  bool
+	expectVal  string
+	expectNil  bool
+}
 
-// TestURL tests URL validation
-func TestURL(t *testing.T) {
-	tests := []struct {
-		name       string
-		json       string
-		usePointer bool
-		expectErr  bool
-		expectVal  string
-		expectNil  bool
-	}{
-		{"Valid HTTPS", `{"website":"https://example.com"}`, false, false, "https://example.com", false},
-		{"Valid HTTP", `{"website":"http://example.com"}`, false, false, "http://example.com", false},
-		{"Invalid format", `{"website":"not a url"}`, false, true, "", false},
-		{"No scheme", `{"website":"example.com"}`, false, true, "", false},
-		{"FTP scheme", `{"website":"ftp://example.com"}`, false, true, "", false},
-		{"Empty string", `{"website":""}`, false, false, "", false},
-		{"Pointer invalid", `{"website":"not a url"}`, true, true, "", false},
-		{"Pointer valid", `{"website":"https://example.com"}`, true, false, "https://example.com", false},
-		{"Nil pointer", `{"website":null}`, true, false, "", true},
-	}
+// runFormatValidationTests is a generic helper for testing format constraints.
+// It executes test logic for both pointer and non-pointer string field scenarios.
+// The test functions passed as callbacks must handle struct creation and validation.
+//
+// testFunc is called with the test case and must perform validation assertions.
+// The function signature is: func(t *testing.T, tt formatTestCase).
+func runFormatValidationTests(
+	t *testing.T,
+	tests []formatTestCase,
+	testFunc func(*testing.T, formatTestCase),
+) {
+	t.Helper()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.usePointer {
-				type Config struct {
-					Website *string `json:"website" pedantigo:"url"`
-				}
-				validator := New[Config]()
-				config, err := validator.Unmarshal([]byte(tt.json))
-
-				if tt.expectErr {
-					require.Error(t, err)
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == "Website" && fieldErr.Message == "must be a valid URL (http or https)" {
-							foundError = true
-						}
-					}
-					assert.True(t, foundError, "expected 'must be a valid URL (http or https)' error, got %v", ve.Errors)
-				} else {
-					assert.NoError(t, err)
-					if tt.expectNil {
-						assert.Nil(t, config.Website)
-					} else {
-						require.NotNil(t, config.Website)
-						assert.Equal(t, tt.expectVal, *config.Website)
-					}
-				}
-			} else {
-				type Config struct {
-					Website string `json:"website" pedantigo:"url"`
-				}
-				validator := New[Config]()
-				config, err := validator.Unmarshal([]byte(tt.json))
-
-				if tt.expectErr {
-					require.Error(t, err)
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == "Website" && fieldErr.Message == "must be a valid URL (http or https)" {
-							foundError = true
-						}
-					}
-					assert.True(t, foundError, "expected 'must be a valid URL (http or https)' error, got %v", ve.Errors)
-				} else {
-					assert.NoError(t, err)
-					assert.Equal(t, tt.expectVal, config.Website)
-				}
-			}
+			testFunc(t, tt)
 		})
 	}
 }
 
 // ==================================================
-// uuid constraint tests
+// Format Constraints (url, uuid, ipv4, ipv6)
 // ==================================================
 
-// TestUUID tests UUID validation
-func TestUUID(t *testing.T) {
-	tests := []struct {
-		name       string
-		json       string
-		usePointer bool
-		expectErr  bool
-		expectVal  string
-		expectNil  bool
-	}{
-		{"Valid V4", `{"id":"550e8400-e29b-41d4-a716-446655440000"}`, false, false, "550e8400-e29b-41d4-a716-446655440000", false},
-		{"Valid V5", `{"id":"886313e1-3b8a-5372-9b90-0c9aee199e5d"}`, false, false, "886313e1-3b8a-5372-9b90-0c9aee199e5d", false},
-		{"Invalid format", `{"id":"not-a-uuid"}`, false, true, "", false},
-		{"Wrong dashes", `{"id":"550e8400e29b41d4a716446655440000"}`, false, true, "", false},
-		{"Empty string", `{"id":""}`, false, false, "", false},
-		{"Pointer invalid", `{"id":"not-a-uuid"}`, true, true, "", false},
-		{"Pointer valid", `{"id":"550e8400-e29b-41d4-a716-446655440000"}`, true, false, "550e8400-e29b-41d4-a716-446655440000", false},
-		{"Nil pointer", `{"id":null}`, true, false, "", true},
+// TestFormatConstraints tests format validation constraints.
+func TestFormatConstraints(t *testing.T) {
+	formatTests := []formatTestConfig{
+		{
+			constraintType: "url",
+			fieldName:      "Website",
+			jsonFieldName:  "website",
+			pedantigoTag:   "url",
+			expectedErrMsg: "must be a valid URL (http or https)",
+			testCases: []formatTestCase{
+				{"Valid HTTPS", `{"website":"https://example.com"}`, false, false, "https://example.com", false},
+				{"Valid HTTP", `{"website":"http://example.com"}`, false, false, "http://example.com", false},
+				{"Invalid format", `{"website":"not a url"}`, false, true, "", false},
+				{"No scheme", `{"website":"example.com"}`, false, true, "", false},
+				{"FTP scheme", `{"website":"ftp://example.com"}`, false, true, "", false},
+				{"Empty string", `{"website":""}`, false, false, "", false},
+				{"Pointer invalid", `{"website":"not a url"}`, true, true, "", false},
+				{"Pointer valid", `{"website":"https://example.com"}`, true, false, "https://example.com", false},
+				{"Nil pointer", `{"website":null}`, true, false, "", true},
+			},
+		},
+		{
+			constraintType: "uuid",
+			fieldName:      "ID",
+			jsonFieldName:  "id",
+			pedantigoTag:   "uuid",
+			expectedErrMsg: "must be a valid UUID",
+			testCases: []formatTestCase{
+				{"Valid V4", `{"id":"550e8400-e29b-41d4-a716-446655440000"}`, false, false, "550e8400-e29b-41d4-a716-446655440000", false},
+				{"Valid V5", `{"id":"886313e1-3b8a-5372-9b90-0c9aee199e5d"}`, false, false, "886313e1-3b8a-5372-9b90-0c9aee199e5d", false},
+				{"Invalid format", `{"id":"not-a-uuid"}`, false, true, "", false},
+				{"Wrong dashes", `{"id":"550e8400e29b41d4a716446655440000"}`, false, true, "", false},
+				{"Empty string", `{"id":""}`, false, false, "", false},
+				{"Pointer invalid", `{"id":"not-a-uuid"}`, true, true, "", false},
+				{"Pointer valid", `{"id":"550e8400-e29b-41d4-a716-446655440000"}`, true, false, "550e8400-e29b-41d4-a716-446655440000", false},
+				{"Nil pointer", `{"id":null}`, true, false, "", true},
+			},
+		},
+		{
+			constraintType: "ipv4",
+			fieldName:      "IP",
+			jsonFieldName:  "ip",
+			pedantigoTag:   "ipv4",
+			expectedErrMsg: "must be a valid IPv4 address",
+			testCases: []formatTestCase{
+				{"Valid localhost", `{"ip":"127.0.0.1"}`, false, false, "127.0.0.1", false},
+				{"Valid private", `{"ip":"192.168.1.1"}`, false, false, "192.168.1.1", false},
+				{"Invalid format", `{"ip":"not-an-ip"}`, false, true, "", false},
+				{"Invalid IPv6", `{"ip":"2001:0db8:85a3::8a2e:0370:7334"}`, false, true, "", false},
+				{"Empty string", `{"ip":""}`, false, false, "", false},
+				{"Pointer invalid", `{"ip":"not-an-ip"}`, true, true, "", false},
+				{"Pointer valid", `{"ip":"10.0.0.1"}`, true, false, "10.0.0.1", false},
+				{"Nil pointer", `{"ip":null}`, true, false, "", true},
+			},
+		},
+		{
+			constraintType: "ipv6",
+			fieldName:      "IP",
+			jsonFieldName:  "ip",
+			pedantigoTag:   "ipv6",
+			expectedErrMsg: "must be a valid IPv6 address",
+			testCases: []formatTestCase{
+				{"Valid localhost", `{"ip":"::1"}`, false, false, "::1", false},
+				{"Valid full", `{"ip":"2001:0db8:85a3:0000:0000:8a2e:0370:7334"}`, false, false, "2001:0db8:85a3:0000:0000:8a2e:0370:7334", false},
+				{"Valid compressed", `{"ip":"2001:db8:85a3::8a2e:370:7334"}`, false, false, "2001:db8:85a3::8a2e:370:7334", false},
+				{"Invalid format", `{"ip":"not-an-ip"}`, false, true, "", false},
+				{"Invalid IPv4", `{"ip":"192.168.1.1"}`, false, true, "", false},
+				{"Empty string", `{"ip":""}`, false, false, "", false},
+				{"Pointer invalid", `{"ip":"not-an-ip"}`, true, true, "", false},
+				{"Pointer valid", `{"ip":"fe80::1"}`, true, false, "fe80::1", false},
+				{"Nil pointer", `{"ip":null}`, true, false, "", true},
+			},
+		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.usePointer {
-				type Entity struct {
-					ID *string `json:"id" pedantigo:"uuid"`
-				}
-				validator := New[Entity]()
-				entity, err := validator.Unmarshal([]byte(tt.json))
-
-				if tt.expectErr {
-					require.Error(t, err)
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == "ID" && fieldErr.Message == "must be a valid UUID" {
-							foundError = true
-						}
-					}
-					assert.True(t, foundError, "expected 'must be a valid UUID' error, got %v", ve.Errors)
-				} else {
-					assert.NoError(t, err)
-					if tt.expectNil {
-						assert.Nil(t, entity.ID)
-					} else {
-						require.NotNil(t, entity.ID)
-						assert.Equal(t, tt.expectVal, *entity.ID)
-					}
-				}
-			} else {
-				type Entity struct {
-					ID string `json:"id" pedantigo:"uuid"`
-				}
-				validator := New[Entity]()
-				entity, err := validator.Unmarshal([]byte(tt.json))
-
-				if tt.expectErr {
-					require.Error(t, err)
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == "ID" && fieldErr.Message == "must be a valid UUID" {
-							foundError = true
-						}
-					}
-					assert.True(t, foundError, "expected 'must be a valid UUID' error, got %v", ve.Errors)
-				} else {
-					assert.NoError(t, err)
-					assert.Equal(t, tt.expectVal, entity.ID)
-				}
-			}
+	for _, ft := range formatTests {
+		ft := ft // capture range variable
+		t.Run(ft.constraintType, func(t *testing.T) {
+			runFormatValidationTests(t, ft.testCases, func(t *testing.T, tt formatTestCase) {
+				testFormatConstraintVariant(t, &ft, tt)
+			})
 		})
 	}
+}
+
+// formatTestConfig holds configuration for format constraint testing.
+type formatTestConfig struct {
+	constraintType string
+	fieldName      string
+	jsonFieldName  string
+	pedantigoTag   string
+	expectedErrMsg string
+	testCases      []formatTestCase
+}
+
+// testFormatConstraintVariant runs a single format constraint test variant.
+func testFormatConstraintVariant(t *testing.T, ft *formatTestConfig, tt formatTestCase) {
+	t.Helper()
+
+	switch ft.constraintType {
+	case "url":
+		runFormatTest(t, tt, ft.fieldName, ft.expectedErrMsg, urlFormatValidator{})
+	case "uuid":
+		runFormatTest(t, tt, ft.fieldName, ft.expectedErrMsg, uuidFormatValidator{})
+	case "ipv4":
+		runFormatTest(t, tt, ft.fieldName, ft.expectedErrMsg, ipv4FormatValidator{})
+	case "ipv6":
+		runFormatTest(t, tt, ft.fieldName, ft.expectedErrMsg, ipv6FormatValidator{})
+	}
+}
+
+// formatValidator interface enables unified format constraint testing.
+type formatValidator interface {
+	unmarshalPointer(json []byte) (val *string, err error)
+	unmarshalValue(json []byte) (val string, err error)
+}
+
+// runFormatTest is a generic helper that validates format constraints using the provided validator.
+func runFormatTest(t *testing.T, tt formatTestCase, fieldName, errMsg string, fv formatValidator) {
+	t.Helper()
+
+	if tt.usePointer {
+		val, err := fv.unmarshalPointer([]byte(tt.json))
+		if tt.expectErr {
+			assertValidationError(t, err, fieldName, errMsg)
+		} else {
+			assertNoValidationError(t, err)
+			if tt.expectNil {
+				assert.Nil(t, val)
+			} else {
+				require.NotNil(t, val)
+				assert.Equal(t, tt.expectVal, *val)
+			}
+		}
+	} else {
+		val, err := fv.unmarshalValue([]byte(tt.json))
+		if tt.expectErr {
+			assertValidationError(t, err, fieldName, errMsg)
+		} else {
+			assertNoValidationError(t, err)
+			assert.Equal(t, tt.expectVal, val)
+		}
+	}
+}
+
+// URL format validator types and methods.
+type urlFormatValidator struct{}
+type urlPtrStruct struct {
+	Website *string `json:"website" pedantigo:"url"`
+}
+type urlValStruct struct {
+	Website string `json:"website" pedantigo:"url"`
+}
+
+func (urlFormatValidator) unmarshalPointer(json []byte) (*string, error) {
+	v := New[urlPtrStruct]()
+	r, err := v.Unmarshal(json)
+	return r.Website, err
+}
+func (urlFormatValidator) unmarshalValue(json []byte) (string, error) {
+	v := New[urlValStruct]()
+	r, err := v.Unmarshal(json)
+	return r.Website, err
+}
+
+// UUID format validator types and methods.
+type uuidFormatValidator struct{}
+type uuidPtrStruct struct {
+	ID *string `json:"id" pedantigo:"uuid"`
+}
+type uuidValStruct struct {
+	ID string `json:"id" pedantigo:"uuid"`
+}
+
+func (uuidFormatValidator) unmarshalPointer(json []byte) (*string, error) {
+	v := New[uuidPtrStruct]()
+	r, err := v.Unmarshal(json)
+	return r.ID, err
+}
+func (uuidFormatValidator) unmarshalValue(json []byte) (string, error) {
+	v := New[uuidValStruct]()
+	r, err := v.Unmarshal(json)
+	return r.ID, err
+}
+
+// IPv4 format validator types and methods.
+type ipv4FormatValidator struct{}
+type ipv4PtrStruct struct {
+	IP *string `json:"ip" pedantigo:"ipv4"`
+}
+type ipv4ValStruct struct {
+	IP string `json:"ip" pedantigo:"ipv4"`
+}
+
+func (ipv4FormatValidator) unmarshalPointer(json []byte) (*string, error) {
+	v := New[ipv4PtrStruct]()
+	r, err := v.Unmarshal(json)
+	return r.IP, err
+}
+func (ipv4FormatValidator) unmarshalValue(json []byte) (string, error) {
+	v := New[ipv4ValStruct]()
+	r, err := v.Unmarshal(json)
+	return r.IP, err
+}
+
+// IPv6 format validator types and methods.
+type ipv6FormatValidator struct{}
+type ipv6PtrStruct struct {
+	IP *string `json:"ip" pedantigo:"ipv6"`
+}
+type ipv6ValStruct struct {
+	IP string `json:"ip" pedantigo:"ipv6"`
+}
+
+func (ipv6FormatValidator) unmarshalPointer(json []byte) (*string, error) {
+	v := New[ipv6PtrStruct]()
+	r, err := v.Unmarshal(json)
+	return r.IP, err
+}
+func (ipv6FormatValidator) unmarshalValue(json []byte) (string, error) {
+	v := New[ipv6ValStruct]()
+	r, err := v.Unmarshal(json)
+	return r.IP, err
 }
 
 // ==================================================
 // regex constraint tests
 // ==================================================
 
-// TestRegex_UppercasePattern tests Regex uppercasepattern
+// TestRegex_UppercasePattern tests Regex uppercasepattern.
 func TestRegex_UppercasePattern(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -204,18 +343,9 @@ func TestRegex_UppercasePattern(t *testing.T) {
 				code, err := validator.Unmarshal([]byte(tt.json))
 
 				if tt.expectErr {
-					require.Error(t, err)
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == "Value" && fieldErr.Message == "must match pattern '^[A-Z]{3}$'" {
-							foundError = true
-						}
-					}
-					assert.True(t, foundError, "expected 'must match pattern' error, got %v", ve.Errors)
+					assertValidationError(t, err, "Value", "must match pattern '^[A-Z]{3}$'")
 				} else {
-					assert.NoError(t, err)
+					assertNoValidationError(t, err)
 					if tt.expectNil {
 						assert.Nil(t, code.Value)
 					} else {
@@ -231,18 +361,9 @@ func TestRegex_UppercasePattern(t *testing.T) {
 				code, err := validator.Unmarshal([]byte(tt.json))
 
 				if tt.expectErr {
-					require.Error(t, err)
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == "Value" && fieldErr.Message == "must match pattern '^[A-Z]{3}$'" {
-							foundError = true
-						}
-					}
-					assert.True(t, foundError, "expected 'must match pattern' error, got %v", ve.Errors)
+					assertValidationError(t, err, "Value", "must match pattern '^[A-Z]{3}$'")
 				} else {
-					assert.NoError(t, err)
+					assertNoValidationError(t, err)
 					assert.Equal(t, tt.expectVal, code.Value)
 				}
 			}
@@ -270,171 +391,10 @@ func TestRegex_DigitsPattern(t *testing.T) {
 			code, err := validator.Unmarshal([]byte(tt.json))
 
 			if tt.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expectVal, code.Value)
-			}
-		})
-	}
-}
-
-// ==================================================
-// ipv4 constraint tests
-// ==================================================
-
-// TestIPv4 tests IPv4 validation
-func TestIPv4(t *testing.T) {
-	tests := []struct {
-		name       string
-		json       string
-		usePointer bool
-		expectErr  bool
-		expectVal  string
-		expectNil  bool
-	}{
-		{"Valid localhost", `{"ip":"127.0.0.1"}`, false, false, "127.0.0.1", false},
-		{"Valid private", `{"ip":"192.168.1.1"}`, false, false, "192.168.1.1", false},
-		{"Invalid format", `{"ip":"not-an-ip"}`, false, true, "", false},
-		{"Invalid IPv6", `{"ip":"2001:0db8:85a3::8a2e:0370:7334"}`, false, true, "", false},
-		{"Empty string", `{"ip":""}`, false, false, "", false},
-		{"Pointer invalid", `{"ip":"not-an-ip"}`, true, true, "", false},
-		{"Pointer valid", `{"ip":"10.0.0.1"}`, true, false, "10.0.0.1", false},
-		{"Nil pointer", `{"ip":null}`, true, false, "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.usePointer {
-				type Server struct {
-					IP *string `json:"ip" pedantigo:"ipv4"`
-				}
-				validator := New[Server]()
-				server, err := validator.Unmarshal([]byte(tt.json))
-
-				if tt.expectErr {
-					require.Error(t, err)
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == "IP" && fieldErr.Message == "must be a valid IPv4 address" {
-							foundError = true
-						}
-					}
-					assert.True(t, foundError, "expected 'must be a valid IPv4 address' error, got %v", ve.Errors)
-				} else {
-					assert.NoError(t, err)
-					if tt.expectNil {
-						assert.Nil(t, server.IP)
-					} else {
-						require.NotNil(t, server.IP)
-						assert.Equal(t, tt.expectVal, *server.IP)
-					}
-				}
-			} else {
-				type Server struct {
-					IP string `json:"ip" pedantigo:"ipv4"`
-				}
-				validator := New[Server]()
-				server, err := validator.Unmarshal([]byte(tt.json))
-
-				if tt.expectErr {
-					require.Error(t, err)
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == "IP" && fieldErr.Message == "must be a valid IPv4 address" {
-							foundError = true
-						}
-					}
-					assert.True(t, foundError, "expected 'must be a valid IPv4 address' error, got %v", ve.Errors)
-				} else {
-					assert.NoError(t, err)
-					assert.Equal(t, tt.expectVal, server.IP)
-				}
-			}
-		})
-	}
-}
-
-// ==================================================
-// ipv6 constraint tests
-// ==================================================
-
-// TestIPv6 tests IPv6 validation
-func TestIPv6(t *testing.T) {
-	tests := []struct {
-		name       string
-		json       string
-		usePointer bool
-		expectErr  bool
-		expectVal  string
-		expectNil  bool
-	}{
-		{"Valid localhost", `{"ip":"::1"}`, false, false, "::1", false},
-		{"Valid full", `{"ip":"2001:0db8:85a3:0000:0000:8a2e:0370:7334"}`, false, false, "2001:0db8:85a3:0000:0000:8a2e:0370:7334", false},
-		{"Valid compressed", `{"ip":"2001:db8:85a3::8a2e:370:7334"}`, false, false, "2001:db8:85a3::8a2e:370:7334", false},
-		{"Invalid format", `{"ip":"not-an-ip"}`, false, true, "", false},
-		{"Invalid IPv4", `{"ip":"192.168.1.1"}`, false, true, "", false},
-		{"Empty string", `{"ip":""}`, false, false, "", false},
-		{"Pointer invalid", `{"ip":"not-an-ip"}`, true, true, "", false},
-		{"Pointer valid", `{"ip":"fe80::1"}`, true, false, "fe80::1", false},
-		{"Nil pointer", `{"ip":null}`, true, false, "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.usePointer {
-				type Server struct {
-					IP *string `json:"ip" pedantigo:"ipv6"`
-				}
-				validator := New[Server]()
-				server, err := validator.Unmarshal([]byte(tt.json))
-
-				if tt.expectErr {
-					require.Error(t, err)
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == "IP" && fieldErr.Message == "must be a valid IPv6 address" {
-							foundError = true
-						}
-					}
-					assert.True(t, foundError, "expected 'must be a valid IPv6 address' error, got %v", ve.Errors)
-				} else {
-					assert.NoError(t, err)
-					if tt.expectNil {
-						assert.Nil(t, server.IP)
-					} else {
-						require.NotNil(t, server.IP)
-						assert.Equal(t, tt.expectVal, *server.IP)
-					}
-				}
-			} else {
-				type Server struct {
-					IP string `json:"ip" pedantigo:"ipv6"`
-				}
-				validator := New[Server]()
-				server, err := validator.Unmarshal([]byte(tt.json))
-
-				if tt.expectErr {
-					require.Error(t, err)
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == "IP" && fieldErr.Message == "must be a valid IPv6 address" {
-							foundError = true
-						}
-					}
-					assert.True(t, foundError, "expected 'must be a valid IPv6 address' error, got %v", ve.Errors)
-				} else {
-					assert.NoError(t, err)
-					assert.Equal(t, tt.expectVal, server.IP)
-				}
 			}
 		})
 	}
@@ -446,7 +406,7 @@ func TestIPv6(t *testing.T) {
 // min_length constraint tests
 // ==================================================
 
-// TestMinLength tests MinLength validation
+// TestMinLength tests MinLength validation.
 func TestMinLength(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -461,7 +421,7 @@ func TestMinLength(t *testing.T) {
 		{
 			name:      "Valid above min",
 			minVal:    3,
-			fieldName: "Username",
+			fieldName: testFieldUsername,
 			json:      `{"username":"alice"}`,
 			usePtr:    false,
 			expectErr: false,
@@ -471,7 +431,7 @@ func TestMinLength(t *testing.T) {
 		{
 			name:      "Exactly at min",
 			minVal:    3,
-			fieldName: "Username",
+			fieldName: testFieldUsername,
 			json:      `{"username":"bob"}`,
 			usePtr:    false,
 			expectErr: false,
@@ -481,7 +441,7 @@ func TestMinLength(t *testing.T) {
 		{
 			name:      "Below min",
 			minVal:    3,
-			fieldName: "Username",
+			fieldName: testFieldUsername,
 			json:      `{"username":"ab"}`,
 			usePtr:    false,
 			expectErr: true,
@@ -491,7 +451,7 @@ func TestMinLength(t *testing.T) {
 		{
 			name:      "Empty string",
 			minVal:    1,
-			fieldName: "Username",
+			fieldName: testFieldUsername,
 			json:      `{"username":""}`,
 			usePtr:    false,
 			expectErr: true,
@@ -549,19 +509,19 @@ func TestMinLength(t *testing.T) {
 
 					if tt.expectErr {
 						require.Error(t, err)
-						ve, ok := err.(*ValidationError)
-						require.True(t, ok, "expected *ValidationError, got %T", err)
+						var ve *ValidationError
+						require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 						expectedMsg := "must be at least 1 characters"
 						foundError := false
 						for _, fieldErr := range ve.Errors {
-							if fieldErr.Field == "Username" && fieldErr.Message == expectedMsg {
+							if fieldErr.Field == testFieldUsername && fieldErr.Message == expectedMsg {
 								foundError = true
 								break
 							}
 						}
 						assert.True(t, foundError, "expected error message %q, got %v", expectedMsg, ve.Errors)
 					} else {
-						assert.NoError(t, err)
+						require.NoError(t, err)
 					}
 				} else {
 					validator := New[User]()
@@ -569,19 +529,19 @@ func TestMinLength(t *testing.T) {
 
 					if tt.expectErr {
 						require.Error(t, err)
-						ve, ok := err.(*ValidationError)
-						require.True(t, ok, "expected *ValidationError, got %T", err)
+						var ve *ValidationError
+						require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 						expectedMsg := "must be at least 3 characters"
 						foundError := false
 						for _, fieldErr := range ve.Errors {
-							if fieldErr.Field == "Username" && fieldErr.Message == expectedMsg {
+							if fieldErr.Field == testFieldUsername && fieldErr.Message == expectedMsg {
 								foundError = true
 								break
 							}
 						}
 						assert.True(t, foundError, "expected error message %q, got %v", expectedMsg, ve.Errors)
 					} else {
-						assert.NoError(t, err)
+						require.NoError(t, err)
 						assert.Equal(t, tt.expectVal, user.Username)
 					}
 				}
@@ -597,8 +557,8 @@ func TestMinLength(t *testing.T) {
 
 				if tt.expectErr {
 					require.Error(t, err)
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var ve *ValidationError
+					require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 					expectedMsg := "must be at least 10 characters"
 					foundError := false
 					for _, fieldErr := range ve.Errors {
@@ -626,250 +586,115 @@ func TestMinLength(t *testing.T) {
 // max_length constraint tests
 // ==================================================
 
-// TestMaxLength tests MaxLength validation
-func TestMaxLength(t *testing.T) {
-	tests := []struct {
-		name      string
-		maxVal    int
-		fieldName string
-		json      string
-		usePtr    bool
-		expectErr bool
-		expectVal string
-		expectNil bool
-		minVal    int // For combined min/max tests
-	}{
-		{
-			name:      "Valid below max",
-			maxVal:    10,
-			fieldName: "Username",
-			json:      `{"username":"alice"}`,
-			usePtr:    false,
-			expectErr: false,
-			expectVal: "alice",
-			expectNil: false,
-			minVal:    0,
-		},
-		{
-			name:      "Exactly at max",
-			maxVal:    5,
-			fieldName: "Username",
-			json:      `{"username":"alice"}`,
-			usePtr:    false,
-			expectErr: false,
-			expectVal: "alice",
-			expectNil: false,
-			minVal:    0,
-		},
-		{
-			name:      "Above max",
-			maxVal:    5,
-			fieldName: "Username",
-			json:      `{"username":"verylongusername"}`,
-			usePtr:    false,
-			expectErr: true,
-			expectVal: "",
-			expectNil: false,
-			minVal:    0,
-		},
-		{
-			name:      "Empty string",
-			maxVal:    10,
-			fieldName: "Username",
-			json:      `{"username":""}`,
-			usePtr:    false,
-			expectErr: false,
-			expectVal: "",
-			expectNil: false,
-			minVal:    0,
-		},
-		{
-			name:      "Pointer above max",
-			maxVal:    20,
-			fieldName: "Bio",
-			json:      `{"bio":"this is a very long biography that exceeds the maximum"}`,
-			usePtr:    true,
-			expectErr: true,
-			expectVal: "",
-			expectNil: false,
-			minVal:    0,
-		},
-		{
-			name:      "Pointer valid",
-			maxVal:    20,
-			fieldName: "Bio",
-			json:      `{"bio":"short bio"}`,
-			usePtr:    true,
-			expectErr: false,
-			expectVal: "short bio",
-			expectNil: false,
-			minVal:    0,
-		},
-		{
-			name:      "Nil pointer",
-			maxVal:    20,
-			fieldName: "Bio",
-			json:      `{"bio":null}`,
-			usePtr:    true,
-			expectErr: false,
-			expectVal: "",
-			expectNil: true,
-			minVal:    0,
-		},
-		{
-			name:      "Combined min/max valid",
-			maxVal:    20,
-			fieldName: "Password",
-			json:      `{"password":"goodpassword"}`,
-			usePtr:    false,
-			expectErr: false,
-			expectVal: "goodpassword",
-			expectNil: false,
-			minVal:    8,
-		},
-		{
-			name:      "Combined below min",
-			maxVal:    20,
-			fieldName: "Password",
-			json:      `{"password":"short"}`,
-			usePtr:    false,
-			expectErr: true,
-			expectVal: "",
-			expectNil: false,
-			minVal:    8,
-		},
-		{
-			name:      "Combined above max",
-			maxVal:    20,
-			fieldName: "Password",
-			json:      `{"password":"thispasswordiswaytoolongforourvalidation"}`,
-			usePtr:    false,
-			expectErr: true,
-			expectVal: "",
-			expectNil: false,
-			minVal:    8,
-		},
+// max length test struct types (moved outside to reduce cognitive complexity).
+type userMax10 struct {
+	Username string `json:"username" pedantigo:"max=10"`
+}
+type userMax5 struct {
+	Username string `json:"username" pedantigo:"max=5"`
+}
+type userMinMax struct {
+	Password string `json:"password" pedantigo:"min=8,max=20"`
+}
+type userBioPtr struct {
+	Bio *string `json:"bio" pedantigo:"max=20"`
+}
+
+// runMaxLengthStringTest handles non-pointer max length tests.
+func runMaxLengthStringTest(t *testing.T, maxVal int, json string, expectErr bool, expectVal string) {
+	t.Helper()
+	var val string
+	var err error
+	if maxVal == 5 {
+		v := New[userMax5]()
+		r, e := v.Unmarshal([]byte(json))
+		val, err = r.Username, e
+	} else {
+		v := New[userMax10]()
+		r, e := v.Unmarshal([]byte(json))
+		val, err = r.Username, e
 	}
+	if expectErr {
+		assertValidationError(t, err, testFieldUsername, fmt.Sprintf("must be at most %d characters", maxVal))
+	} else {
+		require.NoError(t, err)
+		assert.Equal(t, expectVal, val)
+	}
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if !tt.usePtr {
-				// Non-pointer test case
-				if tt.minVal > 0 {
-					// Combined min/max test - use Password field with both constraints
-					// UserWithPassword represents the data structure
-					type UserWithPassword struct {
-						Password string `json:"password" pedantigo:"min=8,max=20"`
-					}
-					validator := New[UserWithPassword]()
-					user, err := validator.Unmarshal([]byte(tt.json))
-
-					if tt.expectErr {
-						require.Error(t, err)
-						ve, ok := err.(*ValidationError)
-						require.True(t, ok, "expected *ValidationError, got %T", err)
-						foundError := false
-						for _, fieldErr := range ve.Errors {
-							if fieldErr.Field == "Password" {
-								foundError = true
-								break
-							}
-						}
-						assert.True(t, foundError, "expected error for Password field, got %v", ve.Errors)
-					} else {
-						assert.NoError(t, err)
-						assert.Equal(t, tt.expectVal, user.Password)
-					}
-				} else {
-					// Max-only tests - use Username field with only max constraint
-					// UserWithUsername represents the data structure
-					type UserWithUsername struct {
-						Username string `json:"username" pedantigo:"max=10"`
-					}
-
-					// Handle different max values
-					if tt.maxVal == 5 {
-						type UserMax5 struct {
-							Username string `json:"username" pedantigo:"max=5"`
-						}
-						validator := New[UserMax5]()
-						user, err := validator.Unmarshal([]byte(tt.json))
-
-						if tt.expectErr {
-							require.Error(t, err)
-							ve, ok := err.(*ValidationError)
-							require.True(t, ok, "expected *ValidationError, got %T", err)
-							expectedMsg := fmt.Sprintf("must be at most %d characters", tt.maxVal)
-							foundError := false
-							for _, fieldErr := range ve.Errors {
-								if fieldErr.Field == "Username" && fieldErr.Message == expectedMsg {
-									foundError = true
-									break
-								}
-							}
-							assert.True(t, foundError, "expected error message %q, got %v", expectedMsg, ve.Errors)
-						} else {
-							assert.NoError(t, err)
-							assert.Equal(t, tt.expectVal, user.Username)
-						}
-					} else {
-						validator := New[UserWithUsername]()
-						user, err := validator.Unmarshal([]byte(tt.json))
-
-						if tt.expectErr {
-							require.Error(t, err)
-							ve, ok := err.(*ValidationError)
-							require.True(t, ok, "expected *ValidationError, got %T", err)
-							expectedMsg := fmt.Sprintf("must be at most %d characters", tt.maxVal)
-							foundError := false
-							for _, fieldErr := range ve.Errors {
-								if fieldErr.Field == "Username" && fieldErr.Message == expectedMsg {
-									foundError = true
-									break
-								}
-							}
-							assert.True(t, foundError, "expected error message %q, got %v", expectedMsg, ve.Errors)
-						} else {
-							assert.NoError(t, err)
-							assert.Equal(t, tt.expectVal, user.Username)
-						}
-					}
-				}
-			} else {
-				// Pointer test case
-				// User represents the data structure
-				type User struct {
-					Bio *string `json:"bio" pedantigo:"max=20"`
-				}
-
-				validator := New[User]()
-				user, err := validator.Unmarshal([]byte(tt.json))
-
-				if tt.expectErr {
-					require.Error(t, err)
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					expectedMsg := "must be at most 20 characters"
-					foundError := false
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == "Bio" && fieldErr.Message == expectedMsg {
-							foundError = true
-							break
-						}
-					}
-					assert.True(t, foundError, "expected error message %q, got %v", expectedMsg, ve.Errors)
-				} else {
-					assert.NoError(t, err)
-					if tt.expectNil {
-						assert.Nil(t, user.Bio)
-					} else {
-						require.NotNil(t, user.Bio)
-						assert.Equal(t, tt.expectVal, *user.Bio)
-					}
-				}
+// runMinMaxTest handles combined min/max tests.
+func runMinMaxTest(t *testing.T, json string, expectErr bool, expectVal string) {
+	t.Helper()
+	v := New[userMinMax]()
+	r, err := v.Unmarshal([]byte(json))
+	if expectErr {
+		require.Error(t, err)
+		var ve *ValidationError
+		require.ErrorAs(t, err, &ve)
+		foundError := false
+		for _, fieldErr := range ve.Errors {
+			if fieldErr.Field == "Password" {
+				foundError = true
+				break
 			}
-		})
+		}
+		assert.True(t, foundError, "expected error for Password field")
+	} else {
+		require.NoError(t, err)
+		assert.Equal(t, expectVal, r.Password)
 	}
+}
+
+// runBioPtrTest handles pointer max length tests.
+func runBioPtrTest(t *testing.T, json string, expectErr bool, expectVal string, expectNil bool) {
+	t.Helper()
+	v := New[userBioPtr]()
+	r, err := v.Unmarshal([]byte(json))
+	if expectErr {
+		assertValidationError(t, err, "Bio", "must be at most 20 characters")
+	} else {
+		require.NoError(t, err)
+		if expectNil {
+			assert.Nil(t, r.Bio)
+		} else {
+			require.NotNil(t, r.Bio)
+			assert.Equal(t, expectVal, *r.Bio)
+		}
+	}
+}
+
+// TestMaxLength tests MaxLength validation.
+func TestMaxLength(t *testing.T) {
+	t.Run("string max=10 valid", func(t *testing.T) {
+		runMaxLengthStringTest(t, 10, `{"username":"alice"}`, false, "alice")
+	})
+	t.Run("string max=5 at boundary", func(t *testing.T) {
+		runMaxLengthStringTest(t, 5, `{"username":"alice"}`, false, "alice")
+	})
+	t.Run("string max=5 above max", func(t *testing.T) {
+		runMaxLengthStringTest(t, 5, `{"username":"verylongusername"}`, true, "")
+	})
+	t.Run("string empty", func(t *testing.T) {
+		runMaxLengthStringTest(t, 10, `{"username":""}`, false, "")
+	})
+	t.Run("pointer above max", func(t *testing.T) {
+		runBioPtrTest(t, `{"bio":"this is a very long biography that exceeds the maximum"}`, true, "", false)
+	})
+	t.Run("pointer valid", func(t *testing.T) {
+		runBioPtrTest(t, `{"bio":"short bio"}`, false, "short bio", false)
+	})
+	t.Run("pointer nil", func(t *testing.T) {
+		runBioPtrTest(t, `{"bio":null}`, false, "", true)
+	})
+	t.Run("combined min/max valid", func(t *testing.T) {
+		runMinMaxTest(t, `{"password":"goodpassword"}`, false, "goodpassword")
+	})
+	t.Run("combined below min", func(t *testing.T) {
+		runMinMaxTest(t, `{"password":"short"}`, true, "")
+	})
+	t.Run("combined above max", func(t *testing.T) {
+		runMinMaxTest(t, `{"password":"thispasswordiswaytoolongforourvalidation"}`, true, "")
+	})
 }
 
 // ==================== Numeric Constraints ====================
@@ -878,7 +703,7 @@ func TestMaxLength(t *testing.T) {
 // gt (greater than) constraint tests
 // ==================================================
 
-// TestGt tests Gt validation
+// TestGt tests Gt validation.
 func TestGt(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -983,8 +808,8 @@ func TestGt(t *testing.T) {
 				if tt.expectErr {
 					require.Error(t, err)
 
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var ve *ValidationError
+					require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 					foundError := false
 					for _, fieldErr := range ve.Errors {
@@ -996,7 +821,7 @@ func TestGt(t *testing.T) {
 
 					assert.True(t, foundError, "expected error message %q, got %v", tt.expectErrMsg, ve.Errors)
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, tt.expectVal.(int), product.Stock)
 				}
 
@@ -1012,8 +837,8 @@ func TestGt(t *testing.T) {
 				if tt.expectErr {
 					require.Error(t, err)
 
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var ve *ValidationError
+					require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 					foundError := false
 					for _, fieldErr := range ve.Errors {
@@ -1025,8 +850,8 @@ func TestGt(t *testing.T) {
 
 					assert.True(t, foundError, "expected error message %q, got %v", tt.expectErrMsg, ve.Errors)
 				} else {
-					assert.NoError(t, err)
-					assert.Equal(t, tt.expectVal.(float64), product.Price)
+					require.NoError(t, err)
+					assert.InDelta(t, tt.expectVal.(float64), product.Price, 0.0001)
 				}
 
 			case "uint":
@@ -1041,8 +866,8 @@ func TestGt(t *testing.T) {
 				if tt.expectErr {
 					require.Error(t, err)
 
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var ve *ValidationError
+					require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 					foundError := false
 					for _, fieldErr := range ve.Errors {
@@ -1054,7 +879,7 @@ func TestGt(t *testing.T) {
 
 					assert.True(t, foundError, "expected error message %q, got %v", tt.expectErrMsg, ve.Errors)
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, tt.expectVal.(uint), config.Port)
 				}
 
@@ -1070,8 +895,8 @@ func TestGt(t *testing.T) {
 				if tt.expectErr {
 					require.Error(t, err)
 
-					ve, ok := err.(*ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
+					var ve *ValidationError
+					require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 					foundError := false
 					for _, fieldErr := range ve.Errors {
@@ -1101,7 +926,7 @@ func TestGt(t *testing.T) {
 // ge (greater or equal) constraint tests
 // ==================================================
 
-// TestGe tests Ge validation
+// TestGe tests Ge validation.
 func TestGe(t *testing.T) {
 	type Product struct {
 		Stock int `json:"stock" pedantigo:"gte=0"`
@@ -1142,8 +967,8 @@ func TestGe(t *testing.T) {
 			if tt.expectError {
 				require.Error(t, err)
 
-				ve, ok := err.(*ValidationError)
-				require.True(t, ok, "expected *ValidationError, got %T", err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 
 				foundError := false
 				for _, fieldErr := range ve.Errors {
@@ -1155,7 +980,7 @@ func TestGe(t *testing.T) {
 
 				assert.True(t, foundError, "expected error message %q, got %v", tt.expectedMessage, ve.Errors)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expectedValue, product.Stock)
 			}
 		})
@@ -1163,126 +988,58 @@ func TestGe(t *testing.T) {
 }
 
 // ==================================================
-// lt (less than) constraint tests
+// lt and lte (less than / less or equal) constraint tests
 // ==================================================
 
-// TestLt tests Lt validation
-func TestLt(t *testing.T) {
-	type Product struct {
-		Discount int `json:"discount" pedantigo:"lt=100"`
-	}
-
-	tests := []struct {
-		name        string
-		jsonData    []byte
-		expectedErr bool
-		expectedVal int
-	}{
-		{
-			name:        "int valid below threshold",
-			jsonData:    []byte(`{"discount":50}`),
-			expectedErr: false,
-			expectedVal: 50,
-		},
-		{
-			name:        "int equal to threshold",
-			jsonData:    []byte(`{"discount":100}`),
-			expectedErr: true,
-			expectedVal: 0,
-		},
-		{
-			name:        "int above threshold",
-			jsonData:    []byte(`{"discount":150}`),
-			expectedErr: true,
-			expectedVal: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			validator := New[Product]()
-			product, err := validator.Unmarshal(tt.jsonData)
-
-			if tt.expectedErr {
-				require.Error(t, err)
-
-				ve, ok := err.(*ValidationError)
-				require.True(t, ok, "expected *ValidationError, got %T", err)
-
-				foundError := false
-				for _, fieldErr := range ve.Errors {
-					if fieldErr.Field == "Discount" && fieldErr.Message == "must be less than 100" {
-						foundError = true
-					}
-				}
-
-				assert.True(t, foundError, "expected 'must be less than 100' error, got %v", ve.Errors)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedVal, product.Discount)
-			}
-		})
-	}
+// ltLteProduct types for lt/lte testing.
+type ltProduct struct {
+	Discount int `json:"discount" pedantigo:"lt=100"`
+}
+type lteProduct struct {
+	Discount int `json:"discount" pedantigo:"lte=100"`
 }
 
-// ==================================================
-// le (less or equal) constraint tests
-// ==================================================
-
-// TestLe tests Le validation
-func TestLe(t *testing.T) {
-	type Product struct {
-		Discount int `json:"discount" pedantigo:"lte=100"`
-	}
-
+// TestLtLte tests lt and lte constraints in a unified table-driven test.
+func TestLtLte(t *testing.T) {
 	tests := []struct {
-		name        string
-		jsonData    []byte
-		expectedErr bool
-		expectedVal int
+		name           string
+		constraint     string // "lt" or "lte"
+		jsonData       []byte
+		expectedErr    bool
+		expectedVal    int
+		expectedErrMsg string
 	}{
-		{
-			name:        "int valid below threshold",
-			jsonData:    []byte(`{"discount":50}`),
-			expectedErr: false,
-			expectedVal: 50,
-		},
-		{
-			name:        "int equal to threshold",
-			jsonData:    []byte(`{"discount":100}`),
-			expectedErr: false,
-			expectedVal: 100,
-		},
-		{
-			name:        "int above threshold",
-			jsonData:    []byte(`{"discount":150}`),
-			expectedErr: true,
-			expectedVal: 0,
-		},
+		// lt (less than) tests
+		{"lt: valid below threshold", "lt", []byte(`{"discount":50}`), false, 50, ""},
+		{"lt: equal to threshold", "lt", []byte(`{"discount":100}`), true, 0, "must be less than 100"},
+		{"lt: above threshold", "lt", []byte(`{"discount":150}`), true, 0, "must be less than 100"},
+		// lte (less or equal) tests
+		{"lte: valid below threshold", "lte", []byte(`{"discount":50}`), false, 50, ""},
+		{"lte: equal to threshold", "lte", []byte(`{"discount":100}`), false, 100, ""},
+		{"lte: above threshold", "lte", []byte(`{"discount":150}`), true, 0, "must be at most 100"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validator := New[Product]()
-			product, err := validator.Unmarshal(tt.jsonData)
+			var discount int
+			var err error
+
+			switch tt.constraint {
+			case "lt":
+				v := New[ltProduct]()
+				p, e := v.Unmarshal(tt.jsonData)
+				discount, err = p.Discount, e
+			case "lte":
+				v := New[lteProduct]()
+				p, e := v.Unmarshal(tt.jsonData)
+				discount, err = p.Discount, e
+			}
 
 			if tt.expectedErr {
-				require.Error(t, err)
-
-				ve, ok := err.(*ValidationError)
-				require.True(t, ok, "expected *ValidationError, got %T", err)
-
-				foundError := false
-				for _, fieldErr := range ve.Errors {
-					if fieldErr.Field == "Discount" && fieldErr.Message == "must be at most 100" {
-						foundError = true
-					}
-				}
-
-				assert.True(t, foundError, "expected 'must be at most 100' error, got %v", ve.Errors)
+				assertNumericValidationError(t, err, "Discount", tt.expectedErrMsg)
 			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedVal, product.Discount)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedVal, discount)
 			}
 		})
 	}
@@ -1294,7 +1051,7 @@ func TestLe(t *testing.T) {
 // enum constraint tests
 // ==================================================
 
-// TestEnum tests Enum validation
+// TestEnum tests Enum validation.
 func TestEnum(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -1368,7 +1125,7 @@ func TestEnum(t *testing.T) {
 				}
 				validator := New[User]()
 				user, err := validator.Unmarshal([]byte(tt.json))
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, "admin", user.Role)
 
 			case "string_invalid":
@@ -1378,8 +1135,8 @@ func TestEnum(t *testing.T) {
 				validator := New[User]()
 				_, err := validator.Unmarshal([]byte(tt.json))
 				require.Error(t, err)
-				ve, ok := err.(*ValidationError)
-				require.True(t, ok, "expected *ValidationError, got %T", err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 				foundError := false
 				for _, fieldErr := range ve.Errors {
 					if fieldErr.Field == tt.errorField && fieldErr.Message == tt.errorMsg {
@@ -1394,7 +1151,7 @@ func TestEnum(t *testing.T) {
 				}
 				validator := New[Status]()
 				status, err := validator.Unmarshal([]byte(tt.json))
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, 200, status.Code)
 
 			case "int_invalid":
@@ -1404,8 +1161,8 @@ func TestEnum(t *testing.T) {
 				validator := New[Status]()
 				_, err := validator.Unmarshal([]byte(tt.json))
 				require.Error(t, err)
-				ve, ok := err.(*ValidationError)
-				require.True(t, ok, "expected *ValidationError, got %T", err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 				foundError := false
 				for _, fieldErr := range ve.Errors {
 					if fieldErr.Field == tt.errorField && fieldErr.Message == tt.errorMsg {
@@ -1421,8 +1178,8 @@ func TestEnum(t *testing.T) {
 				validator := New[Config]()
 				_, err := validator.Unmarshal([]byte(tt.json))
 				require.Error(t, err)
-				ve, ok := err.(*ValidationError)
-				require.True(t, ok, "expected *ValidationError, got %T", err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 				assert.Len(t, ve.Errors, 1)
 				foundError := false
 				for _, fieldErr := range ve.Errors {
@@ -1439,8 +1196,8 @@ func TestEnum(t *testing.T) {
 				validator := New[Config]()
 				_, err := validator.Unmarshal([]byte(tt.json))
 				require.Error(t, err)
-				ve, ok := err.(*ValidationError)
-				require.True(t, ok, "expected *ValidationError, got %T", err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 				assert.Len(t, ve.Errors, 1)
 				foundError := false
 				for _, fieldErr := range ve.Errors {

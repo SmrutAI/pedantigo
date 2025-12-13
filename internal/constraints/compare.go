@@ -6,24 +6,34 @@ import (
 	"time"
 )
 
+// Comparison operator constants.
+const (
+	opEq  = "eq"
+	opNe  = "ne"
+	opGt  = "gt"
+	opGte = "gte"
+	opLt  = "lt"
+	opLte = "lte"
+)
+
 // CompareValues compares two values using the specified operator
 // op values: "eq", "ne", "gt", "gte", "lt", "lte"
 // Returns true if comparison succeeds, false otherwise
-// CompareValues compares two values
+// CompareValues compares two values.
 func CompareValues(op string, left, right any) (bool, error) {
 	// Handle nil values (including typed nil pointers)
 	leftIsNil := isNilValue(left)
 	rightIsNil := isNilValue(right)
 
-	// If both are nil, handle equality/inequality
+	// If both are nil, handle equality/inequality.
 	if leftIsNil && rightIsNil {
 		switch op {
-		case "eq":
+		case opEq:
 			return true, nil
-		case "ne":
+		case opNe:
 			return false, nil
-		case "gt", "gte", "lt", "lte":
-			// nil is not greater/less than nil
+		case opGt, opGte, opLt, opLte:
+			// nil is not greater/less than nil.
 			return false, nil
 		}
 	}
@@ -55,7 +65,7 @@ func CompareValues(op string, left, right any) (bool, error) {
 	return false, fmt.Errorf("cannot compare incompatible types: %T vs %T", left, right)
 }
 
-// isNumeric checks if a reflect.Kind is a numeric type
+// isNumeric checks if a reflect.Kind is a numeric type.
 func isNumeric(kind reflect.Kind) bool {
 	switch kind {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
@@ -66,7 +76,7 @@ func isNumeric(kind reflect.Kind) bool {
 	return false
 }
 
-// toFloat64 converts a numeric reflect.Value to float64
+// toFloat64 converts a numeric reflect.Value to float64.
 func toFloat64(val reflect.Value) float64 {
 	kind := val.Kind()
 
@@ -109,73 +119,73 @@ func toFloat64(val reflect.Value) float64 {
 	return 0
 }
 
-// compareNumeric compares two float64 values
+// compareNumeric compares two float64 values.
 func compareNumeric(op string, left, right float64) (bool, error) {
 	switch op {
-	case "eq":
+	case opEq:
 		return left == right, nil
-	case "ne":
+	case opNe:
 		return left != right, nil
-	case "gt":
+	case opGt:
 		return left > right, nil
-	case "gte":
+	case opGte:
 		return left >= right, nil
-	case "lt":
+	case opLt:
 		return left < right, nil
-	case "lte":
+	case opLte:
 		return left <= right, nil
 	default:
 		return false, fmt.Errorf("unknown comparison operator: %q", op)
 	}
 }
 
-// compareString compares two strings lexicographically
-func compareString(op string, left, right string) (bool, error) {
+// compareString compares two strings lexicographically.
+func compareString(op, left, right string) (bool, error) {
 	switch op {
-	case "eq":
+	case opEq:
 		return left == right, nil
-	case "ne":
+	case opNe:
 		return left != right, nil
-	case "gt":
+	case opGt:
 		return left > right, nil
-	case "gte":
+	case opGte:
 		return left >= right, nil
-	case "lt":
+	case opLt:
 		return left < right, nil
-	case "lte":
+	case opLte:
 		return left <= right, nil
 	default:
 		return false, fmt.Errorf("unknown comparison operator: %q", op)
 	}
 }
 
-// isTime checks if a value is time.Time
+// isTime checks if a value is time.Time.
 func isTime(val any) bool {
 	_, ok := val.(time.Time)
 	return ok
 }
 
-// compareTime compares two time.Time values
+// compareTime compares two time.Time values.
 func compareTime(op string, left, right time.Time) (bool, error) {
 	switch op {
-	case "eq":
+	case opEq:
 		return left.Equal(right), nil
-	case "ne":
+	case opNe:
 		return !left.Equal(right), nil
-	case "gt":
+	case opGt:
 		return left.After(right), nil
-	case "gte":
+	case opGte:
 		return left.Equal(right) || left.After(right), nil
-	case "lt":
+	case opLt:
 		return left.Before(right), nil
-	case "lte":
+	case opLte:
 		return left.Equal(right) || left.Before(right), nil
 	default:
 		return false, fmt.Errorf("unknown comparison operator: %q", op)
 	}
 }
 
-// isNilValue checks if a value is nil, including typed nil pointers/interfaces
+// isNilValue checks if a value is nil, including typed nil pointers/interfaces.
 func isNilValue(val any) bool {
 	if val == nil {
 		return true
@@ -191,7 +201,6 @@ func isNilValue(val any) bool {
 // IsZeroValue checks if a value is the zero value for its type.
 // Returns true for nil, zero integers, empty strings, false booleans, empty slices/maps, etc.
 // Returns false for non-zero values.
-// IsZeroValue checks the condition
 func IsZeroValue(value any) bool {
 	v := reflect.ValueOf(value)
 	return !v.IsValid() || v.IsZero()

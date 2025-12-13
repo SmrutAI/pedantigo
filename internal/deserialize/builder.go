@@ -8,24 +8,24 @@ import (
 	"github.com/SmrutAI/Pedantigo/internal/tags"
 )
 
-// MissingFieldSentinel is a sentinel value to distinguish missing fields from explicit null
+// MissingFieldSentinel is a sentinel value to distinguish missing fields from explicit null.
 type MissingFieldSentinel struct{}
 
-// FieldMissingSentinel is the singleton sentinel value
+// FieldMissingSentinel is the singleton sentinel value.
 var FieldMissingSentinel = MissingFieldSentinel{}
 
 // FieldDeserializer is a closure that deserializes a single field
 // inValue is FieldMissingSentinel if field is missing from JSON,
 // nil if field is explicitly null, or the actual value if present
-// FieldDeserializer represents the data structure
+// FieldDeserializer represents the data structure.
 type FieldDeserializer func(outPtr *reflect.Value, inValue any) error
 
-// BuilderOptions configures the deserializer builder
+// BuilderOptions configures the deserializer builder.
 type BuilderOptions struct {
 	StrictMissingFields bool
 }
 
-// BuildFieldDeserializers creates field deserializer closures for each struct field
+// BuildFieldDeserializers creates field deserializer closures for each struct field.
 func BuildFieldDeserializers(
 	typ reflect.Type,
 	opts BuilderOptions,
@@ -153,7 +153,7 @@ func BuildFieldDeserializers(
 	return deserializers
 }
 
-// ValidateDefaultMethod checks that a method exists and has the correct signature
+// ValidateDefaultMethod checks that a method exists and has the correct signature.
 func ValidateDefaultMethod(structType reflect.Type, methodName string, fieldType reflect.Type) error {
 	// Look for the method on the pointer type (methods are typically defined on pointer receivers)
 	ptrType := reflect.PointerTo(structType)

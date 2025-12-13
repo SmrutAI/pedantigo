@@ -14,7 +14,7 @@ import (
 // Schema() generation tests - Table-driven
 // ==================================================
 
-// TestSchema_TypeMapping verifies correct JSON Schema type generation for Go types
+// TestSchema_TypeMapping verifies correct JSON Schema type generation for Go types.
 func TestSchema_TypeMapping(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -144,7 +144,7 @@ func TestSchema_TypeMapping(t *testing.T) {
 	}
 }
 
-// TestSchema_Constraints verifies constraint mapping to JSON Schema keywords
+// TestSchema_Constraints verifies constraint mapping to JSON Schema keywords.
 func TestSchema_Constraints(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -303,7 +303,7 @@ func TestSchema_Constraints(t *testing.T) {
 // JSON Serialization tests (Schema/SchemaJSON/SchemaOpenAPI) - Table-driven
 // ==================================================
 
-// TestSchemaJSON_Serialization verifies JSON serialization methods and OpenAPI references
+// TestSchemaJSON_Serialization verifies JSON serialization methods and OpenAPI references.
 func TestSchemaJSON_Serialization(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -339,7 +339,7 @@ func TestSchemaJSON_Serialization(t *testing.T) {
 				// Check name field has minLength
 				nameField, ok := properties["name"].(map[string]any)
 				require.True(t, ok)
-				assert.Equal(t, float64(3), nameField["minLength"])
+				assert.InDelta(t, float64(3), nameField["minLength"].(float64), 0.0001)
 
 				// Check email field has format
 				emailField, ok := properties["email"].(map[string]any)
@@ -396,7 +396,7 @@ func TestSchemaJSON_Serialization(t *testing.T) {
 				require.True(t, ok, "expected 'properties' in Address definition")
 				zipProp, ok := addressProps["zip"].(map[string]any)
 				require.True(t, ok)
-				assert.Equal(t, float64(5), zipProp["minLength"])
+				assert.InDelta(t, float64(5), zipProp["minLength"].(float64), 0.0001)
 
 				// Check root schema has $ref to Address
 				properties, ok := schemaMap["properties"].(map[string]any)
@@ -426,7 +426,7 @@ func TestSchemaJSON_Serialization(t *testing.T) {
 				require.True(t, ok, "validator missing SchemaOpenAPI method")
 
 				schema := validator.SchemaOpenAPI()
-				require.Greater(t, len(schema.Definitions), 0, "expected schema to have definitions")
+				require.NotEmpty(t, schema.Definitions, "expected schema to have definitions")
 
 				contactDef, ok := schema.Definitions["Contact"]
 				require.True(t, ok, "expected Contact definition")
@@ -466,7 +466,7 @@ func TestSchemaJSON_Serialization(t *testing.T) {
 // Schema caching and concurrency tests - Table-driven
 // ==================================================
 
-// TestSchema_Caching verifies single-validator schema caching works correctly
+// TestSchema_Caching verifies single-validator schema caching works correctly.
 func TestSchema_Caching(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -591,7 +591,7 @@ func TestSchema_Caching(t *testing.T) {
 	}
 }
 
-// TestSchema_ConcurrencySafe verifies schema generation is thread-safe under concurrent access
+// TestSchema_ConcurrencySafe verifies schema generation is thread-safe under concurrent access.
 func TestSchema_ConcurrencySafe(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -659,7 +659,7 @@ func TestSchema_ConcurrencySafe(t *testing.T) {
 					go func() {
 						defer wg.Done()
 						jsonBytes, err := validator.SchemaJSON()
-						require.NoError(t, err)
+						assert.NoError(t, err)
 						jsonChan <- jsonBytes
 					}()
 				}
@@ -690,7 +690,7 @@ func TestSchema_ConcurrencySafe(t *testing.T) {
 	}
 }
 
-// bytesEqual compares two byte slices for equality
+// bytesEqual compares two byte slices for equality.
 func bytesEqual(a, b []byte) bool {
 	if len(a) != len(b) {
 		return false
@@ -709,7 +709,7 @@ func bytesEqual(a, b []byte) bool {
 
 // TestSchemaOpenAPI_SliceOfStructs tests schema generation with slices of structs
 // This exercises searchSliceType() code path (currently 0% coverage)
-// TestSchemaOpenAPI_SliceOfStructs tests SchemaOpenAPI sliceofstructs
+// TestSchemaOpenAPI_SliceOfStructs tests SchemaOpenAPI sliceofstructs.
 func TestSchemaOpenAPI_SliceOfStructs(t *testing.T) {
 	type Author struct {
 		Name  string `json:"name" pedantigo:"required,min=2"`
@@ -750,7 +750,7 @@ func TestSchemaOpenAPI_SliceOfStructs(t *testing.T) {
 
 // TestSchemaOpenAPI_PointerSliceOfStructs tests schema with pointer slices
 // This exercises searchSliceType() with pointer unwrapping
-// TestSchemaOpenAPI_PointerSliceOfStructs tests SchemaOpenAPI pointersliceofstructs
+// TestSchemaOpenAPI_PointerSliceOfStructs tests SchemaOpenAPI pointersliceofstructs.
 func TestSchemaOpenAPI_PointerSliceOfStructs(t *testing.T) {
 	type Tag struct {
 		Name  string `json:"name" pedantigo:"required,min=1"`
@@ -777,7 +777,7 @@ func TestSchemaOpenAPI_PointerSliceOfStructs(t *testing.T) {
 
 // TestSchemaOpenAPI_MapOfStructs tests schema generation with maps of structs
 // This exercises searchMapType() code path (currently 0% coverage)
-// TestSchemaOpenAPI_MapOfStructs tests SchemaOpenAPI mapofstructs
+// TestSchemaOpenAPI_MapOfStructs tests SchemaOpenAPI mapofstructs.
 func TestSchemaOpenAPI_MapOfStructs(t *testing.T) {
 	type Contact struct {
 		Email string `json:"email" pedantigo:"required,email"`
@@ -818,7 +818,7 @@ func TestSchemaOpenAPI_MapOfStructs(t *testing.T) {
 
 // TestSchemaOpenAPI_PointerMapOfStructs tests schema with pointer map values
 // This exercises searchMapType() with pointer unwrapping
-// TestSchemaOpenAPI_PointerMapOfStructs tests SchemaOpenAPI pointermapofstructs
+// TestSchemaOpenAPI_PointerMapOfStructs tests SchemaOpenAPI pointermapofstructs.
 func TestSchemaOpenAPI_PointerMapOfStructs(t *testing.T) {
 	type Address struct {
 		Street  string `json:"street" pedantigo:"required,min=1"`
@@ -851,7 +851,7 @@ func TestSchemaOpenAPI_PointerMapOfStructs(t *testing.T) {
 
 // TestSchemaOpenAPI_NestedStructInSlice tests deeply nested struct in slice
 // This exercises recursive findTypeForDefinition through searchSliceType
-// TestSchemaOpenAPI_NestedStructInSlice tests SchemaOpenAPI nestedstructinslice
+// TestSchemaOpenAPI_NestedStructInSlice tests SchemaOpenAPI nestedstructinslice.
 func TestSchemaOpenAPI_NestedStructInSlice(t *testing.T) {
 	type Permission struct {
 		Name string `json:"name" pedantigo:"required,min=1"`
@@ -892,7 +892,7 @@ func TestSchemaOpenAPI_NestedStructInSlice(t *testing.T) {
 
 // TestSchemaOpenAPI_NestedStructInMap tests deeply nested struct in map
 // This exercises recursive findTypeForDefinition through searchMapType
-// TestSchemaOpenAPI_NestedStructInMap tests SchemaOpenAPI nestedstructinmap
+// TestSchemaOpenAPI_NestedStructInMap tests SchemaOpenAPI nestedstructinmap.
 func TestSchemaOpenAPI_NestedStructInMap(t *testing.T) {
 	type Metadata struct {
 		Key   string `json:"key" pedantigo:"required,min=1"`
@@ -932,7 +932,7 @@ func TestSchemaOpenAPI_NestedStructInMap(t *testing.T) {
 	assert.Equal(t, uint64(1), *nameProp.MinLength)
 }
 
-// TestSchemaOpenAPI_DirectTypeMatch tests findTypeForDefinition direct name matching
+// TestSchemaOpenAPI_DirectTypeMatch tests findTypeForDefinition direct name matching.
 func TestSchemaOpenAPI_DirectTypeMatch(t *testing.T) {
 	type Address struct {
 		Street string `json:"street" pedantigo:"required"`
@@ -961,7 +961,7 @@ func TestSchemaOpenAPI_DirectTypeMatch(t *testing.T) {
 	assert.Equal(t, uint64(2), *cityProp.MinLength)
 }
 
-// TestSchemaOpenAPI_PointerFieldType tests findTypeForDefinition with pointer field types
+// TestSchemaOpenAPI_PointerFieldType tests findTypeForDefinition with pointer field types.
 func TestSchemaOpenAPI_PointerFieldType(t *testing.T) {
 	type Config struct {
 		Key   string `json:"key" pedantigo:"required"`
@@ -990,7 +990,7 @@ func TestSchemaOpenAPI_PointerFieldType(t *testing.T) {
 	assert.Equal(t, uint64(1), *valueProp.MinLength)
 }
 
-// TestSchemaOpenAPI_DeeplyNestedStruct tests findTypeForDefinition recursive search
+// TestSchemaOpenAPI_DeeplyNestedStruct tests findTypeForDefinition recursive search.
 func TestSchemaOpenAPI_DeeplyNestedStruct(t *testing.T) {
 	type Level3 struct {
 		Data string `json:"data" pedantigo:"required,min=5"`
@@ -1023,7 +1023,7 @@ func TestSchemaOpenAPI_DeeplyNestedStruct(t *testing.T) {
 	assert.Equal(t, uint64(5), *dataProp.MinLength)
 }
 
-// TestSchemaOpenAPI_MixedNestedTypes tests all search paths together
+// TestSchemaOpenAPI_MixedNestedTypes tests all search paths together.
 func TestSchemaOpenAPI_MixedNestedTypes(t *testing.T) {
 	type Tag struct {
 		Name string `json:"name" pedantigo:"required,min=1"`
@@ -1051,11 +1051,11 @@ func TestSchemaOpenAPI_MixedNestedTypes(t *testing.T) {
 	// Should have all nested types in definitions
 	tagDef, hasTag := schema.Definitions["Tag"]
 	assert.True(t, hasTag, "expected Tag definition")
-	assert.Greater(t, tagDef.Properties.Len(), 0, "expected Tag definition to have properties")
+	assert.Positive(t, tagDef.Properties.Len(), "expected Tag definition to have properties")
 
 	metaDef, hasMeta := schema.Definitions["Metadata"]
 	assert.True(t, hasMeta, "expected Metadata definition from map values")
-	assert.Greater(t, metaDef.Properties.Len(), 0, "expected Metadata definition to have properties")
+	assert.Positive(t, metaDef.Properties.Len(), "expected Metadata definition to have properties")
 
 	commentDef, hasComment := schema.Definitions["Comment"]
 	assert.True(t, hasComment, "expected Comment definition from slice")
@@ -1067,7 +1067,7 @@ func TestSchemaOpenAPI_MixedNestedTypes(t *testing.T) {
 	assert.Equal(t, uint64(3), *textProp.MinLength)
 }
 
-// TestSchemaJSON_Caching tests all caching paths in SchemaJSON
+// TestSchemaJSON_Caching tests all caching paths in SchemaJSON.
 func TestSchemaJSON_Caching(t *testing.T) {
 	type Product struct {
 		Name  string `json:"name" pedantigo:"required,min=1"`
@@ -1080,7 +1080,7 @@ func TestSchemaJSON_Caching(t *testing.T) {
 		// First call should generate schema and JSON
 		jsonBytes1, err := validator.SchemaJSON()
 		require.NoError(t, err)
-		assert.Greater(t, len(jsonBytes1), 0, "expected non-empty JSON bytes")
+		assert.NotEmpty(t, jsonBytes1, "expected non-empty JSON bytes")
 
 		// Verify it's valid JSON
 		var schema1 map[string]any
@@ -1100,7 +1100,7 @@ func TestSchemaJSON_Caching(t *testing.T) {
 		require.NoError(t, err2)
 
 		// Should return exact same cached bytes
-		assert.Equal(t, string(jsonBytes1), string(jsonBytes2))
+		assert.JSONEq(t, string(jsonBytes1), string(jsonBytes2))
 	})
 
 	t.Run("Schema called first then SchemaJSON uses cached schema", func(t *testing.T) {
@@ -1113,7 +1113,7 @@ func TestSchemaJSON_Caching(t *testing.T) {
 		// Call SchemaJSON() - should use cached schema but generate JSON
 		jsonBytes, err := validator.SchemaJSON()
 		require.NoError(t, err)
-		assert.Greater(t, len(jsonBytes), 0, "expected non-empty JSON bytes")
+		assert.NotEmpty(t, jsonBytes, "expected non-empty JSON bytes")
 
 		// Verify constraints are in the JSON
 		var schemaMap map[string]any
@@ -1129,11 +1129,11 @@ func TestSchemaJSON_Caching(t *testing.T) {
 		// Check min length constraint
 		minLen, ok := nameProp["minLength"].(float64)
 		require.True(t, ok)
-		assert.Equal(t, 1.0, minLen)
+		assert.InDelta(t, 1.0, minLen, 1e-9)
 	})
 }
 
-// TestSchemaJSON_DefinitionUnwrapping tests definition unwrapping path
+// TestSchemaJSON_DefinitionUnwrapping tests definition unwrapping path.
 func TestSchemaJSON_DefinitionUnwrapping(t *testing.T) {
 	// This tests the path where baseSchema.Properties is nil but has definitions
 	// This happens with certain struct configurations

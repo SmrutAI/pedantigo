@@ -3,17 +3,38 @@ package constraints_test
 import (
 	"testing"
 
-	"github.com/SmrutAI/Pedantigo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	pedantigo "github.com/SmrutAI/Pedantigo"
 )
+
+// checkValidationError verifies that a validation error contains the expected field error.
+func checkValidationError(t *testing.T, err error, expectErr bool, errField string) {
+	t.Helper()
+
+	if expectErr {
+		var ve *pedantigo.ValidationError
+		require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
+		var found bool
+		for _, fieldErr := range ve.Errors {
+			if fieldErr.Field == errField {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "expected error for field %s, got %v", errField, ve.Errors)
+	} else {
+		require.NoError(t, err)
+	}
+}
 
 // ==================================================
 // excluded_if constraint tests
 // ==================================================
 // Field must be absent (zero value) if another field equals specific value
 
-// TestExcludedIf tests ExcludedIf validation
+// TestExcludedIf tests ExcludedIf validation.
 func TestExcludedIf(t *testing.T) {
 	type Payment struct {
 		Method     string `json:"method" pedantigo:"required"`
@@ -131,52 +152,13 @@ func TestExcludedIf(t *testing.T) {
 			switch v := tt.validator.(type) {
 			case *pedantigo.Validator[Payment]:
 				err := v.Validate(tt.data.(*Payment))
-				if tt.expectErr {
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					var found bool
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == tt.errField {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
-				} else {
-					assert.NoError(t, err)
-				}
+				checkValidationError(t, err, tt.expectErr, tt.errField)
 			case *pedantigo.Validator[UserPreferences]:
 				err := v.Validate(tt.data.(*UserPreferences))
-				if tt.expectErr {
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					var found bool
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == tt.errField {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
-				} else {
-					assert.NoError(t, err)
-				}
+				checkValidationError(t, err, tt.expectErr, tt.errField)
 			case *pedantigo.Validator[Vehicle]:
 				err := v.Validate(tt.data.(*Vehicle))
-				if tt.expectErr {
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					var found bool
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == tt.errField {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
-				} else {
-					assert.NoError(t, err)
-				}
+				checkValidationError(t, err, tt.expectErr, tt.errField)
 			}
 		})
 	}
@@ -187,7 +169,7 @@ func TestExcludedIf(t *testing.T) {
 // ==================================================
 // Field must be absent (zero value) unless another field equals specific value
 
-// TestExcludedUnless tests ExcludedUnless validation
+// TestExcludedUnless tests ExcludedUnless validation.
 func TestExcludedUnless(t *testing.T) {
 	type Document struct {
 		Status        string `json:"status" pedantigo:"required"`
@@ -242,23 +224,9 @@ func TestExcludedUnless(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			switch v := tt.validator.(type) {
-			case *pedantigo.Validator[Document]:
+			if v, ok := tt.validator.(*pedantigo.Validator[Document]); ok {
 				err := v.Validate(tt.data.(*Document))
-				if tt.expectErr {
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					var found bool
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == tt.errField {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
-				} else {
-					assert.NoError(t, err)
-				}
+				checkValidationError(t, err, tt.expectErr, tt.errField)
 			}
 		})
 	}
@@ -269,7 +237,7 @@ func TestExcludedUnless(t *testing.T) {
 // ==================================================
 // Field must be absent (zero value) if another field is present (non-zero)
 
-// TestExcludedWith tests ExcludedWith validation
+// TestExcludedWith tests ExcludedWith validation.
 func TestExcludedWith(t *testing.T) {
 	type User struct {
 		HomePhone string `json:"home_phone" pedantigo:"required"`
@@ -393,52 +361,13 @@ func TestExcludedWith(t *testing.T) {
 			switch v := tt.validator.(type) {
 			case *pedantigo.Validator[User]:
 				err := v.Validate(tt.data.(*User))
-				if tt.expectErr {
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					var found bool
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == tt.errField {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
-				} else {
-					assert.NoError(t, err)
-				}
+				checkValidationError(t, err, tt.expectErr, tt.errField)
 			case *pedantigo.Validator[Account]:
 				err := v.Validate(tt.data.(*Account))
-				if tt.expectErr {
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					var found bool
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == tt.errField {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
-				} else {
-					assert.NoError(t, err)
-				}
+				checkValidationError(t, err, tt.expectErr, tt.errField)
 			case *pedantigo.Validator[Feature]:
 				err := v.Validate(tt.data.(*Feature))
-				if tt.expectErr {
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					var found bool
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == tt.errField {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
-				} else {
-					assert.NoError(t, err)
-				}
+				checkValidationError(t, err, tt.expectErr, tt.errField)
 			}
 		})
 	}
@@ -449,7 +378,7 @@ func TestExcludedWith(t *testing.T) {
 // ==================================================
 // Field must be absent (zero value) if another field is absent (zero)
 
-// TestExcludedWithout tests ExcludedWithout validation
+// TestExcludedWithout tests ExcludedWithout validation.
 func TestExcludedWithout(t *testing.T) {
 	type Address struct {
 		Country string `json:"country" pedantigo:"required"`
@@ -540,36 +469,10 @@ func TestExcludedWithout(t *testing.T) {
 			switch v := tt.validator.(type) {
 			case *pedantigo.Validator[Address]:
 				err := v.Validate(tt.data.(*Address))
-				if tt.expectErr {
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					var found bool
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == tt.errField {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
-				} else {
-					assert.NoError(t, err)
-				}
+				checkValidationError(t, err, tt.expectErr, tt.errField)
 			case *pedantigo.Validator[Notification]:
 				err := v.Validate(tt.data.(*Notification))
-				if tt.expectErr {
-					ve, ok := err.(*pedantigo.ValidationError)
-					require.True(t, ok, "expected *ValidationError, got %T", err)
-					var found bool
-					for _, fieldErr := range ve.Errors {
-						if fieldErr.Field == tt.errField {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "expected error for field %s, got %v", tt.errField, ve.Errors)
-				} else {
-					assert.NoError(t, err)
-				}
+				checkValidationError(t, err, tt.expectErr, tt.errField)
 			}
 		})
 	}
@@ -579,7 +482,7 @@ func TestExcludedWithout(t *testing.T) {
 // excluded_without unmarshal integration tests
 // ==================================================
 
-// TestExcludedWithoutUnmarshal tests ExcludedWithoutUnmarshal validation
+// TestExcludedWithoutUnmarshal tests ExcludedWithoutUnmarshal validation.
 func TestExcludedWithoutUnmarshal(t *testing.T) {
 	type Shipping struct {
 		Weight      int `json:"weight"`
@@ -631,7 +534,7 @@ func TestExcludedWithoutUnmarshal(t *testing.T) {
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				if tt.checkFn != nil {
 					assert.True(t, tt.checkFn(result), "data validation failed for %+v", result)
 				}
@@ -644,7 +547,7 @@ func TestExcludedWithoutUnmarshal(t *testing.T) {
 // Integration tests combining multiple constraints
 // ==================================================
 
-// TestMultipleExclusionConstraints_Complex tests MultipleExclusionConstraints complex
+// TestMultipleExclusionConstraints_Complex tests MultipleExclusionConstraints complex.
 func TestMultipleExclusionConstraints_Complex(t *testing.T) {
 	type Subscription struct {
 		Status             string `json:"status" pedantigo:"required"`
@@ -698,7 +601,7 @@ func TestMultipleExclusionConstraints_Complex(t *testing.T) {
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -777,7 +680,7 @@ func TestConditionalExclusion_RealWorldPaymentExample(t *testing.T) {
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

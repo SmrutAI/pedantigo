@@ -12,7 +12,7 @@
 //	user, errs := validator.Unmarshal(jsonData)
 package pedantigo
 
-// Validatable is an interface for types that implement custom validation
+// Validatable is an interface for types that implement custom validation.
 type Validatable interface {
 	Validate() error
 }

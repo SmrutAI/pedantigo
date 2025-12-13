@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// SetFieldValue sets a field value from a JSON value
+// SetFieldValue sets a field value from a JSON value.
 func SetFieldValue(
 	fieldValue reflect.Value,
 	inValue any,
@@ -65,7 +65,7 @@ func SetFieldValue(
 			// Parse RFC3339 format (same as Go's encoding/json package)
 			t, err := time.Parse(time.RFC3339, inVal.String())
 			if err != nil {
-				return fmt.Errorf("failed to parse time: %v", err)
+				return fmt.Errorf("failed to parse time: %w", err)
 			}
 			fieldValue.Set(reflect.ValueOf(t))
 			return nil
@@ -77,13 +77,13 @@ func SetFieldValue(
 		// Re-marshal the map and unmarshal into the struct
 		jsonBytes, err := json.Marshal(inValue)
 		if err != nil {
-			return fmt.Errorf("failed to marshal nested struct: %v", err)
+			return fmt.Errorf("failed to marshal nested struct: %w", err)
 		}
 
 		// Create a new instance of the target type
 		newStruct := reflect.New(fieldType)
 		if err := json.Unmarshal(jsonBytes, newStruct.Interface()); err != nil {
-			return fmt.Errorf("failed to unmarshal nested struct: %v", err)
+			return fmt.Errorf("failed to unmarshal nested struct: %w", err)
 		}
 
 		fieldValue.Set(newStruct.Elem())
@@ -101,9 +101,10 @@ func SetFieldValue(
 	}
 
 	// Handle type conversion
-	if inVal.Type().AssignableTo(fieldType) {
+	switch {
+	case inVal.Type().AssignableTo(fieldType):
 		fieldValue.Set(inVal)
-	} else if inVal.Type().ConvertibleTo(fieldType) {
+	case inVal.Type().ConvertibleTo(fieldType):
 		// Block nonsensical conversions (e.g., int→string which converts to rune)
 		// Allow only meaningful conversions between numeric types or within same kind
 		if isValidConversion(inVal.Type(), fieldType) {
@@ -111,7 +112,7 @@ func SetFieldValue(
 		} else {
 			return fmt.Errorf("cannot convert %v to %v", inVal.Type(), fieldType)
 		}
-	} else {
+	default:
 		return fmt.Errorf("cannot convert %v to %v", inVal.Type(), fieldType)
 	}
 
@@ -119,7 +120,7 @@ func SetFieldValue(
 }
 
 // isValidConversion checks if a type conversion is semantically valid for JSON deserialization
-// Blocks nonsensical conversions like int→string (which would convert to rune)
+// Blocks nonsensical conversions like int→string (which would convert to rune).
 func isValidConversion(from, to reflect.Type) bool {
 	fromKind := from.Kind()
 	toKind := to.Kind()
@@ -147,7 +148,7 @@ func isValidConversion(from, to reflect.Type) bool {
 	return false
 }
 
-// isNumericKind checks if a kind is a numeric type
+// isNumericKind checks if a kind is a numeric type.
 func isNumericKind(k reflect.Kind) bool {
 	switch k {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
@@ -268,11 +269,12 @@ func setMapField(
 
 		// Convert key if needed
 		var convertedKey reflect.Value
-		if key.Type().AssignableTo(keyType) {
+		switch {
+		case key.Type().AssignableTo(keyType):
 			convertedKey = key
-		} else if key.Type().ConvertibleTo(keyType) {
+		case key.Type().ConvertibleTo(keyType):
 			convertedKey = key.Convert(keyType)
-		} else {
+		default:
 			return fmt.Errorf("cannot convert map key %v to %v", key.Type(), keyType)
 		}
 
@@ -306,7 +308,7 @@ func setMapField(
 	return nil
 }
 
-// SetDefaultValue sets a default value on a field
+// SetDefaultValue sets a default value on a field.
 func SetDefaultValue(fieldValue reflect.Value, defaultValue string, recursiveSetFunc func(fieldValue reflect.Value, defaultValue string)) {
 	if !fieldValue.CanSet() {
 		return
