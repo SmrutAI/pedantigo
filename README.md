@@ -10,6 +10,17 @@ go get github.com/SmrutAI/Pedantigo
 
 Requires Go 1.25.4+
 
+## When to Use Pedantigo
+
+| Use Case | Why Pedantigo? |
+|----------|----------------|
+| **API Request Validation** | Validate incoming JSON, return structured errors |
+| **LLM Structured Output** | Generate JSON Schema for function calling, validate responses |
+| **Configuration Files** | Parse config with defaults, fail fast on invalid values |
+| **Data Pipeline Input** | Ensure data quality at ingestion with detailed error paths |
+
+Pedantigo combines JSON unmarshaling with validation in a single step. Define constraints once in struct tags, get validated data and JSON Schema automatically.
+
 ## Quick Start
 
 ```go
@@ -24,6 +35,10 @@ if err != nil {
     // Handle validation errors
 }
 ```
+
+> **Two Ways to Validate:**
+> - `Unmarshal(jsonBytes)` — Parse JSON and validate in one step
+> - `Validate(structPtr)` — Validate an existing Go struct
 
 ## Feature Coverage
 
@@ -40,6 +55,32 @@ validator := pedantigo.New[User]()
 ```
 
 The validator is built once and can be reused. It pre-compiles all validation rules for performance.
+
+### Reuse Validators for Performance
+
+Create validators ONCE and reuse them. Don't create a new validator every time.
+
+```go
+// DO: Create once, reuse many times
+var userValidator = pedantigo.New[User]()  // Package-level
+
+// OR store in a struct
+type Service struct {
+    userValidator *pedantigo.Validator[User]
+}
+
+func NewService() *Service {
+    return &Service{userValidator: pedantigo.New[User]()}
+}
+
+// DON'T: Create per-request (loses caching benefit!)
+func HandleRequest(data []byte) (*User, error) {
+    v := pedantigo.New[User]()  // Wasteful! Rebuilds every time
+    return v.Unmarshal(data)
+}
+```
+
+**Why reuse?** `New[T]()` parses struct tags and compiles validation rules. Creating it once avoids repeated reflection overhead. Schema generation (`validator.Schema()`) is also cached.
 
 ### Validation Tags
 
@@ -81,6 +122,8 @@ fmt.Printf("User: %+v\n", user)
 
 Use `Validate()` on structs you created manually:
 
+NOTE: Unlike JSON, for structs, required fields cannot be verified for missing values. (In Go, structs never have missing values)
+
 ```go
 user := &User{
     Email: "invalid-email",
@@ -108,36 +151,51 @@ Alternatively, use pointer types (`*int`, `*bool`, `*string`) where `nil` indica
 
 ### Available Constraints
 
-| Constraint | Description | Example |
-|------------|-------------|---------|
-| `required` | Field must be present in JSON | `pedantigo:"required"` |
-| `min` | Minimum value (numbers) or length (strings/slices) | `pedantigo:"min=18"` |
-| `max` | Maximum value (numbers) or length (strings/slices) | `pedantigo:"max=100"` |
-| `gt` | Greater than (numbers only) | `pedantigo:"gt=0"` |
-| `gte` | Greater than or equal (numbers only) | `pedantigo:"gte=1"` |
-| `lt` | Less than (numbers only) | `pedantigo:"lt=100"` |
-| `lte` | Less than or equal (numbers only) | `pedantigo:"lte=99"` |
-| `email` | Valid email address | `pedantigo:"email"` |
-| `url` | Valid URL | `pedantigo:"url"` |
-| `uuid` | Valid UUID | `pedantigo:"uuid"` |
-| `ipv4` | Valid IPv4 address | `pedantigo:"ipv4"` |
-| `ipv6` | Valid IPv6 address | `pedantigo:"ipv6"` |
-| `regexp` | Match regular expression | `pedantigo:"regexp=^[A-Z]+$"` |
-| `oneof` | Value must be one of specified options | `pedantigo:"oneof=red green blue"` |
-| `eqfield` | Field equals another field | `pedantigo:"eqfield=Password"` |
-| `nefield` | Field not equal to another field | `pedantigo:"nefield=OldPassword"` |
-| `gtfield` | Greater than another field | `pedantigo:"gtfield=MinPrice"` |
-| `gtefield` | Greater than or equal to another field | `pedantigo:"gtefield=StartDate"` |
-| `ltfield` | Less than another field | `pedantigo:"ltfield=MaxPrice"` |
-| `ltefield` | Less than or equal to another field | `pedantigo:"ltefield=EndDate"` |
-| `required_if` | Required if another field has value | `pedantigo:"required_if=Country:USA"` |
-| `required_unless` | Required unless another field has value | `pedantigo:"required_unless=Type:guest"` |
-| `required_with` | Required if another field is present | `pedantigo:"required_with=Address"` |
-| `required_without` | Required if another field is absent | `pedantigo:"required_without=Email"` |
-| `excluded_if` | Excluded if another field has value | `pedantigo:"excluded_if=Type admin"` |
-| `excluded_unless` | Excluded unless another field has value | `pedantigo:"excluded_unless=Role user"` |
-| `excluded_with` | Excluded if another field is present | `pedantigo:"excluded_with=TempToken"` |
-| `excluded_without` | Excluded if another field is absent | `pedantigo:"excluded_without=PermanentID"` |
+| Constraint         | Description                                        | Example                                    |
+|--------------------|----------------------------------------------------|--------------------------------------------|
+| `required`         | Field must be present in JSON                      | `pedantigo:"required"`                     |
+| `min`              | Minimum value (numbers) or length (strings/slices) | `pedantigo:"min=18"`                       |
+| `max`              | Maximum value (numbers) or length (strings/slices) | `pedantigo:"max=100"`                      |
+| `gt`               | Greater than (numbers only)                        | `pedantigo:"gt=0"`                         |
+| `gte`              | Greater than or equal (numbers only)               | `pedantigo:"gte=1"`                        |
+| `lt`               | Less than (numbers only)                           | `pedantigo:"lt=100"`                       |
+| `lte`              | Less than or equal (numbers only)                  | `pedantigo:"lte=99"`                       |
+| `email`            | Valid email address                                | `pedantigo:"email"`                        |
+| `url`              | Valid URL                                          | `pedantigo:"url"`                          |
+| `uuid`             | Valid UUID                                         | `pedantigo:"uuid"`                         |
+| `ipv4`             | Valid IPv4 address                                 | `pedantigo:"ipv4"`                         |
+| `ipv6`             | Valid IPv6 address                                 | `pedantigo:"ipv6"`                         |
+| `regexp`           | Match regular expression                           | `pedantigo:"regexp=^[A-Z]+$"`              |
+| `oneof`            | Value must be one of specified options             | `pedantigo:"oneof=red green blue"`         |
+| `eqfield`          | Field equals another field                         | `pedantigo:"eqfield=Password"`             |
+| `nefield`          | Field not equal to another field                   | `pedantigo:"nefield=OldPassword"`          |
+| `gtfield`          | Greater than another field                         | `pedantigo:"gtfield=MinPrice"`             |
+| `gtefield`         | Greater than or equal to another field             | `pedantigo:"gtefield=StartDate"`           |
+| `ltfield`          | Less than another field                            | `pedantigo:"ltfield=MaxPrice"`             |
+| `ltefield`         | Less than or equal to another field                | `pedantigo:"ltefield=EndDate"`             |
+| `required_if`      | Required if another field has value                | `pedantigo:"required_if=Country:USA"`      |
+| `required_unless`  | Required unless another field has value            | `pedantigo:"required_unless=Type:guest"`   |
+| `required_with`    | Required if another field is present               | `pedantigo:"required_with=Address"`        |
+| `required_without` | Required if another field is absent                | `pedantigo:"required_without=Email"`       |
+| `excluded_if`      | Excluded if another field has value                | `pedantigo:"excluded_if=Type admin"`       |
+| `excluded_unless`  | Excluded unless another field has value            | `pedantigo:"excluded_unless=Role user"`    |
+| `excluded_with`    | Excluded if another field is present               | `pedantigo:"excluded_with=TempToken"`      |
+| `excluded_without` | Excluded if another field is absent                | `pedantigo:"excluded_without=PermanentID"` |
+| `len`              | Exact length (strings/slices)                      | `pedantigo:"len=10"`                       |
+| `alpha`            | Letters only                                       | `pedantigo:"alpha"`                        |
+| `alphanum`         | Letters and numbers only                           | `pedantigo:"alphanum"`                     |
+| `ascii`            | ASCII characters only                              | `pedantigo:"ascii"`                        |
+| `lowercase`        | Must be lowercase                                  | `pedantigo:"lowercase"`                    |
+| `uppercase`        | Must be uppercase                                  | `pedantigo:"uppercase"`                    |
+| `contains`         | Must contain substring                             | `pedantigo:"contains=@"`                   |
+| `excludes`         | Must not contain substring                         | `pedantigo:"excludes=<"`                   |
+| `startswith`       | Must start with prefix                             | `pedantigo:"startswith=http"`              |
+| `endswith`         | Must end with suffix                               | `pedantigo:"endswith=.com"`                |
+| `positive`         | Must be > 0 (numbers only)                         | `pedantigo:"positive"`                     |
+| `negative`         | Must be < 0 (numbers only)                         | `pedantigo:"negative"`                     |
+| `multiple_of`      | Must be divisible by value                         | `pedantigo:"multiple_of=5"`                |
+| `max_digits`       | Maximum total digits                               | `pedantigo:"max_digits=10"`                |
+| `decimal_places`   | Maximum decimal places                             | `pedantigo:"decimal_places=2"`             |
 
 Combine multiple constraints with commas: `pedantigo:"required,min=3,max=50"`
 
@@ -284,7 +342,7 @@ schema := validator.Schema()
 // Generates fully nested schema with all constraints
 ```
 
-## Advanced: OpenAPI Schema (Optional)
+## Advanced: OpenAPI/Swagger Schema (Optional)
 
 For OpenAPI specifications and Swagger documentation, use schemas with `$ref` for reusable type definitions.
 
@@ -363,12 +421,15 @@ Constraints are applied to all definitions, including referenced types.
 
 ## Advanced: Performance Mode (Optional)
 
+A lot of gophers like the zero-values, and don't want to have even the slightest performance drop that comes with additional validations.
+For them, we have a bypass to continue using Go's zero-value based validations.
+
 Skip required-field checking and default-value application for better performance when using Go's zero-value semantics.
 
 ### When to Use
 
 Use `StrictMissingFields: false` when:
-- You handle optionality with pointers (`*int`, `*bool`)
+- You can handle optionality with pointers (`*int`, `*bool`)
 - You prefer zero values over explicit defaults
 - You don't need "field required" errors
 
@@ -473,7 +534,7 @@ Some design decisions differ from Pydantic due to Go's type system:
 
 - **[Why No `.model_rebuild()`?](documents/nuances/model_rebuild.md)** — Go resolves types at compile-time using pointers; no runtime forward reference resolution needed.
 
-- **[Computed Fields](documents/nuances/computed_derived_fields.md)** — Go uses `MarshalJSON()` interface instead of decorators. More boilerplate, but zero runtime overhead.
+- **[How to create Computed Fields](documents/nuances/computed_derived_fields.md)** — Go uses `MarshalJSON()` interface instead of decorators. More boilerplate, but zero runtime overhead.
 
 I will revisit these based on what the community prefers.
 

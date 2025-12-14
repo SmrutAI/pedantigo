@@ -9,28 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/SmrutAI/Pedantigo/internal/constraints"
+	"github.com/SmrutAI/Pedantigo/internal/tags"
 )
 
-// parseTestTag is a test helper that parses pedantigo:"..." tags.
-func parseTestTag(tag reflect.StructTag) map[string]string {
-	tagStr := tag.Get("pedantigo")
-	if tagStr == "" {
-		return nil
-	}
-
-	result := make(map[string]string)
-	pairs := splitTagPairs(tagStr)
-	for _, pair := range pairs {
-		key, value := parseTagPair(pair)
-		if key != "" {
-			result[key] = value
-		}
-	}
-	if len(result) == 0 {
-		return nil
-	}
-	return result
-}
+// parseTestTag wraps tags.ParseTagWithDive for test use.
+var parseTestTag = tags.ParseTagWithDive
 
 // buildTestConstraints wraps constraints.BuildConstraints to return ConstraintValidator.
 func buildTestConstraints(constraintsMap map[string]string, fieldType reflect.Type) []ConstraintValidator {
@@ -40,79 +23,6 @@ func buildTestConstraints(constraintsMap map[string]string, fieldType reflect.Ty
 		validators[i] = c
 	}
 	return validators
-}
-
-// splitTagPairs splits comma-separated tag pairs, handling values with commas.
-func splitTagPairs(tag string) []string {
-	var pairs []string
-	var current string
-	inValue := false
-
-	for i := 0; i < len(tag); i++ {
-		c := tag[i]
-		switch {
-		case c == '=':
-			inValue = true
-			current += string(c)
-		case c == ',' && !inValue:
-			if current != "" {
-				pairs = append(pairs, current)
-				current = ""
-			}
-		default:
-			if c == ',' && inValue {
-				// Check if this comma is really the end of a value.
-				// Simple heuristic: if next char is a letter, it's a new pair.
-				if i+1 < len(tag) && isLetter(tag[i+1]) {
-					pairs = append(pairs, current)
-					current = ""
-					inValue = false
-				} else {
-					current += string(c)
-				}
-			} else {
-				current += string(c)
-				if c == ',' {
-					inValue = false
-				}
-			}
-		}
-	}
-	if current != "" {
-		pairs = append(pairs, current)
-	}
-	return pairs
-}
-
-func isLetter(b byte) bool {
-	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
-}
-
-// parseTagPair splits a single tag pair (e.g., "min=18" or "required").
-func parseTagPair(pair string) (key, value string) {
-	pair = trimSpace(pair)
-	if pair == "" {
-		return "", ""
-	}
-
-	for i := 0; i < len(pair); i++ {
-		if pair[i] == '=' {
-			return pair[:i], pair[i+1:]
-		}
-	}
-	return pair, ""
-}
-
-func trimSpace(s string) string {
-	start := 0
-	end := len(s)
-	for start < end && s[start] == ' ' {
-		start++
-	}
-	for end > start && s[end-1] == ' ' {
-		end--
-	}
-	return s[start:end]
 }
 
 // TestValidate_FlatStruct tests validation of simple structs with multiple constraints.
@@ -320,10 +230,10 @@ func TestValidate_NestedStruct(t *testing.T) {
 	}
 }
 
-// TestValidate_Slices tests validation of slice elements.
+// TestValidate_Slices tests validation of slice elements with dive.
 func TestValidate_Slices(t *testing.T) {
 	type Team struct {
-		Members []string `pedantigo:"min=1"`
+		Members []string `pedantigo:"dive,min=2"` // dive + each element min 2 chars
 	}
 
 	tests := []struct {
@@ -340,27 +250,217 @@ func TestValidate_Slices(t *testing.T) {
 		{
 			name:     "one element too short",
 			input:    Team{Members: []string{"Alice", "B", "Charlie"}},
-			wantErrs: 0, // "B" has length 1, satisfies min=1
+			wantErrs: 1, // "B" has length 1, needs min=2
 			errCheck: func(t *testing.T, errs []FieldError) {
-				if len(errs) > 0 {
-					assert.Equal(t, "Members[1]", errs[0].Field)
-				}
+				require.NotEmpty(t, errs)
+				assert.Equal(t, "Members[1]", errs[0].Field)
 			},
 		},
 		{
 			name:     "multiple elements too short",
 			input:    Team{Members: []string{"Alice", "B", "C"}},
-			wantErrs: 0, // "B" and "C" have length 1, satisfy min=1
+			wantErrs: 2, // "B" and "C" both too short
 		},
 		{
 			name:     "empty slice",
 			input:    Team{Members: []string{}},
-			wantErrs: 0,
+			wantErrs: 0, // Empty slice is valid (no elements to validate)
 		},
 		{
 			name:     "nil slice",
 			input:    Team{Members: nil},
+			wantErrs: 0, // Nil slice is valid (no elements to validate)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := ValidateValue(
+				reflect.ValueOf(tt.input),
+				"",
+				false,
+				parseTestTag,
+				buildTestConstraints,
+				func(val reflect.Value, path string) []FieldError {
+					return ValidateValue(val, path, false, parseTestTag, buildTestConstraints, nil)
+				},
+			)
+
+			assert.Len(t, errs, tt.wantErrs)
+
+			if tt.errCheck != nil {
+				tt.errCheck(t, errs)
+			}
+		})
+	}
+}
+
+// TestValidate_SliceCollectionConstraints tests that constraints apply to collection without dive.
+func TestValidate_SliceCollectionConstraints(t *testing.T) {
+	type Config struct {
+		Tags []string `pedantigo:"min=2,max=4"` // Collection: 2-4 elements required
+	}
+
+	tests := []struct {
+		name     string
+		input    Config
+		wantErrs int
+		errCheck func(t *testing.T, errs []FieldError)
+	}{
+		{
+			name:     "valid - 3 elements within range",
+			input:    Config{Tags: []string{"a", "b", "c"}},
 			wantErrs: 0,
+		},
+		{
+			name:     "valid - exactly 2 elements (min)",
+			input:    Config{Tags: []string{"a", "b"}},
+			wantErrs: 0,
+		},
+		{
+			name:     "valid - exactly 4 elements (max)",
+			input:    Config{Tags: []string{"a", "b", "c", "d"}},
+			wantErrs: 0,
+		},
+		{
+			name:     "invalid - only 1 element (below min)",
+			input:    Config{Tags: []string{"a"}},
+			wantErrs: 1,
+			errCheck: func(t *testing.T, errs []FieldError) {
+				require.NotEmpty(t, errs)
+				assert.Equal(t, "Tags", errs[0].Field) // Error on collection, not element
+				assert.Contains(t, errs[0].Message, "at least 2")
+			},
+		},
+		{
+			name:     "invalid - 5 elements (above max)",
+			input:    Config{Tags: []string{"a", "b", "c", "d", "e"}},
+			wantErrs: 1,
+			errCheck: func(t *testing.T, errs []FieldError) {
+				require.NotEmpty(t, errs)
+				assert.Equal(t, "Tags", errs[0].Field)
+				assert.Contains(t, errs[0].Message, "at most 4")
+			},
+		},
+		{
+			name:     "invalid - empty slice (below min)",
+			input:    Config{Tags: []string{}},
+			wantErrs: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := ValidateValue(
+				reflect.ValueOf(tt.input),
+				"",
+				false,
+				parseTestTag,
+				buildTestConstraints,
+				func(val reflect.Value, path string) []FieldError {
+					return ValidateValue(val, path, false, parseTestTag, buildTestConstraints, nil)
+				},
+			)
+
+			assert.Len(t, errs, tt.wantErrs)
+
+			if tt.errCheck != nil {
+				tt.errCheck(t, errs)
+			}
+		})
+	}
+}
+
+// TestValidate_SliceMixedConstraints tests both collection and element constraints.
+func TestValidate_SliceMixedConstraints(t *testing.T) {
+	type Config struct {
+		Tags []string `pedantigo:"min=2,dive,min=3"` // min=2 on collection, min=3 on elements
+	}
+
+	tests := []struct {
+		name     string
+		input    Config
+		wantErrs int
+		errCheck func(t *testing.T, errs []FieldError)
+	}{
+		{
+			name:     "valid - 2 elements, each 3+ chars",
+			input:    Config{Tags: []string{"abc", "def"}},
+			wantErrs: 0,
+		},
+		{
+			name:     "invalid - only 1 element (collection constraint)",
+			input:    Config{Tags: []string{"abc"}},
+			wantErrs: 1,
+			errCheck: func(t *testing.T, errs []FieldError) {
+				require.NotEmpty(t, errs)
+				assert.Equal(t, "Tags", errs[0].Field) // Collection error
+			},
+		},
+		{
+			name:     "invalid - element too short (element constraint)",
+			input:    Config{Tags: []string{"abc", "ab"}}, // "ab" is < 3 chars
+			wantErrs: 1,
+			errCheck: func(t *testing.T, errs []FieldError) {
+				require.NotEmpty(t, errs)
+				assert.Equal(t, "Tags[1]", errs[0].Field) // Element error
+			},
+		},
+		{
+			name:     "invalid - both constraints violated",
+			input:    Config{Tags: []string{"ab"}}, // 1 element < 2, and "ab" < 3 chars
+			wantErrs: 2,                            // Both collection AND element errors
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := ValidateValue(
+				reflect.ValueOf(tt.input),
+				"",
+				false,
+				parseTestTag,
+				buildTestConstraints,
+				func(val reflect.Value, path string) []FieldError {
+					return ValidateValue(val, path, false, parseTestTag, buildTestConstraints, nil)
+				},
+			)
+
+			assert.Len(t, errs, tt.wantErrs)
+
+			if tt.errCheck != nil {
+				tt.errCheck(t, errs)
+			}
+		})
+	}
+}
+
+// TestValidate_SliceNoDive tests that constraints without dive apply to collection, not elements.
+func TestValidate_SliceNoDive(t *testing.T) {
+	type Config struct {
+		Tags []string `pedantigo:"min=2"` // Without dive: min applies to element COUNT
+	}
+
+	tests := []struct {
+		name     string
+		input    Config
+		wantErrs int
+		errCheck func(t *testing.T, errs []FieldError)
+	}{
+		{
+			name:     "valid - 2 short elements (min applies to count, not length)",
+			input:    Config{Tags: []string{"a", "b"}}, // Elements are 1 char, but that's OK
+			wantErrs: 0,
+		},
+		{
+			name:     "invalid - 1 element (count < 2)",
+			input:    Config{Tags: []string{"verylongstring"}}, // Long element but only 1
+			wantErrs: 1,
+			errCheck: func(t *testing.T, errs []FieldError) {
+				require.NotEmpty(t, errs)
+				assert.Equal(t, "Tags", errs[0].Field)
+				assert.Contains(t, errs[0].Message, "at least 2")
+			},
 		},
 	}
 
@@ -454,7 +554,7 @@ func TestValidate_SliceOfStructs(t *testing.T) {
 // TestValidate_Maps tests validation of map values.
 func TestValidate_Maps(t *testing.T) {
 	type Scores struct {
-		Values map[string]int `pedantigo:"min=0,max=100"`
+		Values map[string]int `pedantigo:"dive,min=0,max=100"`
 	}
 
 	tests := []struct {
@@ -500,6 +600,128 @@ func TestValidate_Maps(t *testing.T) {
 			name:     "nil map",
 			input:    Scores{Values: nil},
 			wantErrs: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := ValidateValue(
+				reflect.ValueOf(tt.input),
+				"",
+				false,
+				parseTestTag,
+				buildTestConstraints,
+				func(val reflect.Value, path string) []FieldError {
+					return ValidateValue(val, path, false, parseTestTag, buildTestConstraints, nil)
+				},
+			)
+
+			assert.Len(t, errs, tt.wantErrs)
+
+			if tt.errCheck != nil {
+				tt.errCheck(t, errs)
+			}
+		})
+	}
+}
+
+// TestValidate_MapCollectionConstraints tests that constraints apply to map entry count without dive.
+func TestValidate_MapCollectionConstraints(t *testing.T) {
+	type Config struct {
+		Settings map[string]string `pedantigo:"min=2,max=3"` // Collection: 2-3 entries required
+	}
+
+	tests := []struct {
+		name     string
+		input    Config
+		wantErrs int
+		errCheck func(t *testing.T, errs []FieldError)
+	}{
+		{
+			name:     "valid - 2 entries",
+			input:    Config{Settings: map[string]string{"a": "1", "b": "2"}},
+			wantErrs: 0,
+		},
+		{
+			name:     "valid - 3 entries (max)",
+			input:    Config{Settings: map[string]string{"a": "1", "b": "2", "c": "3"}},
+			wantErrs: 0,
+		},
+		{
+			name:     "invalid - only 1 entry (below min)",
+			input:    Config{Settings: map[string]string{"a": "1"}},
+			wantErrs: 1,
+			errCheck: func(t *testing.T, errs []FieldError) {
+				require.NotEmpty(t, errs)
+				assert.Equal(t, "Settings", errs[0].Field)
+				assert.Contains(t, errs[0].Message, "at least 2")
+			},
+		},
+		{
+			name:     "invalid - 4 entries (above max)",
+			input:    Config{Settings: map[string]string{"a": "1", "b": "2", "c": "3", "d": "4"}},
+			wantErrs: 1,
+			errCheck: func(t *testing.T, errs []FieldError) {
+				require.NotEmpty(t, errs)
+				assert.Equal(t, "Settings", errs[0].Field)
+				assert.Contains(t, errs[0].Message, "at most 3")
+			},
+		},
+		{
+			name:     "invalid - empty map",
+			input:    Config{Settings: map[string]string{}},
+			wantErrs: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := ValidateValue(
+				reflect.ValueOf(tt.input),
+				"",
+				false,
+				parseTestTag,
+				buildTestConstraints,
+				func(val reflect.Value, path string) []FieldError {
+					return ValidateValue(val, path, false, parseTestTag, buildTestConstraints, nil)
+				},
+			)
+
+			assert.Len(t, errs, tt.wantErrs)
+
+			if tt.errCheck != nil {
+				tt.errCheck(t, errs)
+			}
+		})
+	}
+}
+
+// TestValidate_MapNoDive tests that constraints without dive apply to entry count, not values.
+func TestValidate_MapNoDive(t *testing.T) {
+	type Config struct {
+		Data map[string]string `pedantigo:"min=2"` // Without dive: min applies to entry COUNT
+	}
+
+	tests := []struct {
+		name     string
+		input    Config
+		wantErrs int
+		errCheck func(t *testing.T, errs []FieldError)
+	}{
+		{
+			name:     "valid - 2 entries with short values (min applies to count, not value length)",
+			input:    Config{Data: map[string]string{"a": "x", "b": "y"}}, // Values are 1 char, but that's OK
+			wantErrs: 0,
+		},
+		{
+			name:     "invalid - 1 entry (count < 2)",
+			input:    Config{Data: map[string]string{"key": "verylongvalue"}}, // Long value but only 1 entry
+			wantErrs: 1,
+			errCheck: func(t *testing.T, errs []FieldError) {
+				require.NotEmpty(t, errs)
+				assert.Equal(t, "Data", errs[0].Field)
+				assert.Contains(t, errs[0].Message, "at least 2")
+			},
 		},
 	}
 

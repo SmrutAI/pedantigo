@@ -1173,7 +1173,7 @@ func TestEnum(t *testing.T) {
 
 			case "slice":
 				type Config struct {
-					Roles []string `json:"roles" pedantigo:"oneof=admin user guest"`
+					Roles []string `json:"roles" pedantigo:"dive,oneof=admin user guest"`
 				}
 				validator := New[Config]()
 				_, err := validator.Unmarshal([]byte(tt.json))
@@ -1191,7 +1191,7 @@ func TestEnum(t *testing.T) {
 
 			case "map":
 				type Config struct {
-					Permissions map[string]string `json:"permissions" pedantigo:"oneof=read write execute"`
+					Permissions map[string]string `json:"permissions" pedantigo:"dive,oneof=read write execute"`
 				}
 				validator := New[Config]()
 				_, err := validator.Unmarshal([]byte(tt.json))

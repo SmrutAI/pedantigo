@@ -37,3 +37,103 @@ func ParseTag(tag reflect.StructTag) map[string]string {
 
 	return constraints
 }
+
+// ParseTagWithDive parses a struct tag and returns a structured ParsedTag
+// that separates collection-level, key-level, and element-level constraints.
+//
+// Syntax:
+//   - pedantigo:"min=3"                    -> CollectionConstraints only
+//   - pedantigo:"dive,email"               -> ElementConstraints only (dive present)
+//   - pedantigo:"min=3,dive,min=5"         -> Both collection and element
+//   - pedantigo:"dive,keys,min=2,endkeys,email" -> Map: key + value constraints
+func ParseTagWithDive(tag reflect.StructTag) *ParsedTag {
+	validateTag := tag.Get("pedantigo")
+	if validateTag == "" {
+		return nil
+	}
+
+	parsed := &ParsedTag{
+		CollectionConstraints: make(map[string]string),
+		KeyConstraints:        make(map[string]string),
+		ElementConstraints:    make(map[string]string),
+	}
+
+	parts := strings.Split(validateTag, ",")
+
+	// State machine states
+	const (
+		stateCollection = iota
+		stateDive
+		stateKeysSection
+		stateElementAfterKeys
+		stateElement
+	)
+
+	state := stateCollection
+	var keysFound bool
+	var endkeysFound bool
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		// Handle special keywords
+		if part == "dive" {
+			if state == stateCollection {
+				parsed.DivePresent = true
+				state = stateDive
+			}
+			continue
+		}
+
+		if part == "keys" {
+			if state != stateDive {
+				panic("'keys' can only appear after 'dive'")
+			}
+			keysFound = true
+			state = stateKeysSection
+			continue
+		}
+
+		if part == "endkeys" {
+			if !keysFound {
+				panic("'endkeys' without preceding 'keys'")
+			}
+			endkeysFound = true
+			state = stateElementAfterKeys
+			continue
+		}
+
+		// Parse constraint (key=value or bare keyword)
+		var constraintName, constraintValue string
+		if idx := strings.IndexByte(part, '='); idx != -1 {
+			constraintName = strings.TrimSpace(part[:idx])
+			constraintValue = strings.TrimSpace(part[idx+1:])
+		} else {
+			constraintName = part
+			constraintValue = ""
+		}
+
+		// Add to appropriate map based on current state
+		switch state {
+		case stateCollection:
+			parsed.CollectionConstraints[constraintName] = constraintValue
+		case stateDive:
+			parsed.ElementConstraints[constraintName] = constraintValue
+		case stateKeysSection:
+			parsed.KeyConstraints[constraintName] = constraintValue
+		case stateElementAfterKeys, stateElement:
+			parsed.ElementConstraints[constraintName] = constraintValue
+			state = stateElement
+		}
+	}
+
+	// Validation: if keys was found, endkeys must also be found
+	if keysFound && !endkeysFound {
+		panic("'keys' without closing 'endkeys'")
+	}
+
+	return parsed
+}

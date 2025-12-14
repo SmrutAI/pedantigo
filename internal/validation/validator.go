@@ -3,6 +3,8 @@ package validation
 import (
 	"fmt"
 	"reflect"
+
+	"github.com/SmrutAI/Pedantigo/internal/tags"
 )
 
 // FieldError represents a validation error for a specific field
@@ -19,15 +21,15 @@ type ConstraintValidator interface {
 	Validate(value any) error
 }
 
-// TagParser is a function type for parsing struct tags.
-type TagParser func(tag reflect.StructTag) map[string]string
+// TagParser is a function type for parsing struct tags with dive support.
+type TagParser func(tag reflect.StructTag) *tags.ParsedTag
 
 // ConstraintBuilder is a function type for building constraint validators.
 type ConstraintBuilder func(constraints map[string]string, fieldType reflect.Type) []ConstraintValidator
 
-// ValidateValue recursively validates a reflected value.
+// ValidateValue recursively validates a reflected value with dive support.
+// Uses ParseTagWithDive to handle collection-level and element-level constraints.
 // NOTE: 'required' constraint is skipped (not built in BuildConstraints).
-// ValidateValue implements the functionality.
 func ValidateValue(
 	val reflect.Value,
 	path string,
@@ -69,21 +71,19 @@ func ValidateValue(
 			fieldPath = path + "." + field.Name
 		}
 
-		// Parse validation tags
-		constraintsMap := parseTagFunc(field.Tag)
-		if constraintsMap == nil {
+		// Parse validation tags with dive support
+		parsedTag := parseTagFunc(field.Tag)
+		if parsedTag == nil {
 			// No validation tags, but still check nested structs, slices, and maps
-
 			nestedErrors := validateNestedElements(fieldValue, recursiveValidateFunc, fieldPath)
 			errors = append(errors, nestedErrors...)
 			continue
 		}
 
 		// For nested structs (path != ""), check required fields
-		// This is needed because nested structs in slices are deserialized via json.Unmarshal
-		// which bypasses our custom required field checking in Unmarshal()
 		if path != "" && strictMissingFields {
-			if _, hasRequired := constraintsMap["required"]; hasRequired {
+			// Check if "required" is in CollectionConstraints (before dive)
+			if _, hasRequired := parsedTag.CollectionConstraints["required"]; hasRequired {
 				// Check if field is zero value (indicates it was missing from JSON)
 				if fieldValue.IsZero() {
 					errors = append(errors, FieldError{
@@ -97,18 +97,49 @@ func ValidateValue(
 			}
 		}
 
-		// Build constraint validators (required is already skipped in BuildConstraints)
-		validators := buildConstraintsFunc(constraintsMap, field.Type)
+		// Validate based on field kind
+		isCollection := fieldValue.Kind() == reflect.Slice || fieldValue.Kind() == reflect.Map
+		isMap := fieldValue.Kind() == reflect.Map
 
-		// For slices, validate each element instead of the slice itself
-		switch fieldValue.Kind() {
-		case reflect.Slice:
-			errors = append(errors, validateSliceElements(fieldValue, fieldPath, validators, recursiveValidateFunc)...)
-		case reflect.Map:
-			// For maps, validate each value instead of the map itself
-			errors = append(errors, validateMapElements(fieldValue, fieldPath, validators, recursiveValidateFunc)...)
-		default:
-			// For non-slice/map fields, apply constraints directly
+		// Panic checks for invalid tag combinations
+		if parsedTag.DivePresent && !isCollection {
+			panic(fmt.Sprintf("field %s.%s: 'dive' can only be used on slice or map types, got %s",
+				typ.Name(), field.Name, fieldValue.Kind()))
+		}
+
+		if len(parsedTag.KeyConstraints) > 0 && !isMap {
+			panic(fmt.Sprintf("field %s.%s: 'keys' can only be used on map types, got %s",
+				typ.Name(), field.Name, fieldValue.Kind()))
+		}
+
+		// Validate based on field type
+		if isCollection {
+			// Always apply collection-level constraints first (constraints before dive)
+			if len(parsedTag.CollectionConstraints) > 0 {
+				collectionValidators := buildConstraintsFunc(parsedTag.CollectionConstraints, field.Type)
+				errors = append(errors, validateScalarField(fieldValue, fieldPath, collectionValidators, recursiveValidateFunc)...)
+			}
+
+			if parsedTag.DivePresent {
+				// Dive into collection: validate elements with ElementConstraints
+				elementValidators := buildConstraintsFunc(parsedTag.ElementConstraints, field.Type.Elem())
+				if isMap {
+					// Map with dive support
+					errors = append(errors, validateMapElementsWithDive(
+						fieldValue, fieldPath, elementValidators, parsedTag.KeyConstraints,
+						buildConstraintsFunc, field.Type.Key(), recursiveValidateFunc)...)
+				} else {
+					// Slice with dive support
+					errors = append(errors, validateSliceElements(fieldValue, fieldPath, elementValidators, recursiveValidateFunc)...)
+				}
+			} else {
+				// No dive: still check nested structs in the collection
+				nestedErrors := validateNestedElements(fieldValue, recursiveValidateFunc, fieldPath)
+				errors = append(errors, nestedErrors...)
+			}
+		} else {
+			// Non-collection field: apply constraints directly
+			validators := buildConstraintsFunc(parsedTag.CollectionConstraints, field.Type)
 			errors = append(errors, validateScalarField(fieldValue, fieldPath, validators, recursiveValidateFunc)...)
 		}
 	}
@@ -180,21 +211,39 @@ func validateSliceElements(
 	return errors
 }
 
-func validateMapElements(
+func validateMapElementsWithDive(
 	fieldValue reflect.Value,
 	fieldPath string,
-	validators []ConstraintValidator,
+	elementValidators []ConstraintValidator,
+	keyConstraints map[string]string,
+	buildConstraintsFunc ConstraintBuilder,
+	keyType reflect.Type,
 	recursiveValidateFunc func(val reflect.Value, path string) []FieldError,
 ) []FieldError {
 	var errors []FieldError
+
+	// Build key validators
+	keyValidators := buildConstraintsFunc(keyConstraints, keyType)
+
 	iter := fieldValue.MapRange()
 	for iter.Next() {
 		mapKey := iter.Key()
 		mapValue := iter.Value()
 		mapPath := fmt.Sprintf("%s[%v]", fieldPath, mapKey.Interface())
 
-		// Apply constraints to each value
-		for _, validator := range validators {
+		// Validate keys if key constraints exist
+		for _, validator := range keyValidators {
+			if err := validator.Validate(mapKey.Interface()); err != nil {
+				errors = append(errors, FieldError{
+					Field:   mapPath,
+					Message: err.Error(),
+					Value:   mapKey.Interface(),
+				})
+			}
+		}
+
+		// Validate values
+		for _, validator := range elementValidators {
 			if err := validator.Validate(mapValue.Interface()); err != nil {
 				errors = append(errors, FieldError{
 					Field:   mapPath,

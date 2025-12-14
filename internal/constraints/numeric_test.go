@@ -63,6 +63,7 @@ func TestMaxConstraint(t *testing.T) {
 
 		// Invalid type
 		{name: "invalid type - bool", value: true, max: 100, wantErr: true},
+		// Note: slices use minLengthConstraint/maxLengthConstraint, not minConstraint/maxConstraint
 		{name: "invalid type - slice", value: []int{1, 2, 3}, max: 100, wantErr: true},
 	}
 
@@ -105,7 +106,16 @@ func TestMaxLengthConstraint(t *testing.T) {
 		// Invalid types
 		{name: "invalid type - int", value: 123, maxLength: 10, wantErr: true},
 		{name: "invalid type - bool", value: true, maxLength: 10, wantErr: true},
-		{name: "invalid type - slice", value: []string{"a", "b"}, maxLength: 10, wantErr: true},
+
+		// Slice support (for collection-level constraints)
+		{name: "slice below max length", value: []string{"a", "b"}, maxLength: 10, wantErr: false},
+		{name: "slice at max length", value: []string{"a", "b"}, maxLength: 2, wantErr: false},
+		{name: "slice exceeds max length", value: []string{"a", "b", "c"}, maxLength: 2, wantErr: true},
+
+		// Map support (for collection-level constraints)
+		{name: "map below max length", value: map[string]int{"a": 1}, maxLength: 10, wantErr: false},
+		{name: "map at max length", value: map[string]int{"a": 1, "b": 2}, maxLength: 2, wantErr: false},
+		{name: "map exceeds max length", value: map[string]int{"a": 1, "b": 2, "c": 3}, maxLength: 2, wantErr: true},
 	}
 
 	for _, tt := range tests {

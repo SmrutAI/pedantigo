@@ -60,6 +60,9 @@ func New[T any](opts ...ValidatorOptions) *Validator[T] {
 	// Build cross-field constraints at creation time (fail-fast)
 	validator.buildCrossFieldConstraints(typ)
 
+	// Validate dive/keys/endkeys tag usage at creation time (fail-fast)
+	validator.validateDiveTags(typ)
+
 	return validator
 }
 
@@ -92,6 +95,69 @@ func (v *Validator[T]) buildCrossFieldConstraints(typ reflect.Type) {
 		crossConstraints := constraints.BuildCrossFieldConstraintsForField(constraintsMap, typ, i)
 		if len(crossConstraints) > 0 {
 			v.fieldCrossConstraints[field.Name] = crossConstraints
+		}
+	}
+}
+
+// validateDiveTags validates that dive/keys/endkeys tags are used correctly.
+// This is called at creation time to fail fast on invalid tag combinations.
+func (v *Validator[T]) validateDiveTags(typ reflect.Type) {
+	// Handle pointer types
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+	}
+
+	if typ.Kind() != reflect.Struct {
+		return
+	}
+
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+
+		// Skip unexported fields
+		if !field.IsExported() {
+			continue
+		}
+
+		// Parse the tag with dive support
+		parsedTag := tags.ParseTagWithDive(field.Tag)
+		if parsedTag == nil {
+			continue
+		}
+
+		// Get the underlying field type (dereference pointers)
+		fieldType := field.Type
+		if fieldType.Kind() == reflect.Ptr {
+			fieldType = fieldType.Elem()
+		}
+
+		isCollection := fieldType.Kind() == reflect.Slice || fieldType.Kind() == reflect.Map
+		isMap := fieldType.Kind() == reflect.Map
+
+		// Panic: dive on non-collection field
+		if parsedTag.DivePresent && !isCollection {
+			panic(fmt.Sprintf("field %s.%s: 'dive' can only be used on slice or map types, got %s",
+				typ.Name(), field.Name, fieldType.Kind()))
+		}
+
+		// Panic: keys on non-map field
+		if len(parsedTag.KeyConstraints) > 0 && !isMap {
+			panic(fmt.Sprintf("field %s.%s: 'keys' can only be used on map types, got %s",
+				typ.Name(), field.Name, fieldType.Kind()))
+		}
+
+		// Recursively validate nested structs
+		switch fieldType.Kind() {
+		case reflect.Struct:
+			v.validateDiveTags(fieldType)
+		case reflect.Slice:
+			if fieldType.Elem().Kind() == reflect.Struct {
+				v.validateDiveTags(fieldType.Elem())
+			}
+		case reflect.Map:
+			if fieldType.Elem().Kind() == reflect.Struct {
+				v.validateDiveTags(fieldType.Elem())
+			}
 		}
 	}
 }
@@ -201,7 +267,7 @@ func (v *Validator[T]) validateValueInternal(
 		val,
 		path,
 		v.options.StrictMissingFields,
-		tags.ParseTag,
+		tags.ParseTagWithDive,
 		func(constraintsMap map[string]string, fieldType reflect.Type) []validation.ConstraintValidator {
 			// Wrap constraints.Constraint to validation.ConstraintValidator
 			constraintList := constraints.BuildConstraints(constraintsMap, fieldType)

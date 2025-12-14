@@ -112,37 +112,63 @@ func (c minConstraint) Validate(value any) error { return validateBound(value, c
 // maxConstraint validates that a numeric value is <= max.
 func (c maxConstraint) Validate(value any) error { return validateBound(value, c.max, boundMax) }
 
-// minLengthConstraint validates that a string has at least minLength characters.
+// minLengthConstraint validates length constraints for strings, slices, and maps.
 func (c minLengthConstraint) Validate(value any) error {
 	v, ok := derefValue(value)
 	if !ok {
 		return nil // Skip validation for invalid/nil values
 	}
 
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("min_length constraint requires string value")
+	var length int
+	var unitName string
+
+	switch v.Kind() {
+	case reflect.String:
+		length = len(v.String())
+		unitName = "characters"
+	case reflect.Slice, reflect.Array:
+		length = v.Len()
+		unitName = "elements"
+	case reflect.Map:
+		length = v.Len()
+		unitName = "entries"
+	default:
+		return fmt.Errorf("min constraint not supported for type %s", v.Kind())
 	}
 
-	if len(v.String()) < c.minLength {
-		return fmt.Errorf("must be at least %d characters", c.minLength)
+	if length < c.minLength {
+		return fmt.Errorf("must be at least %d %s", c.minLength, unitName)
 	}
 
 	return nil
 }
 
-// maxLengthConstraint validates that a string has at most maxLength characters.
+// maxLengthConstraint validates length constraints for strings, slices, and maps.
 func (c maxLengthConstraint) Validate(value any) error {
 	v, ok := derefValue(value)
 	if !ok {
 		return nil // Skip validation for invalid/nil values
 	}
 
-	if v.Kind() != reflect.String {
-		return fmt.Errorf("max_length constraint requires string value")
+	var length int
+	var unitName string
+
+	switch v.Kind() {
+	case reflect.String:
+		length = len(v.String())
+		unitName = "characters"
+	case reflect.Slice, reflect.Array:
+		length = v.Len()
+		unitName = "elements"
+	case reflect.Map:
+		length = v.Len()
+		unitName = "entries"
+	default:
+		return fmt.Errorf("max constraint not supported for type %s", v.Kind())
 	}
 
-	if len(v.String()) > c.maxLength {
-		return fmt.Errorf("must be at most %d characters", c.maxLength)
+	if length > c.maxLength {
+		return fmt.Errorf("must be at most %d %s", c.maxLength, unitName)
 	}
 
 	return nil
@@ -392,7 +418,7 @@ func buildMinConstraint(value string, fieldType reflect.Type) (Constraint, bool)
 		checkType = checkType.Elem()
 	}
 	kind := checkType.Kind()
-	if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
+	if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array || kind == reflect.Map {
 		return minLengthConstraint{minLength: minVal}, true
 	}
 	return minConstraint{min: minVal}, true
@@ -412,7 +438,7 @@ func buildMaxConstraint(value string, fieldType reflect.Type) (Constraint, bool)
 		checkType = checkType.Elem()
 	}
 	kind := checkType.Kind()
-	if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array {
+	if kind == reflect.String || kind == reflect.Slice || kind == reflect.Array || kind == reflect.Map {
 		return maxLengthConstraint{maxLength: maxVal}, true
 	}
 	return maxConstraint{max: maxVal}, true
