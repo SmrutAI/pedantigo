@@ -1,6 +1,7 @@
 package pedantigo
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -303,12 +304,27 @@ func (v *Validator[T]) Unmarshal(data []byte) (*T, error) {
 	// Fast path: skip 2-step flow if StrictMissingFields is disabled
 	if !v.options.StrictMissingFields {
 		var obj T
-		if err := json.Unmarshal(data, &obj); err != nil {
-			return nil, &ValidationError{
-				Errors: []FieldError{{
-					Field:   "root",
-					Message: fmt.Sprintf("JSON decode error: %v", err),
-				}},
+
+		// Use json.Decoder with DisallowUnknownFields for ExtraForbid
+		if v.options.ExtraFields == ExtraForbid {
+			decoder := json.NewDecoder(bytes.NewReader(data))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&obj); err != nil {
+				return &obj, &ValidationError{
+					Errors: []FieldError{{
+						Field:   "root",
+						Message: "JSON decode error: unknown field in JSON",
+					}},
+				}
+			}
+		} else {
+			if err := json.Unmarshal(data, &obj); err != nil {
+				return nil, &ValidationError{
+					Errors: []FieldError{{
+						Field:   "root",
+						Message: fmt.Sprintf("JSON decode error: %v", err),
+					}},
+				}
 			}
 		}
 
@@ -317,6 +333,21 @@ func (v *Validator[T]) Unmarshal(data []byte) (*T, error) {
 			return &obj, err
 		}
 		return &obj, nil
+	}
+
+	// Step 0.5: Pre-check for extra fields if ExtraForbid is set (handles nested structs)
+	if v.options.ExtraFields == ExtraForbid {
+		var obj T
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&obj); err != nil {
+			return &obj, &ValidationError{
+				Errors: []FieldError{{
+					Field:   "root",
+					Message: "unknown field in JSON",
+				}},
+			}
+		}
 	}
 
 	// Step 1: Unmarshal to map[string]any to detect which fields exist

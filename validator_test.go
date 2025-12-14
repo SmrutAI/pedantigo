@@ -1249,3 +1249,174 @@ func TestValidator_Dict_UnmarshalableType(t *testing.T) {
 	// Error could be from json.Unmarshal when it tries to parse nil bytes
 	// This is still validating that our error handling works
 }
+
+// ==================== Extra Fields Tests ====================
+
+// TestExtraFields_DefaultBehavior tests that default behavior ignores unknown fields.
+func TestExtraFields_DefaultBehavior(t *testing.T) {
+	type User struct {
+		Name string `json:"name" pedantigo:"required"`
+	}
+
+	// Default options (ExtraIgnore)
+	validator := New[User]()
+
+	// JSON with extra field "age" not in struct
+	jsonData := []byte(`{"name": "Alice", "age": 30}`)
+	user, err := validator.Unmarshal(jsonData)
+
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", user.Name)
+}
+
+// TestExtraFields_Ignore tests ExtraIgnore explicitly ignores unknown fields.
+func TestExtraFields_Ignore(t *testing.T) {
+	type User struct {
+		Name string `json:"name" pedantigo:"required"`
+	}
+
+	validator := New[User](ValidatorOptions{
+		StrictMissingFields: true,
+		ExtraFields:         ExtraIgnore,
+	})
+
+	// JSON with extra fields
+	jsonData := []byte(`{"name": "Bob", "email": "bob@test.com", "age": 25}`)
+	user, err := validator.Unmarshal(jsonData)
+
+	require.NoError(t, err)
+	assert.Equal(t, "Bob", user.Name)
+}
+
+// TestExtraFields_Forbid tests ExtraForbid rejects unknown fields.
+func TestExtraFields_Forbid(t *testing.T) {
+	type User struct {
+		Name string `json:"name" pedantigo:"required"`
+	}
+
+	validator := New[User](ValidatorOptions{
+		StrictMissingFields: true,
+		ExtraFields:         ExtraForbid,
+	})
+
+	tests := []struct {
+		name    string
+		json    string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "no extra fields - valid",
+			json:    `{"name": "Alice"}`,
+			wantErr: false,
+		},
+		{
+			name:    "one extra field - error",
+			json:    `{"name": "Alice", "age": 30}`,
+			wantErr: true,
+			errMsg:  "unknown field",
+		},
+		{
+			name:    "multiple extra fields - error",
+			json:    `{"name": "Alice", "age": 30, "email": "test@example.com"}`,
+			wantErr: true,
+			errMsg:  "unknown field",
+		},
+		{
+			name:    "nested extra field in root - error",
+			json:    `{"name": "Alice", "metadata": {"key": "value"}}`,
+			wantErr: true,
+			errMsg:  "unknown field",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			user, err := validator.Unmarshal([]byte(tt.json))
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+				// User should still be partially populated even with error
+				assert.NotNil(t, user)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, "Alice", user.Name)
+			}
+		})
+	}
+}
+
+// TestExtraFields_Forbid_NestedStruct tests ExtraForbid with nested structs.
+func TestExtraFields_Forbid_NestedStruct(t *testing.T) {
+	type Address struct {
+		City string `json:"city" pedantigo:"required"`
+	}
+	type User struct {
+		Name    string  `json:"name" pedantigo:"required"`
+		Address Address `json:"address"`
+	}
+
+	validator := New[User](ValidatorOptions{
+		StrictMissingFields: true,
+		ExtraFields:         ExtraForbid,
+	})
+
+	tests := []struct {
+		name    string
+		json    string
+		wantErr bool
+	}{
+		{
+			name:    "valid nested struct",
+			json:    `{"name": "Alice", "address": {"city": "NYC"}}`,
+			wantErr: false,
+		},
+		{
+			name:    "extra field at root",
+			json:    `{"name": "Alice", "address": {"city": "NYC"}, "extra": "field"}`,
+			wantErr: true,
+		},
+		{
+			name:    "extra field in nested struct",
+			json:    `{"name": "Alice", "address": {"city": "NYC", "country": "USA"}}`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := validator.Unmarshal([]byte(tt.json))
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestExtraFields_Forbid_WithStrictMissingFieldsFalse tests interaction with StrictMissingFields=false.
+func TestExtraFields_Forbid_WithStrictMissingFieldsFalse(t *testing.T) {
+	type User struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+	}
+
+	validator := New[User](ValidatorOptions{
+		StrictMissingFields: false,
+		ExtraFields:         ExtraForbid,
+	})
+
+	// Valid: no extra fields, missing 'age' is OK with StrictMissingFields=false
+	user, err := validator.Unmarshal([]byte(`{"name": "Alice"}`))
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", user.Name)
+	assert.Equal(t, 0, user.Age) // Zero value
+
+	// Invalid: extra field
+	_, err = validator.Unmarshal([]byte(`{"name": "Alice", "extra": "field"}`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown field")
+}
