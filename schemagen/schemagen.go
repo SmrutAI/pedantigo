@@ -434,3 +434,81 @@ func applyFormatConstraint(schema *jsonschema.Schema, constraintName string) {
 		schema.Format = fmtIPv6
 	}
 }
+
+// GenerateVariantSchema creates a JSON Schema for a single union variant.
+// It generates the base schema for the variant type and adds a const constraint
+// on the discriminator field.
+// Parameters:
+//   - variantType: the reflect.Type of the variant struct
+//   - discriminatorField: the JSON field name used as discriminator
+//   - discriminatorValue: the const value for this variant
+//   - parseTagFunc: function to parse validation tags
+//
+// Implementation.
+func GenerateVariantSchema(variantType reflect.Type, discriminatorField, discriminatorValue string, parseTagFunc func(reflect.StructTag) map[string]string) *jsonschema.Schema {
+	// Handle pointer types
+	if variantType.Kind() == reflect.Ptr {
+		variantType = variantType.Elem()
+	}
+
+	// Generate base schema for the variant type using jsonschema reflector
+	// Set DoNotReference: true to inline all nested structs
+	reflector := jsonschema.Reflector{
+		ExpandedStruct: true, // Expand root struct inline
+		DoNotReference: true, // Inline ALL nested structs without creating $ref
+	}
+	// Create a zero value of the type - Reflect() needs a value, not a reflect.Type
+	variantZero := reflect.New(variantType).Interface()
+	variantSchema := reflector.Reflect(variantZero)
+
+	// If the schema is a reference, unwrap it and return the actual definition
+	if variantSchema.Properties == nil && len(variantSchema.Definitions) > 0 {
+		// The jsonschema library creates a reference schema with definitions
+		// Find the actual struct schema in the definitions
+		for _, def := range variantSchema.Definitions {
+			if def.Type == "object" && def.Properties != nil {
+				variantSchema = def
+				break
+			}
+		}
+	}
+
+	// Clear the required fields set by jsonschema library
+	variantSchema.Required = nil
+
+	// Add the discriminator field with const constraint
+	// Create the const schema for the discriminator field
+	discriminatorSchema := &jsonschema.Schema{
+		Const: discriminatorValue,
+	}
+
+	// Set the discriminator field in Properties
+	variantSchema.Properties.Set(discriminatorField, discriminatorSchema)
+
+	// Apply validation constraints using EnhanceSchema
+	EnhanceSchema(variantSchema, variantType, parseTagFunc)
+
+	return variantSchema
+}
+
+// GenerateUnionSchema creates a JSON Schema with oneOf for discriminated unions.
+// Parameters:
+//   - discriminatorField: the JSON field name used as discriminator
+//   - variants: map of discriminator values to variant types
+//   - parseTagFunc: function to parse validation tags
+//
+// Implementation.
+func GenerateUnionSchema(discriminatorField string, variants map[string]reflect.Type, parseTagFunc func(reflect.StructTag) map[string]string) *jsonschema.Schema {
+	// Create an empty schema to hold the oneOf array
+	unionSchema := &jsonschema.Schema{
+		OneOf: []*jsonschema.Schema{},
+	}
+
+	// Generate a schema for each variant and add to oneOf array
+	for discriminatorValue, variantType := range variants {
+		variantSchema := GenerateVariantSchema(variantType, discriminatorField, discriminatorValue, parseTagFunc)
+		unionSchema.OneOf = append(unionSchema.OneOf, variantSchema)
+	}
+
+	return unionSchema
+}

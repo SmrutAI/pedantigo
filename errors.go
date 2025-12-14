@@ -9,6 +9,12 @@ const (
 
 	// ErrMsgConstMismatch is returned when a value doesn't match the expected constant.
 	ErrMsgConstMismatch = "must be equal to %s"
+
+	// ErrMsgMissingDiscriminator is returned when discriminator field is missing from JSON.
+	ErrMsgMissingDiscriminator = "discriminator field %q is missing"
+
+	// ErrMsgUnknownDiscriminator is returned when discriminator value doesn't match any variant.
+	ErrMsgUnknownDiscriminator = "unknown discriminator value %q for field %q"
 )
 
 // FieldError represents a single field validation error.
