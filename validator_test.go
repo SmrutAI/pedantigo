@@ -1303,7 +1303,6 @@ func TestExtraFields_Forbid(t *testing.T) {
 		name    string
 		json    string
 		wantErr bool
-		errMsg  string
 	}{
 		{
 			name:    "no extra fields - valid",
@@ -1314,19 +1313,16 @@ func TestExtraFields_Forbid(t *testing.T) {
 			name:    "one extra field - error",
 			json:    `{"name": "Alice", "age": 30}`,
 			wantErr: true,
-			errMsg:  "unknown field",
 		},
 		{
 			name:    "multiple extra fields - error",
 			json:    `{"name": "Alice", "age": 30, "email": "test@example.com"}`,
 			wantErr: true,
-			errMsg:  "unknown field",
 		},
 		{
 			name:    "nested extra field in root - error",
 			json:    `{"name": "Alice", "metadata": {"key": "value"}}`,
 			wantErr: true,
-			errMsg:  "unknown field",
 		},
 	}
 
@@ -1336,7 +1332,13 @@ func TestExtraFields_Forbid(t *testing.T) {
 
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
+
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
+				require.Len(t, ve.Errors, 1)
+				assert.Equal(t, "root", ve.Errors[0].Field)
+				assert.Equal(t, "unknown field in JSON", ve.Errors[0].Message)
+
 				// User should still be partially populated even with error
 				assert.NotNil(t, user)
 			} else {
@@ -1390,6 +1392,12 @@ func TestExtraFields_Forbid_NestedStruct(t *testing.T) {
 
 			if tt.wantErr {
 				require.Error(t, err)
+
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
+				require.Len(t, ve.Errors, 1)
+				assert.Equal(t, "root", ve.Errors[0].Field)
+				assert.Equal(t, "unknown field in JSON", ve.Errors[0].Message)
 			} else {
 				require.NoError(t, err)
 			}
@@ -1418,5 +1426,10 @@ func TestExtraFields_Forbid_WithStrictMissingFieldsFalse(t *testing.T) {
 	// Invalid: extra field
 	_, err = validator.Unmarshal([]byte(`{"name": "Alice", "extra": "field"}`))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown field")
+
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
+	require.Len(t, ve.Errors, 1)
+	assert.Equal(t, "root", ve.Errors[0].Field)
+	assert.Equal(t, "JSON decode error: unknown field in JSON", ve.Errors[0].Message)
 }
