@@ -313,7 +313,7 @@ func (v *Validator[T]) Unmarshal(data []byte) (*T, error) {
 				return &obj, &ValidationError{
 					Errors: []FieldError{{
 						Field:   "root",
-						Message: "JSON decode error: unknown field in JSON",
+						Message: "JSON decode error: " + ErrMsgUnknownField,
 					}},
 				}
 			}
@@ -344,7 +344,7 @@ func (v *Validator[T]) Unmarshal(data []byte) (*T, error) {
 			return &obj, &ValidationError{
 				Errors: []FieldError{{
 					Field:   "root",
-					Message: "unknown field in JSON",
+					Message: ErrMsgUnknownField,
 				}},
 			}
 		}

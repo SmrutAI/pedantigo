@@ -2,6 +2,12 @@ package pedantigo
 
 import "fmt"
 
+// Error message constants for validation errors.
+const (
+	// ErrMsgUnknownField is returned when ExtraForbid encounters unknown JSON fields.
+	ErrMsgUnknownField = "unknown field in JSON"
+)
+
 // FieldError represents a single field validation error.
 type FieldError struct {
 	Field   string // Field path (e.g., "user.email")

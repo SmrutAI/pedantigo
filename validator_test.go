@@ -1337,7 +1337,7 @@ func TestExtraFields_Forbid(t *testing.T) {
 				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 				require.Len(t, ve.Errors, 1)
 				assert.Equal(t, "root", ve.Errors[0].Field)
-				assert.Equal(t, "unknown field in JSON", ve.Errors[0].Message)
+				assert.Equal(t, ErrMsgUnknownField, ve.Errors[0].Message)
 
 				// User should still be partially populated even with error
 				assert.NotNil(t, user)
@@ -1397,7 +1397,7 @@ func TestExtraFields_Forbid_NestedStruct(t *testing.T) {
 				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 				require.Len(t, ve.Errors, 1)
 				assert.Equal(t, "root", ve.Errors[0].Field)
-				assert.Equal(t, "unknown field in JSON", ve.Errors[0].Message)
+				assert.Equal(t, ErrMsgUnknownField, ve.Errors[0].Message)
 			} else {
 				require.NoError(t, err)
 			}
@@ -1431,5 +1431,5 @@ func TestExtraFields_Forbid_WithStrictMissingFieldsFalse(t *testing.T) {
 	require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 	require.Len(t, ve.Errors, 1)
 	assert.Equal(t, "root", ve.Errors[0].Field)
-	assert.Equal(t, "JSON decode error: unknown field in JSON", ve.Errors[0].Message)
+	assert.Equal(t, "JSON decode error: "+ErrMsgUnknownField, ve.Errors[0].Message)
 }
