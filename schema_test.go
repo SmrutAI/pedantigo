@@ -1133,6 +1133,125 @@ func TestSchemaJSON_Caching(t *testing.T) {
 	})
 }
 
+// TestSchemaJSONOpenAPI_CachingPaths tests all caching paths in SchemaJSONOpenAPI.
+func TestSchemaJSONOpenAPI_CachingPaths(t *testing.T) {
+	type Item struct {
+		Name  string `json:"name" pedantigo:"required,min=1"`
+		Value int    `json:"value" pedantigo:"gt=0"`
+	}
+
+	t.Run("first call generates and caches both schema and JSON", func(t *testing.T) {
+		validator := New[Item]()
+
+		// First call should generate OpenAPI schema and JSON
+		jsonBytes1, err := validator.SchemaJSONOpenAPI()
+		require.NoError(t, err)
+		assert.NotEmpty(t, jsonBytes1, "expected non-empty JSON bytes")
+
+		// Verify it's valid JSON with OpenAPI structure
+		var schemaMap map[string]any
+		err = json.Unmarshal(jsonBytes1, &schemaMap)
+		require.NoError(t, err)
+
+		// Should have properties
+		_, ok := schemaMap["properties"].(map[string]any)
+		assert.True(t, ok, "expected properties object")
+	})
+
+	t.Run("second call returns cached JSON (fast path)", func(t *testing.T) {
+		validator := New[Item]()
+
+		// First call
+		jsonBytes1, err1 := validator.SchemaJSONOpenAPI()
+		require.NoError(t, err1)
+
+		// Second call should hit cachedOpenAPIJSON fast path
+		jsonBytes2, err2 := validator.SchemaJSONOpenAPI()
+		require.NoError(t, err2)
+
+		// Should return identical bytes
+		assert.JSONEq(t, string(jsonBytes1), string(jsonBytes2))
+	})
+
+	t.Run("SchemaOpenAPI called first then SchemaJSONOpenAPI uses cached schema", func(t *testing.T) {
+		validator := New[Item]()
+
+		// Call SchemaOpenAPI() first to cache schema object
+		schema1 := validator.SchemaOpenAPI()
+		require.NotNil(t, schema1)
+
+		// Call SchemaJSONOpenAPI() - should use cached OpenAPI schema but generate JSON
+		// This tests the "if v.cachedOpenAPI != nil" branch
+		jsonBytes, err := validator.SchemaJSONOpenAPI()
+		require.NoError(t, err)
+		assert.NotEmpty(t, jsonBytes, "expected non-empty JSON bytes")
+
+		// Verify constraints are in the JSON
+		var schemaMap map[string]any
+		err = json.Unmarshal(jsonBytes, &schemaMap)
+		require.NoError(t, err)
+
+		properties, ok := schemaMap["properties"].(map[string]any)
+		require.True(t, ok, "expected properties object")
+
+		nameProp, ok := properties["name"].(map[string]any)
+		require.True(t, ok, "expected name property")
+
+		// Check min length constraint
+		minLen, ok := nameProp["minLength"].(float64)
+		require.True(t, ok, "expected minLength in name property")
+		assert.InDelta(t, 1.0, minLen, 1e-9)
+
+		// Third call should hit cachedOpenAPIJSON fast path
+		jsonBytes2, err2 := validator.SchemaJSONOpenAPI()
+		require.NoError(t, err2)
+		assert.JSONEq(t, string(jsonBytes), string(jsonBytes2))
+	})
+
+	t.Run("concurrent calls properly serialize through caching", func(t *testing.T) {
+		validator := New[Item]()
+		numGoroutines := 50
+
+		var wg sync.WaitGroup
+		wg.Add(numGoroutines)
+		jsonChan := make(chan []byte, numGoroutines)
+		errChan := make(chan error, numGoroutines)
+
+		for i := 0; i < numGoroutines; i++ {
+			go func() {
+				defer wg.Done()
+				jsonBytes, err := validator.SchemaJSONOpenAPI()
+				if err != nil {
+					errChan <- err
+					return
+				}
+				jsonChan <- jsonBytes
+			}()
+		}
+
+		wg.Wait()
+		close(jsonChan)
+		close(errChan)
+
+		// Should have no errors
+		for err := range errChan {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		// All results should be identical
+		allBytes := make([][]byte, 0, numGoroutines)
+		for jsonBytes := range jsonChan {
+			allBytes = append(allBytes, jsonBytes)
+		}
+
+		require.NotEmpty(t, allBytes)
+		firstBytes := allBytes[0]
+		for i, jsonBytes := range allBytes {
+			assert.JSONEq(t, string(firstBytes), string(jsonBytes), "goroutine %d result differs", i)
+		}
+	})
+}
+
 // TestSchemaJSON_DefinitionUnwrapping tests definition unwrapping path.
 func TestSchemaJSON_DefinitionUnwrapping(t *testing.T) {
 	// This tests the path where baseSchema.Properties is nil but has definitions

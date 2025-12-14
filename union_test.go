@@ -9,6 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Test discriminator values.
+const (
+	discCat = "cat"
+	discDog = "dog"
+)
+
 // Test structs for discriminated union validation
 
 // Cat represents a cat variant in the pet union.
@@ -1021,17 +1027,30 @@ func TestUnionValidator_Schema_DiscriminatorFieldWithConst(t *testing.T) {
 	require.NotNil(t, schema.OneOf, "oneOf array should not be nil")
 	require.Len(t, schema.OneOf, 2, "oneOf should have 2 schemas")
 
-	// Check cat variant has const "cat"
-	catSchema := schema.OneOf[0]
-	require.NotNil(t, catSchema, "cat schema should not be nil")
+	// Find cat and dog schemas by discriminator const value (order may vary due to map iteration)
+	var catSchema, dogSchema *jsonschema.Schema
+	for _, vs := range schema.OneOf {
+		if vs.Properties != nil {
+			if pt, ok := vs.Properties.Get("pet_type"); ok {
+				switch pt.Const {
+				case discCat:
+					catSchema = vs
+				case discDog:
+					dogSchema = vs
+				}
+			}
+		}
+	}
+
+	// Verify cat schema
+	require.NotNil(t, catSchema, "cat schema should exist")
 	require.NotNil(t, catSchema.Properties, "cat schema properties should not be nil")
 	petTypeSchema, ok := catSchema.Properties.Get("pet_type")
 	require.True(t, ok, "pet_type property should exist in cat schema")
 	assert.Equal(t, "cat", petTypeSchema.Const, "cat schema pet_type should have const 'cat'")
 
-	// Check dog variant has const "dog"
-	dogSchema := schema.OneOf[1]
-	require.NotNil(t, dogSchema, "dog schema should not be nil")
+	// Verify dog schema
+	require.NotNil(t, dogSchema, "dog schema should exist")
 	require.NotNil(t, dogSchema.Properties, "dog schema properties should not be nil")
 	petTypeSchema, ok = dogSchema.Properties.Get("pet_type")
 	require.True(t, ok, "pet_type property should exist in dog schema")
@@ -1062,9 +1081,9 @@ func TestUnionValidator_Schema_VariantPropertiesIncluded(t *testing.T) {
 		if vs.Properties != nil {
 			if pt, ok := vs.Properties.Get("pet_type"); ok {
 				switch pt.Const {
-				case "cat":
+				case discCat:
 					catSchema = vs
-				case "dog":
+				case discDog:
 					dogSchema = vs
 				}
 			}

@@ -397,6 +397,117 @@ func TestApplyConstraints(t *testing.T) {
 				assert.Equal(t, `.*@example\.com.*`, schema.Pattern)
 			},
 		},
+		{
+			name:      "excludes constraint",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"excludes": "bad",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, "^(?!.*bad).*$", schema.Pattern)
+			},
+		},
+		{
+			name:      "excludes with special chars",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"excludes": "test.value",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, `^(?!.*test\.value).*$`, schema.Pattern)
+			},
+		},
+		{
+			name:      "startswith constraint",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"startswith": "prefix",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, "^prefix.*", schema.Pattern)
+			},
+		},
+		{
+			name:      "startswith with special chars",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"startswith": "http://",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, `^http://.*`, schema.Pattern)
+			},
+		},
+		{
+			name:      "endswith constraint",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"endswith": ".txt",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, `.*\.txt$`, schema.Pattern)
+			},
+		},
+		{
+			name:      "lowercase constraint",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"lowercase": "",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, "^[^A-Z]*$", schema.Pattern)
+			},
+		},
+		{
+			name:      "uppercase constraint",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"uppercase": "",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, "^[^a-z]*$", schema.Pattern)
+			},
+		},
+		{
+			name:      "positive constraint",
+			fieldType: reflect.TypeOf(0),
+			constraints: map[string]string{
+				"positive": "",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, "0", string(schema.ExclusiveMinimum))
+			},
+		},
+		{
+			name:      "negative constraint",
+			fieldType: reflect.TypeOf(0),
+			constraints: map[string]string{
+				"negative": "",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, "0", string(schema.ExclusiveMaximum))
+			},
+		},
+		{
+			name:      "multiple_of constraint",
+			fieldType: reflect.TypeOf(0),
+			constraints: map[string]string{
+				"multiple_of": "5",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.Equal(t, "5", string(schema.MultipleOf))
+			},
+		},
+		{
+			name:      "defaultUsingMethod is skipped",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"defaultUsingMethod": "GetDefault",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				// Should not set any schema property
+				assert.Nil(t, schema.Default)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1372,4 +1483,157 @@ func TestGenerateUnionSchema_WithValidationConstraints(t *testing.T) {
 			assert.NotNil(t, livesSchema.Maximum, "lives should have maximum")
 		}
 	}
+}
+
+// TestEnhanceSchema_UnexportedFields tests that unexported fields are skipped.
+func TestEnhanceSchema_UnexportedFields(t *testing.T) {
+	type StructWithUnexported struct {
+		Public     string `json:"public" pedantigo:"required"`
+		private    string //nolint:unused // intentionally unexported for testing
+		AlsoPublic int    `json:"also_public" pedantigo:"min=0"`
+	}
+
+	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
+		pedantigoTag := tag.Get("pedantigo")
+		if pedantigoTag == "" {
+			return nil
+		}
+		constraints := make(map[string]string)
+		parts := splitConstraints(pedantigoTag)
+		for _, part := range parts {
+			if key, value, found := splitKeyValue(part); found {
+				constraints[key] = value
+			} else {
+				constraints[part] = ""
+			}
+		}
+		return constraints
+	}
+
+	schema := GenerateBaseSchema[StructWithUnexported]()
+	EnhanceSchema(schema, reflect.TypeOf(StructWithUnexported{}), mockParseTagFunc)
+
+	// Should have public fields in required
+	assert.Contains(t, schema.Required, "public")
+
+	// Should have also_public with constraints
+	alsoProp, ok := schema.Properties.Get("also_public")
+	require.True(t, ok)
+	assert.NotNil(t, alsoProp.Minimum)
+}
+
+// TestEnhanceSchema_PointerType tests enhancing a pointer type.
+func TestEnhanceSchema_PointerType(t *testing.T) {
+	type Target struct {
+		Name string `json:"name" pedantigo:"required,min=1"`
+	}
+
+	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
+		pedantigoTag := tag.Get("pedantigo")
+		if pedantigoTag == "" {
+			return nil
+		}
+		constraints := make(map[string]string)
+		parts := splitConstraints(pedantigoTag)
+		for _, part := range parts {
+			if key, value, found := splitKeyValue(part); found {
+				constraints[key] = value
+			} else {
+				constraints[part] = ""
+			}
+		}
+		return constraints
+	}
+
+	schema := GenerateBaseSchema[Target]()
+	// Pass pointer type - should unwrap it
+	EnhanceSchema(schema, reflect.TypeOf((*Target)(nil)), mockParseTagFunc)
+
+	// Should still process fields correctly
+	assert.Contains(t, schema.Required, "name")
+	nameProp, ok := schema.Properties.Get("name")
+	require.True(t, ok)
+	require.NotNil(t, nameProp.MinLength)
+	assert.Equal(t, uint64(1), *nameProp.MinLength)
+}
+
+// TestEnhanceSchema_NonStructType tests enhancing a non-struct type returns early.
+func TestEnhanceSchema_NonStructType(t *testing.T) {
+	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
+		return nil
+	}
+
+	schema := &jsonschema.Schema{}
+	// Pass non-struct type - should return early without panic
+	EnhanceSchema(schema, reflect.TypeOf("string"), mockParseTagFunc)
+	EnhanceSchema(schema, reflect.TypeOf(123), mockParseTagFunc)
+	EnhanceSchema(schema, reflect.TypeOf([]string{}), mockParseTagFunc)
+
+	// Should not modify schema
+	assert.Nil(t, schema.Properties)
+}
+
+// TestEnhanceSchema_JSONTagWithOptions tests JSON tag with comma-separated options.
+func TestEnhanceSchema_JSONTagWithOptions(t *testing.T) {
+	type StructWithJSONOptions struct {
+		Name     string `json:"name,omitempty" pedantigo:"required"`
+		Age      int    `json:"age,string" pedantigo:"min=0"`
+		Disabled string `json:"-"`
+	}
+
+	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
+		pedantigoTag := tag.Get("pedantigo")
+		if pedantigoTag == "" {
+			return nil
+		}
+		constraints := make(map[string]string)
+		parts := splitConstraints(pedantigoTag)
+		for _, part := range parts {
+			if key, value, found := splitKeyValue(part); found {
+				constraints[key] = value
+			} else {
+				constraints[part] = ""
+			}
+		}
+		return constraints
+	}
+
+	schema := GenerateBaseSchema[StructWithJSONOptions]()
+	EnhanceSchema(schema, reflect.TypeOf(StructWithJSONOptions{}), mockParseTagFunc)
+
+	// name should be in required (JSON name extracted from "name,omitempty")
+	assert.Contains(t, schema.Required, "name")
+
+	// age should have minimum (JSON name extracted from "age,string")
+	ageProp, ok := schema.Properties.Get("age")
+	require.True(t, ok, "age property should exist")
+	assert.NotNil(t, ageProp.Minimum)
+}
+
+// TestApplyConstraints_SliceWithConstraints tests constraints applied to slice items.
+func TestApplyConstraints_SliceWithConstraints(t *testing.T) {
+	schema := &jsonschema.Schema{
+		Items: &jsonschema.Schema{},
+	}
+	constraints := map[string]string{
+		"email": "",
+	}
+	ApplyConstraints(schema, constraints, reflect.TypeOf([]string{}))
+
+	// email format should be applied to items
+	assert.Equal(t, "email", schema.Items.Format)
+}
+
+// TestApplyConstraints_MapWithConstraints tests constraints applied to map values.
+func TestApplyConstraints_MapWithConstraints(t *testing.T) {
+	schema := &jsonschema.Schema{
+		AdditionalProperties: &jsonschema.Schema{},
+	}
+	constraints := map[string]string{
+		"url": "",
+	}
+	ApplyConstraints(schema, constraints, reflect.TypeOf(map[string]string{}))
+
+	// url format should be applied to additionalProperties
+	assert.Equal(t, "uri", schema.AdditionalProperties.Format)
 }

@@ -106,6 +106,189 @@ func TestParseTag_ValidConstraints(t *testing.T) {
 	}
 }
 
+// TestParseTagWithDive_CollectionConstraintsOnly tests parsing tags with only collection-level constraints.
+func TestParseTagWithDive_CollectionConstraintsOnly(t *testing.T) {
+	tests := []struct {
+		name        string
+		tag         reflect.StructTag
+		wantNil     bool
+		constraints map[string]string
+	}{
+		{
+			name:        "single_min_constraint",
+			tag:         reflect.StructTag(`pedantigo:"min=3"`),
+			constraints: map[string]string{"min": "3"},
+		},
+		{
+			name:        "multiple_collection_constraints",
+			tag:         reflect.StructTag(`pedantigo:"min=3,max=10"`),
+			constraints: map[string]string{"min": "3", "max": "10"},
+		},
+		{
+			name:    "empty_tag",
+			tag:     reflect.StructTag(`pedantigo:""`),
+			wantNil: true,
+		},
+		{
+			name:    "no_pedantigo_tag",
+			tag:     reflect.StructTag(`json:"field"`),
+			wantNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parsed := ParseTagWithDive(tt.tag)
+
+			if tt.wantNil {
+				assert.Nil(t, parsed)
+				return
+			}
+
+			require.NotNil(t, parsed)
+			assert.False(t, parsed.DivePresent)
+			assert.Equal(t, tt.constraints, parsed.CollectionConstraints)
+			assert.Empty(t, parsed.KeyConstraints)
+			assert.Empty(t, parsed.ElementConstraints)
+		})
+	}
+}
+
+// TestParseTagWithDive_ElementConstraints tests parsing tags with dive and element constraints.
+func TestParseTagWithDive_ElementConstraints(t *testing.T) {
+	tests := []struct {
+		name                  string
+		tag                   reflect.StructTag
+		wantDivePresent       bool
+		collectionConstraints map[string]string
+		elementConstraints    map[string]string
+	}{
+		{
+			name:                  "dive_only_with_element_constraint",
+			tag:                   reflect.StructTag(`pedantigo:"dive,email"`),
+			wantDivePresent:       true,
+			collectionConstraints: map[string]string{},
+			elementConstraints:    map[string]string{"email": ""},
+		},
+		{
+			name:                  "dive_with_multiple_element_constraints",
+			tag:                   reflect.StructTag(`pedantigo:"dive,email,min=5"`),
+			wantDivePresent:       true,
+			collectionConstraints: map[string]string{},
+			elementConstraints:    map[string]string{"email": "", "min": "5"},
+		},
+		{
+			name:                  "collection_and_element_constraints",
+			tag:                   reflect.StructTag(`pedantigo:"min=3,dive,min=5"`),
+			wantDivePresent:       true,
+			collectionConstraints: map[string]string{"min": "3"},
+			elementConstraints:    map[string]string{"min": "5"},
+		},
+		{
+			name:                  "collection_max_and_element_email",
+			tag:                   reflect.StructTag(`pedantigo:"max=100,dive,email,required"`),
+			wantDivePresent:       true,
+			collectionConstraints: map[string]string{"max": "100"},
+			elementConstraints:    map[string]string{"email": "", "required": ""},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parsed := ParseTagWithDive(tt.tag)
+
+			require.NotNil(t, parsed)
+			assert.Equal(t, tt.wantDivePresent, parsed.DivePresent)
+			assert.Equal(t, tt.collectionConstraints, parsed.CollectionConstraints)
+			assert.Equal(t, tt.elementConstraints, parsed.ElementConstraints)
+			assert.Empty(t, parsed.KeyConstraints)
+		})
+	}
+}
+
+// TestParseTagWithDive_MapKeyConstraints tests parsing tags with keys/endkeys for map validation.
+func TestParseTagWithDive_MapKeyConstraints(t *testing.T) {
+	tests := []struct {
+		name               string
+		tag                reflect.StructTag
+		keyConstraints     map[string]string
+		elementConstraints map[string]string
+	}{
+		{
+			name:               "keys_with_min_constraint",
+			tag:                reflect.StructTag(`pedantigo:"dive,keys,min=2,endkeys,email"`),
+			keyConstraints:     map[string]string{"min": "2"},
+			elementConstraints: map[string]string{"email": ""},
+		},
+		{
+			name:               "keys_with_multiple_constraints",
+			tag:                reflect.StructTag(`pedantigo:"dive,keys,min=2,max=10,endkeys,required"`),
+			keyConstraints:     map[string]string{"min": "2", "max": "10"},
+			elementConstraints: map[string]string{"required": ""},
+		},
+		{
+			name:               "keys_with_pattern",
+			tag:                reflect.StructTag(`pedantigo:"dive,keys,pattern=^[a-z]+$,endkeys,min=1"`),
+			keyConstraints:     map[string]string{"pattern": "^[a-z]+$"},
+			elementConstraints: map[string]string{"min": "1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parsed := ParseTagWithDive(tt.tag)
+
+			require.NotNil(t, parsed)
+			assert.True(t, parsed.DivePresent)
+			assert.Equal(t, tt.keyConstraints, parsed.KeyConstraints)
+			assert.Equal(t, tt.elementConstraints, parsed.ElementConstraints)
+		})
+	}
+}
+
+// TestParseTagWithDive_Panics tests that invalid tag syntax panics.
+func TestParseTagWithDive_Panics(t *testing.T) {
+	tests := []struct {
+		name          string
+		tag           reflect.StructTag
+		expectedPanic string
+	}{
+		{
+			name:          "keys_without_dive",
+			tag:           reflect.StructTag(`pedantigo:"keys,min=2,endkeys"`),
+			expectedPanic: "'keys' can only appear after 'dive'",
+		},
+		{
+			name:          "endkeys_without_keys",
+			tag:           reflect.StructTag(`pedantigo:"dive,endkeys"`),
+			expectedPanic: "'endkeys' without preceding 'keys'",
+		},
+		{
+			name:          "keys_without_endkeys",
+			tag:           reflect.StructTag(`pedantigo:"dive,keys,min=2"`),
+			expectedPanic: "'keys' without closing 'endkeys'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.PanicsWithValue(t, tt.expectedPanic, func() {
+				ParseTagWithDive(tt.tag)
+			})
+		})
+	}
+}
+
+// TestParseTagWithDive_WhitespaceHandling tests that whitespace is properly trimmed.
+func TestParseTagWithDive_WhitespaceHandling(t *testing.T) {
+	parsed := ParseTagWithDive(reflect.StructTag(`pedantigo:"  min = 3 , dive , email  "`))
+
+	require.NotNil(t, parsed)
+	assert.True(t, parsed.DivePresent)
+	assert.Equal(t, "3", parsed.CollectionConstraints["min"])
+	assert.Contains(t, parsed.ElementConstraints, "email")
+}
+
 // TestParseTag_InvalidInputs tests edge cases and missing/invalid tags.
 func TestParseTag_InvalidInputs(t *testing.T) {
 	tests := []struct {
