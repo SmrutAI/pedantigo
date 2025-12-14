@@ -1238,3 +1238,218 @@ func TestEnum(t *testing.T) {
 		})
 	}
 }
+
+// ==================== Const Constraint ====================
+
+// ==================================================
+// const constraint tests
+// ==================================================
+
+// ErrMsgConstMustEqual is the expected error message format for const constraint violations.
+const ErrMsgConstMustEqual = "must be equal to %s"
+
+// TestConst tests the const constraint for literal/constant value validation.
+func TestConst(t *testing.T) {
+	tests := []struct {
+		name       string
+		testType   string // "string_valid", "string_invalid", "int_valid", "int_invalid", "float_valid", "pointer_valid", "pointer_nil"
+		json       string
+		expectErr  bool
+		errorField string
+		constValue string
+	}{
+		// String const tests
+		{
+			name:      "valid string const - exact match",
+			testType:  "string_valid",
+			json:      `{"type":"user"}`,
+			expectErr: false,
+		},
+		{
+			name:       "invalid string const - wrong value",
+			testType:   "string_invalid",
+			json:       `{"type":"admin"}`,
+			expectErr:  true,
+			errorField: "Type",
+			constValue: "user",
+		},
+		{
+			name:       "invalid string const - empty value",
+			testType:   "string_invalid",
+			json:       `{"type":""}`,
+			expectErr:  true,
+			errorField: "Type",
+			constValue: "user",
+		},
+		// Integer const tests
+		{
+			name:      "valid int const - exact match",
+			testType:  "int_valid",
+			json:      `{"version":1}`,
+			expectErr: false,
+		},
+		{
+			name:       "invalid int const - wrong value",
+			testType:   "int_invalid",
+			json:       `{"version":2}`,
+			expectErr:  true,
+			errorField: "Version",
+			constValue: "1",
+		},
+		// Float const tests
+		{
+			name:      "valid float const - exact match",
+			testType:  "float_valid",
+			json:      `{"rate":0.5}`,
+			expectErr: false,
+		},
+		// Pointer tests
+		{
+			name:      "valid pointer const - exact match",
+			testType:  "pointer_valid",
+			json:      `{"kind":"event"}`,
+			expectErr: false,
+		},
+		{
+			name:      "nil pointer skips validation",
+			testType:  "pointer_nil",
+			json:      `{"kind":null}`,
+			expectErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			switch tt.testType {
+			case "string_valid":
+				type Message struct {
+					Type string `json:"type" pedantigo:"const=user"`
+				}
+				validator := New[Message]()
+				msg, err := validator.Unmarshal([]byte(tt.json))
+				require.NoError(t, err)
+				assert.Equal(t, "user", msg.Type)
+
+			case "string_invalid":
+				type Message struct {
+					Type string `json:"type" pedantigo:"const=user"`
+				}
+				validator := New[Message]()
+				_, err := validator.Unmarshal([]byte(tt.json))
+				require.Error(t, err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
+				foundError := false
+				expectedMsg := fmt.Sprintf(ErrMsgConstMustEqual, tt.constValue)
+				for _, fieldErr := range ve.Errors {
+					if fieldErr.Field == tt.errorField && fieldErr.Message == expectedMsg {
+						foundError = true
+					}
+				}
+				assert.True(t, foundError, "expected error field=%s msg=%s, got %v", tt.errorField, expectedMsg, ve.Errors)
+
+			case "int_valid":
+				type Config struct {
+					Version int `json:"version" pedantigo:"const=1"`
+				}
+				validator := New[Config]()
+				cfg, err := validator.Unmarshal([]byte(tt.json))
+				require.NoError(t, err)
+				assert.Equal(t, 1, cfg.Version)
+
+			case "int_invalid":
+				type Config struct {
+					Version int `json:"version" pedantigo:"const=1"`
+				}
+				validator := New[Config]()
+				_, err := validator.Unmarshal([]byte(tt.json))
+				require.Error(t, err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
+				foundError := false
+				expectedMsg := fmt.Sprintf(ErrMsgConstMustEqual, tt.constValue)
+				for _, fieldErr := range ve.Errors {
+					if fieldErr.Field == tt.errorField && fieldErr.Message == expectedMsg {
+						foundError = true
+					}
+				}
+				assert.True(t, foundError, "expected error field=%s msg=%s, got %v", tt.errorField, expectedMsg, ve.Errors)
+
+			case "float_valid":
+				type Rate struct {
+					Rate float64 `json:"rate" pedantigo:"const=0.5"`
+				}
+				validator := New[Rate]()
+				r, err := validator.Unmarshal([]byte(tt.json))
+				require.NoError(t, err)
+				assert.InDelta(t, 0.5, r.Rate, 0.0001)
+
+			case "pointer_valid":
+				type Event struct {
+					Kind *string `json:"kind" pedantigo:"const=event"`
+				}
+				validator := New[Event]()
+				ev, err := validator.Unmarshal([]byte(tt.json))
+				require.NoError(t, err)
+				require.NotNil(t, ev.Kind)
+				assert.Equal(t, "event", *ev.Kind)
+
+			case "pointer_nil":
+				type Event struct {
+					Kind *string `json:"kind" pedantigo:"const=event"`
+				}
+				validator := New[Event]()
+				ev, err := validator.Unmarshal([]byte(tt.json))
+				require.NoError(t, err)
+				assert.Nil(t, ev.Kind)
+			}
+		})
+	}
+}
+
+// TestConstWithCombinedConstraints tests const with other constraints.
+func TestConstWithCombinedConstraints(t *testing.T) {
+	// const combined with required
+	t.Run("const with required", func(t *testing.T) {
+		type APIVersion struct {
+			Version string `json:"version" pedantigo:"required,const=v1"`
+		}
+		validator := New[APIVersion]()
+
+		// Valid case
+		result, err := validator.Unmarshal([]byte(`{"version":"v1"}`))
+		require.NoError(t, err)
+		assert.Equal(t, "v1", result.Version)
+
+		// Missing field - should fail required
+		_, err = validator.Unmarshal([]byte(`{}`))
+		require.Error(t, err)
+	})
+}
+
+// TestConstBoolValue tests const constraint with boolean values.
+func TestConstBoolValue(t *testing.T) {
+	type Feature struct {
+		Enabled bool `json:"enabled" pedantigo:"const=true"`
+	}
+	validator := New[Feature]()
+
+	// Valid - exactly true
+	result, err := validator.Unmarshal([]byte(`{"enabled":true}`))
+	require.NoError(t, err)
+	assert.True(t, result.Enabled)
+
+	// Invalid - false when const=true
+	_, err = validator.Unmarshal([]byte(`{"enabled":false}`))
+	require.Error(t, err)
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve)
+	foundError := false
+	expectedMsg := fmt.Sprintf(ErrMsgConstMustEqual, "true")
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Enabled" && fieldErr.Message == expectedMsg {
+			foundError = true
+		}
+	}
+	assert.True(t, foundError, "expected const error, got %v", ve.Errors)
+}

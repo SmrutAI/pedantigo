@@ -117,6 +117,10 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			result = append(result, ipv6Constraint{})
 		case "oneof":
 			result = append(result, buildEnumConstraint(value))
+		case "const":
+			if constraint, ok := buildConstConstraint(value); ok {
+				result = append(result, constraint)
+			}
 		case "len":
 			if constraint, ok := buildLenConstraint(value); ok {
 				result = append(result, constraint)

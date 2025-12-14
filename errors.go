@@ -6,6 +6,9 @@ import "fmt"
 const (
 	// ErrMsgUnknownField is returned when ExtraForbid encounters unknown JSON fields.
 	ErrMsgUnknownField = "unknown field in JSON"
+
+	// ErrMsgConstMismatch is returned when a value doesn't match the expected constant.
+	ErrMsgConstMismatch = "must be equal to %s"
 )
 
 // FieldError represents a single field validation error.

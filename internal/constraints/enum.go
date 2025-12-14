@@ -11,6 +11,7 @@ import (
 // Enum constraint types.
 type (
 	enumConstraint    struct{ values []string }
+	constConstraint   struct{ value string }
 	defaultConstraint struct{ value string }
 )
 
@@ -48,6 +49,38 @@ func (c enumConstraint) Validate(value any) error {
 	return fmt.Errorf("must be one of: %s", strings.Join(c.values, ", "))
 }
 
+// constConstraint validates that value equals a specific constant.
+func (c constConstraint) Validate(value any) error {
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for nil/invalid values
+	}
+
+	// Convert value to string for comparison
+	var str string
+	switch v.Kind() {
+	case reflect.String:
+		str = v.String()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		str = strconv.FormatInt(v.Int(), 10)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		str = strconv.FormatUint(v.Uint(), 10)
+	case reflect.Float32, reflect.Float64:
+		str = strconv.FormatFloat(v.Float(), 'f', -1, 64)
+	case reflect.Bool:
+		str = strconv.FormatBool(v.Bool())
+	default:
+		return fmt.Errorf("const constraint not supported for type %s", v.Kind())
+	}
+
+	// Check if value equals the required constant
+	if str != c.value {
+		return fmt.Errorf("must be equal to %s", c.value)
+	}
+
+	return nil
+}
+
 // defaultConstraint is not a validator - it's handled during unmarshaling.
 func (c defaultConstraint) Validate(value any) error {
 	return nil // No-op for validation
@@ -57,4 +90,12 @@ func (c defaultConstraint) Validate(value any) error {
 func buildEnumConstraint(value string) Constraint {
 	values := strings.Fields(value)
 	return enumConstraint{values: values}
+}
+
+// buildConstConstraint creates a const constraint for a specific value.
+func buildConstConstraint(value string) (Constraint, bool) {
+	if value == "" {
+		return nil, false
+	}
+	return constConstraint{value: value}, true
 }

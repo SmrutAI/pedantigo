@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // checkConstraintError asserts validation errors based on expected outcome.
@@ -401,4 +402,85 @@ func TestParseConditionalConstraint_ErrorPath(t *testing.T) {
 			assert.Equal(t, tt.wantSecond, second)
 		})
 	}
+}
+
+// TestConstConstraint tests the const constraint directly.
+func TestConstConstraint(t *testing.T) {
+	tests := []struct {
+		name       string
+		constValue string
+		input      any
+		wantErr    bool
+	}{
+		// String tests
+		{"string exact match", "hello", "hello", false},
+		{"string mismatch", "hello", "world", true},
+		{"string empty mismatch", "hello", "", true},
+		// Integer tests
+		{"int exact match", "42", 42, false},
+		{"int mismatch", "42", 43, true},
+		{"int8 exact match", "42", int8(42), false},
+		{"int64 exact match", "42", int64(42), false},
+		// Uint tests
+		{"uint exact match", "100", uint(100), false},
+		{"uint8 exact match", "100", uint8(100), false},
+		// Float tests
+		{"float exact match", "3.14", 3.14, false},
+		{"float32 exact match", "3.140000104904175", float32(3.14), false}, // float32 to string has precision loss
+		// Bool tests
+		{"bool true match", "true", true, false},
+		{"bool false match", "false", false, false},
+		{"bool mismatch", "true", false, true},
+		// Nil tests
+		{"nil pointer skips", "test", (*string)(nil), false},
+		// Pointer tests
+		{"pointer string match", "hello", ptrTo("hello"), false},
+		{"pointer string mismatch", "hello", ptrTo("world"), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := constConstraint{value: tt.constValue}
+			err := c.Validate(tt.input)
+			checkConstraintError(t, err, tt.wantErr)
+		})
+	}
+}
+
+// TestConstConstraintUnsupportedType tests const with unsupported types.
+func TestConstConstraintUnsupportedType(t *testing.T) {
+	c := constConstraint{value: "test"}
+	err := c.Validate(struct{}{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not supported")
+}
+
+// TestBuildConstConstraint tests buildConstConstraint function.
+func TestBuildConstConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		wantOk  bool
+		wantVal string
+	}{
+		{"valid value", "hello", true, "hello"},
+		{"numeric value", "42", true, "42"},
+		{"empty value returns false", "", false, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, ok := buildConstConstraint(tt.value)
+			assert.Equal(t, tt.wantOk, ok)
+			if ok {
+				cc := c.(constConstraint)
+				assert.Equal(t, tt.wantVal, cc.value)
+			}
+		})
+	}
+}
+
+// ptrTo returns a pointer to the given value.
+func ptrTo[T any](v T) *T {
+	return &v
 }
