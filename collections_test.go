@@ -643,3 +643,201 @@ func TestKeys_OnlyValidForMaps(t *testing.T) {
 		New[Config]()
 	})
 }
+
+// ==================== Unique Constraint Tests ====================
+
+// TestSlice_Unique tests the unique constraint on slices.
+func TestSlice_Unique(t *testing.T) {
+	t.Run("unique_strings", func(t *testing.T) {
+		type Config struct {
+			Tags []string `json:"tags" pedantigo:"unique"`
+		}
+		validator := New[Config]()
+
+		// Valid: unique elements
+		config, err := validator.Unmarshal([]byte(`{"tags":["a","b","c"]}`))
+		require.NoError(t, err)
+		assert.Len(t, config.Tags, 3)
+
+		// Invalid: duplicates
+		_, err = validator.Unmarshal([]byte(`{"tags":["a","b","a"]}`))
+		require.Error(t, err)
+		var ve *ValidationError
+		require.ErrorAs(t, err, &ve)
+		assert.Equal(t, "Tags", ve.Errors[0].Field)
+		assert.Contains(t, ve.Errors[0].Message, "duplicate")
+	})
+
+	t.Run("unique_ints", func(t *testing.T) {
+		type Config struct {
+			IDs []int `json:"ids" pedantigo:"unique"`
+		}
+		validator := New[Config]()
+
+		// Valid
+		_, err := validator.Unmarshal([]byte(`{"ids":[1,2,3]}`))
+		require.NoError(t, err)
+
+		// Invalid
+		_, err = validator.Unmarshal([]byte(`{"ids":[1,2,1]}`))
+		require.Error(t, err)
+	})
+
+	t.Run("empty_slice_passes", func(t *testing.T) {
+		type Config struct {
+			Tags []string `json:"tags" pedantigo:"unique"`
+		}
+		validator := New[Config]()
+
+		config, err := validator.Unmarshal([]byte(`{"tags":[]}`))
+		require.NoError(t, err)
+		assert.Empty(t, config.Tags)
+	})
+
+	t.Run("nil_slice_passes", func(t *testing.T) {
+		type Config struct {
+			Tags []string `json:"tags" pedantigo:"unique"`
+		}
+		validator := New[Config]()
+
+		config, err := validator.Unmarshal([]byte(`{"tags":null}`))
+		require.NoError(t, err)
+		assert.Nil(t, config.Tags)
+	})
+
+	t.Run("single_element_passes", func(t *testing.T) {
+		type Config struct {
+			Tags []string `json:"tags" pedantigo:"unique"`
+		}
+		validator := New[Config]()
+
+		config, err := validator.Unmarshal([]byte(`{"tags":["only"]}`))
+		require.NoError(t, err)
+		assert.Len(t, config.Tags, 1)
+	})
+}
+
+// TestMap_UniqueValues tests the unique constraint on map values.
+func TestMap_UniqueValues(t *testing.T) {
+	t.Run("unique_values", func(t *testing.T) {
+		type Config struct {
+			Scores map[string]int `json:"scores" pedantigo:"unique"`
+		}
+		validator := New[Config]()
+
+		// Valid: unique values
+		config, err := validator.Unmarshal([]byte(`{"scores":{"a":1,"b":2,"c":3}}`))
+		require.NoError(t, err)
+		assert.Len(t, config.Scores, 3)
+
+		// Invalid: duplicate values
+		_, err = validator.Unmarshal([]byte(`{"scores":{"a":1,"b":1}}`))
+		require.Error(t, err)
+		var ve *ValidationError
+		require.ErrorAs(t, err, &ve)
+		assert.Equal(t, "Scores", ve.Errors[0].Field)
+		assert.Contains(t, ve.Errors[0].Message, "duplicate")
+	})
+
+	t.Run("empty_map_passes", func(t *testing.T) {
+		type Config struct {
+			Scores map[string]int `json:"scores" pedantigo:"unique"`
+		}
+		validator := New[Config]()
+
+		config, err := validator.Unmarshal([]byte(`{"scores":{}}`))
+		require.NoError(t, err)
+		assert.Empty(t, config.Scores)
+	})
+}
+
+// TestSlice_UniqueByField tests the unique=Field constraint on struct slices.
+func TestSlice_UniqueByField(t *testing.T) {
+	type User struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+
+	t.Run("unique_by_id", func(t *testing.T) {
+		type Config struct {
+			Users []User `json:"users" pedantigo:"unique=ID"`
+		}
+		validator := New[Config]()
+
+		// Valid: unique IDs
+		config, err := validator.Unmarshal([]byte(`{"users":[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"}]}`))
+		require.NoError(t, err)
+		assert.Len(t, config.Users, 2)
+
+		// Invalid: duplicate IDs (different names OK)
+		_, err = validator.Unmarshal([]byte(`{"users":[{"id":1,"name":"Alice"},{"id":1,"name":"Bob"}]}`))
+		require.Error(t, err)
+		var ve *ValidationError
+		require.ErrorAs(t, err, &ve)
+		assert.Equal(t, "Users", ve.Errors[0].Field)
+		assert.Contains(t, ve.Errors[0].Message, "ID")
+	})
+
+	t.Run("unique_by_name", func(t *testing.T) {
+		type Config struct {
+			Users []User `json:"users" pedantigo:"unique=Name"`
+		}
+		validator := New[Config]()
+
+		// Valid: unique names
+		_, err := validator.Unmarshal([]byte(`{"users":[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"}]}`))
+		require.NoError(t, err)
+
+		// Invalid: duplicate names
+		_, err = validator.Unmarshal([]byte(`{"users":[{"id":1,"name":"Alice"},{"id":2,"name":"Alice"}]}`))
+		require.Error(t, err)
+	})
+
+	t.Run("empty_struct_slice_passes", func(t *testing.T) {
+		type Config struct {
+			Users []User `json:"users" pedantigo:"unique=ID"`
+		}
+		validator := New[Config]()
+
+		config, err := validator.Unmarshal([]byte(`{"users":[]}`))
+		require.NoError(t, err)
+		assert.Empty(t, config.Users)
+	})
+}
+
+// TestUnique_PanicOnNonCollection tests that unique on non-collection panics.
+func TestUnique_PanicOnNonCollection(t *testing.T) {
+	type Config struct {
+		Name string `json:"name" pedantigo:"unique"`
+	}
+
+	assert.Panics(t, func() {
+		New[Config]()
+	})
+}
+
+// TestSlice_UniqueWithOtherConstraints tests unique combined with other constraints.
+func TestSlice_UniqueWithOtherConstraints(t *testing.T) {
+	t.Run("unique_and_min", func(t *testing.T) {
+		type Config struct {
+			Tags []string `json:"tags" pedantigo:"unique,min=2"`
+		}
+		validator := New[Config]()
+
+		// Invalid: not enough elements
+		_, err := validator.Unmarshal([]byte(`{"tags":["a"]}`))
+		require.Error(t, err)
+		var ve *ValidationError
+		require.ErrorAs(t, err, &ve)
+		assert.Contains(t, ve.Errors[0].Message, "at least 2")
+
+		// Invalid: duplicates
+		_, err = validator.Unmarshal([]byte(`{"tags":["a","a"]}`))
+		require.Error(t, err)
+
+		// Valid: 2 unique elements
+		config, err := validator.Unmarshal([]byte(`{"tags":["a","b"]}`))
+		require.NoError(t, err)
+		assert.Len(t, config.Tags, 2)
+	})
+}

@@ -146,6 +146,12 @@ func (v *Validator[T]) validateDiveTags(typ reflect.Type) {
 				typ.Name(), field.Name, fieldType.Kind()))
 		}
 
+		// Panic: unique on non-collection field
+		if _, hasUnique := parsedTag.CollectionConstraints["unique"]; hasUnique && !isCollection {
+			panic(fmt.Sprintf("field %s.%s: 'unique' can only be used on slice or map types, got %s",
+				typ.Name(), field.Name, fieldType.Kind()))
+		}
+
 		// Recursively validate nested structs
 		switch fieldType.Kind() {
 		case reflect.Struct:

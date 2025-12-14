@@ -165,6 +165,8 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			}
 		case "disallow_inf_nan":
 			result = append(result, disallowInfNanConstraint{})
+		case "unique":
+			result = append(result, uniqueConstraint{field: value})
 		case "default":
 			result = append(result, defaultConstraint{value: value})
 		}
