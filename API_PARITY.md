@@ -83,9 +83,9 @@ JSON Schema standard support.
 | Feature                      | Pedantigo | Pydantic v2 | Go Validator | Supported by JSON Schema standard? |
 |------------------------------|-----------|-------------|--------------|------------------------------------|
 | Array/Slice min/max          | √         | √           | √            | √                                  |
-| Element validation           | √         | √           | √            | √                                  |
+| Element validation (dive)    | √         | √           | √            | √                                  |
 | Map validation               | √         | √           | √            | √                                  |
-| Map key validation           | Partial   | √           | √            | √                                  |
+| Map key validation (keys)    | √         | √           | √            | √                                  |
 | Unique items                 | ×         | √           | √            | √                                  |
 | Set types                    | ×         | √           | ×            | ×                                  |
 | Tuple types                  | ×         | √           | ×            | √                                  |
@@ -210,7 +210,7 @@ JSON Schema standard support.
 | Struct field reflection      | ×         | √           | ×            | ×                                  |
 | Recursive structs            | √         | √           | √            | √                                  |
 
-**Summary**: 73/137 features implemented (53%)
+**Summary**: 75/137 features implemented (55%)
 
 **Legend**: √ = Supported, × = Not supported, Partial = Limited support
 
