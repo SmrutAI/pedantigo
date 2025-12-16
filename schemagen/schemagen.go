@@ -83,11 +83,12 @@ const (
 	fmtULID   = "ulid"
 )
 
-// Schema metadata constraints (Phase 12).
+// Schema metadata constraints (Phase 9 and 12).
 const (
 	metaTitle       = "title"
 	metaDescription = "description"
 	metaExamples    = "examples"
+	metaDeprecated  = "deprecated"
 )
 
 // GenerateBaseSchema creates base JSON schema for a type (all nested structs inlined).
@@ -373,6 +374,18 @@ func ApplyConstraints(schema *jsonschema.Schema, constraintsMap map[string]strin
 			schema.Examples = make([]any, len(examples))
 			for i, ex := range examples {
 				schema.Examples[i] = strings.TrimSpace(ex)
+			}
+
+		case metaDeprecated:
+			schema.Deprecated = true
+			// If a message is provided, append to description
+			if value != "" {
+				deprecationMsg := "Deprecated: " + value
+				if schema.Description != "" {
+					schema.Description = schema.Description + ". " + deprecationMsg
+				} else {
+					schema.Description = deprecationMsg
+				}
 			}
 
 		case "default":

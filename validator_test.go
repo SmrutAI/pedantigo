@@ -1976,3 +1976,314 @@ func TestNewModel_NilPointer(t *testing.T) {
 	require.ErrorAs(t, err, &ve)
 	assert.Contains(t, ve.Errors[0].Message, "nil pointer")
 }
+
+// ==================== String Transformation Tests ====================
+// Tests for #19/#20: strip_whitespace, to_lower, to_upper transformations
+// In Unmarshal/NewModel mode: transforms the string data
+// In Validate() mode: checks if string is already in expected format (no mutation)
+
+// TestStringTransformations_StripWhitespace tests strip_whitespace during Unmarshal.
+func TestStringTransformations_StripWhitespace(t *testing.T) {
+	type User struct {
+		Name string `json:"name" pedantigo:"strip_whitespace"`
+	}
+
+	validator := New[User]()
+
+	tests := []struct {
+		name     string
+		json     string
+		expected string
+	}{
+		{
+			name:     "leading whitespace stripped",
+			json:     `{"name":"  John"}`,
+			expected: "John",
+		},
+		{
+			name:     "trailing whitespace stripped",
+			json:     `{"name":"John  "}`,
+			expected: "John",
+		},
+		{
+			name:     "both stripped",
+			json:     `{"name":"  John  "}`,
+			expected: "John",
+		},
+		{
+			name:     "tabs and newlines stripped",
+			json:     `{"name":"\t\nJohn\n\t"}`,
+			expected: "John",
+		},
+		{
+			name:     "already clean",
+			json:     `{"name":"John"}`,
+			expected: "John",
+		},
+		{
+			name:     "internal spaces preserved",
+			json:     `{"name":"  John Doe  "}`,
+			expected: "John Doe",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			user, err := validator.Unmarshal([]byte(tt.json))
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, user.Name)
+		})
+	}
+}
+
+// TestStringTransformations_ToLower tests to_lower during Unmarshal.
+func TestStringTransformations_ToLower(t *testing.T) {
+	type User struct {
+		Email string `json:"email" pedantigo:"to_lower"`
+	}
+
+	validator := New[User]()
+
+	tests := []struct {
+		name     string
+		json     string
+		expected string
+	}{
+		{
+			name:     "uppercase to lowercase",
+			json:     `{"email":"JOHN@EXAMPLE.COM"}`,
+			expected: "john@example.com",
+		},
+		{
+			name:     "mixed case to lowercase",
+			json:     `{"email":"John@Example.COM"}`,
+			expected: "john@example.com",
+		},
+		{
+			name:     "already lowercase",
+			json:     `{"email":"john@example.com"}`,
+			expected: "john@example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			user, err := validator.Unmarshal([]byte(tt.json))
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, user.Email)
+		})
+	}
+}
+
+// TestStringTransformations_ToUpper tests to_upper during Unmarshal.
+func TestStringTransformations_ToUpper(t *testing.T) {
+	type Product struct {
+		Code string `json:"code" pedantigo:"to_upper"`
+	}
+
+	validator := New[Product]()
+
+	tests := []struct {
+		name     string
+		json     string
+		expected string
+	}{
+		{
+			name:     "lowercase to uppercase",
+			json:     `{"code":"abc-123"}`,
+			expected: "ABC-123",
+		},
+		{
+			name:     "mixed case to uppercase",
+			json:     `{"code":"aBc-123-dEf"}`,
+			expected: "ABC-123-DEF",
+		},
+		{
+			name:     "already uppercase",
+			json:     `{"code":"ABC-123"}`,
+			expected: "ABC-123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			product, err := validator.Unmarshal([]byte(tt.json))
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, product.Code)
+		})
+	}
+}
+
+// TestStringTransformations_Combined tests multiple transformations together.
+func TestStringTransformations_Combined(t *testing.T) {
+	type User struct {
+		Email string `json:"email" pedantigo:"strip_whitespace,to_lower"`
+	}
+
+	validator := New[User]()
+
+	tests := []struct {
+		name     string
+		json     string
+		expected string
+	}{
+		{
+			name:     "strip and lowercase",
+			json:     `{"email":"  JOHN@EXAMPLE.COM  "}`,
+			expected: "john@example.com",
+		},
+		{
+			name:     "strip tabs and lowercase",
+			json:     `{"email":"\tJohn@Example.com\t"}`,
+			expected: "john@example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			user, err := validator.Unmarshal([]byte(tt.json))
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, user.Email)
+		})
+	}
+}
+
+// TestStringTransformations_StripAndToUpper tests strip_whitespace with to_upper.
+func TestStringTransformations_StripAndToUpper(t *testing.T) {
+	type Product struct {
+		Code string `json:"code" pedantigo:"strip_whitespace,to_upper"`
+	}
+
+	validator := New[Product]()
+
+	product, err := validator.Unmarshal([]byte(`{"code":"  abc-123  "}`))
+	require.NoError(t, err)
+	assert.Equal(t, "ABC-123", product.Code)
+}
+
+// TestStringTransformations_WithPointerField tests transformations with pointer fields.
+func TestStringTransformations_WithPointerField(t *testing.T) {
+	type User struct {
+		Email *string `json:"email" pedantigo:"strip_whitespace,to_lower"`
+	}
+
+	validator := New[User]()
+
+	// Non-nil value
+	user, err := validator.Unmarshal([]byte(`{"email":"  JOHN@EXAMPLE.COM  "}`))
+	require.NoError(t, err)
+	require.NotNil(t, user.Email)
+	assert.Equal(t, "john@example.com", *user.Email)
+
+	// Nil value (missing field)
+	user2, err := validator.Unmarshal([]byte(`{}`))
+	require.NoError(t, err)
+	assert.Nil(t, user2.Email)
+}
+
+// TestStringTransformations_WithDefaults tests transformations with default values.
+func TestStringTransformations_WithDefaults(t *testing.T) {
+	type Config struct {
+		Mode string `json:"mode" pedantigo:"default=DEBUG,to_lower"`
+	}
+
+	validator := New[Config]()
+
+	// Missing field - default should be applied then transformed
+	config, err := validator.Unmarshal([]byte(`{}`))
+	require.NoError(t, err)
+	assert.Equal(t, "debug", config.Mode)
+
+	// Explicit value - should be transformed
+	config2, err := validator.Unmarshal([]byte(`{"mode":"PRODUCTION"}`))
+	require.NoError(t, err)
+	assert.Equal(t, "production", config2.Mode)
+}
+
+// TestStringTransformations_Validate_NoMutation tests that Validate() mode
+// checks format but does NOT mutate the value.
+func TestStringTransformations_Validate_NoMutation(t *testing.T) {
+	type User struct {
+		Email string `json:"email" pedantigo:"to_lower"`
+	}
+
+	validator := New[User]()
+
+	// User with uppercase email - Validate should fail (to_lower checks if already lowercase)
+	user := &User{Email: "JOHN@EXAMPLE.COM"}
+	err := validator.Validate(user)
+	require.Error(t, err)
+
+	// Original value should NOT be mutated
+	assert.Equal(t, "JOHN@EXAMPLE.COM", user.Email)
+
+	// User with lowercase email - Validate should pass
+	user2 := &User{Email: "john@example.com"}
+	err = validator.Validate(user2)
+	require.NoError(t, err)
+}
+
+// TestStringTransformations_Validate_StripWhitespace tests strip_whitespace in Validate mode.
+func TestStringTransformations_Validate_StripWhitespace(t *testing.T) {
+	type User struct {
+		Name string `json:"name" pedantigo:"strip_whitespace"`
+	}
+
+	validator := New[User]()
+
+	// String with whitespace - should fail validation
+	user := &User{Name: "  John  "}
+	err := validator.Validate(user)
+	require.Error(t, err)
+
+	// Original value should NOT be mutated
+	assert.Equal(t, "  John  ", user.Name)
+
+	// String without whitespace - should pass
+	user2 := &User{Name: "John"}
+	err = validator.Validate(user2)
+	require.NoError(t, err)
+}
+
+// TestStringTransformations_NewModel_Map tests transformations with map input.
+func TestStringTransformations_NewModel_Map(t *testing.T) {
+	type User struct {
+		Email string `json:"email" pedantigo:"strip_whitespace,to_lower"`
+	}
+
+	validator := New[User]()
+
+	user, err := validator.NewModel(map[string]any{
+		"email": "  JOHN@EXAMPLE.COM  ",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "john@example.com", user.Email)
+}
+
+// TestStringTransformations_WithValidation tests transformations with additional validation.
+func TestStringTransformations_WithValidation(t *testing.T) {
+	type User struct {
+		Email string `json:"email" pedantigo:"strip_whitespace,to_lower,email"`
+	}
+
+	validator := New[User]()
+
+	// Valid email with whitespace and uppercase - should transform and validate
+	user, err := validator.Unmarshal([]byte(`{"email":"  JOHN@EXAMPLE.COM  "}`))
+	require.NoError(t, err)
+	assert.Equal(t, "john@example.com", user.Email)
+
+	// Invalid email - should fail validation after transformation
+	_, err = validator.Unmarshal([]byte(`{"email":"  notanemail  "}`))
+	require.Error(t, err)
+
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve)
+	foundEmailError := false
+	for _, fieldErr := range ve.Errors {
+		if fieldErr.Field == "Email" {
+			foundEmailError = true
+		}
+	}
+	assert.True(t, foundEmailError, "expected email validation error")
+}

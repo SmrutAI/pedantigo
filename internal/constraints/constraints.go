@@ -33,15 +33,18 @@ const (
 	CLen    = "len"
 
 	// String constraints.
-	CAscii      = "ascii"
-	CAlpha      = "alpha"
-	CAlphanum   = "alphanum"
-	CContains   = "contains"
-	CExcludes   = "excludes"
-	CStartswith = "startswith"
-	CEndswith   = "endswith"
-	CLowercase  = "lowercase"
-	CUppercase  = "uppercase"
+	CAscii           = "ascii"
+	CAlpha           = "alpha"
+	CAlphanum        = "alphanum"
+	CContains        = "contains"
+	CExcludes        = "excludes"
+	CStartswith      = "startswith"
+	CEndswith        = "endswith"
+	CLowercase       = "lowercase"
+	CUppercase       = "uppercase"
+	CStripWhitespace = "strip_whitespace"
+	CToLower         = "to_lower"
+	CToUpper         = "to_upper"
 
 	// Numeric constraints.
 	CPositive       = "positive"
@@ -193,7 +196,7 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			result = appendCoreConstraint(result, name, value, fieldType)
 
 		// String constraints.
-		case CAscii, CAlpha, CAlphanum, CContains, CExcludes, CStartswith, CEndswith, CLowercase, CUppercase:
+		case CAscii, CAlpha, CAlphanum, CContains, CExcludes, CStartswith, CEndswith, CLowercase, CUppercase, CStripWhitespace, CToLower, CToUpper:
 			result = appendStringConstraint(result, name, value)
 
 		// Numeric constraints.
@@ -322,6 +325,15 @@ func appendStringConstraint(result []Constraint, name, value string) []Constrain
 	case "lowercase":
 		return append(result, lowercaseConstraint{})
 	case "uppercase":
+		return append(result, uppercaseConstraint{})
+	case "strip_whitespace":
+		// In Validate mode: check if string has no leading/trailing whitespace
+		return append(result, stripWhitespaceConstraint{})
+	case "to_lower":
+		// In Validate mode: check if string is all lowercase
+		return append(result, lowercaseConstraint{})
+	case "to_upper":
+		// In Validate mode: check if string is all uppercase
 		return append(result, uppercaseConstraint{})
 	}
 	return result

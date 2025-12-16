@@ -15,18 +15,43 @@ func ShouldIncludeField(
 	meta FieldMetadata,
 	fieldValue reflect.Value,
 	opts SerializeOptions,
+	hasWhitelistContext bool,
 ) bool {
-	// 1. Check context-based exclusion
-	if opts.Context != "" && meta.ExcludeContexts[opts.Context] {
-		return false
+	if opts.Context != "" {
+		// 1. Check context-based exclusion (blacklist)
+		if meta.ExcludeContexts[opts.Context] {
+			return false
+		}
+
+		// 2. Check context-based inclusion (whitelist)
+		// If any field in the struct has include:context, we're in whitelist mode
+		if hasWhitelistContext {
+			// Field must explicitly have include:context to be included
+			if !meta.IncludeContexts[opts.Context] {
+				return false
+			}
+		}
 	}
 
-	// 2. Check omitzero
+	// 3. Check omitzero
 	if meta.OmitZero && opts.OmitZero && isZeroValue(fieldValue) {
 		return false
 	}
 
 	return true
+}
+
+// HasWhitelistContext checks if any field in metadata has include:context.
+func HasWhitelistContext(metadata map[string]FieldMetadata, context string) bool {
+	if context == "" {
+		return false
+	}
+	for _, meta := range metadata {
+		if meta.IncludeContexts[context] {
+			return true
+		}
+	}
+	return false
 }
 
 // isZeroValue checks if a value is its zero value (including nil pointers).
@@ -68,10 +93,13 @@ func ToFilteredMap(
 		val = val.Elem()
 	}
 
+	// Check if we're in whitelist mode for this context
+	hasWhitelist := HasWhitelistContext(metadata, opts.Context)
+
 	for jsonName, meta := range metadata {
 		fieldValue := val.Field(meta.FieldIndex)
 
-		if !ShouldIncludeField(meta, fieldValue, opts) {
+		if !ShouldIncludeField(meta, fieldValue, opts, hasWhitelist) {
 			continue
 		}
 

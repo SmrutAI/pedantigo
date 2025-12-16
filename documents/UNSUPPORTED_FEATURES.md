@@ -1,0 +1,459 @@
+# Unsupported Features
+
+Features from Pydantic v2 and go-playground/validator that Pedantigo does not support, with explanations.
+
+---
+
+## Quick Reference
+
+| Feature                         | Source    | Reason                                 | Workaround                                       |
+|---------------------------------|-----------|----------------------------------------|--------------------------------------------------|
+| Immutable structs               | Pydantic  | Go can't intercept field writes        | Use unexported fields + getters                  |
+| Validate on assignment          | Pydantic  | Go can't intercept field writes        | Call `Validate()` after mutations                |
+| Before validators               | Pydantic  | Go has no annotation system            | Transform in `NewModel()` or custom deserializer |
+| Wrap validators                 | Pydantic  | Go has no annotation system            | Implement `Validatable` interface                |
+| Type coercion                   | Pydantic  | Go is statically typed                 | Use correct types in JSON                        |
+| Generic[T] BaseModel            | Pydantic  | Go can't construct types at runtime    | Define concrete types per variant                |
+| ORM mode                        | Pydantic  | Python-specific (SQLAlchemy)           | Manual struct conversion                         |
+| BaseSettings                    | Pydantic  | Python-specific (dotenv, env vars)     | Use `envconfig` or `viper`                       |
+| TypeAdapter                     | Pydantic  | Python's dynamic typing                | Use `Validator[T]` directly                      |
+| RootModel                       | Pydantic  | Python-specific pattern                | Use wrapper struct                               |
+| Cross-struct validation         | validator | Adds complexity, rarely needed         | Validate at service layer                        |
+| Validator context               | validator | Adds complexity                        | Use struct fields for context                    |
+| Country/Currency/Language codes | validator | Database dependency                    | Use `oneof` with code list                       |
+| Postal codes                    | validator | Country-specific complexity            | Use `regexp`                                     |
+
+---
+
+## Detailed Explanations
+
+### 1. Immutable/Frozen Structs
+
+**Source:** Pydantic `frozen=True`
+
+**Pydantic:**
+```python
+class User(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    name: str
+
+user = User(name="Alice")
+user.name = "Bob"  # ❌ Raises ValidationError
+```
+
+**Why not in Go:**
+- Go has no mechanism to intercept struct field writes
+- Would require getter/setter for every field (massive boilerplate)
+- Not idiomatic Go - breaks expectations
+
+**Workaround:**
+```go
+type User struct {
+    name string  // unexported
+}
+
+func (u *User) Name() string { return u.name }  // read-only access
+```
+
+**See:** [documents/nuances/why_not_basemodel.md](nuances/why_not_basemodel.md)
+
+---
+
+### 2. Validate on Assignment
+
+**Source:** Pydantic `validate_assignment=True`
+
+**Pydantic:**
+```python
+class User(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+    age: int = Field(ge=0)
+
+user = User(age=25)
+user.age = -5  # ❌ Raises ValidationError immediately
+```
+
+**Why not in Go:**
+- Same as immutable structs - Go can't intercept field assignments
+- Would need setters for every field
+- Defeats purpose of struct tags
+
+**Workaround:**
+```go
+user.Age = -5
+if err := validator.Validate(&user); err != nil {
+    // Handle validation error
+}
+```
+
+---
+
+### 3. Before/Wrap Validators
+
+**Source:** Pydantic `mode='before'`, `mode='wrap'`
+
+**Pydantic:**
+```python
+class User(BaseModel):
+    name: str
+
+    @field_validator('name', mode='before')
+    @classmethod
+    def strip_name(cls, v):
+        return v.strip() if isinstance(v, str) else v
+```
+
+**Why not in Go:**
+- Go has no decorator/annotation system
+- Can't inject code before field assignment during unmarshaling
+- Reflection can observe but not modify unmarshaling process
+
+**Workaround:**
+```go
+// Use NewModel() which can transform data
+user, err := validator.NewModel(input)
+
+// Or implement custom UnmarshalJSON
+func (u *User) UnmarshalJSON(data []byte) error {
+    // Transform before setting fields
+}
+```
+
+**Note:** String transformations (`strip_whitespace`, `to_lower`, `to_upper`) ARE supported via tags. In `Unmarshal()`/`NewModel()` they transform the data; in `Validate()` they check format.
+
+---
+
+### 4. Type Coercion
+
+**Source:** Pydantic automatic coercion
+
+**Pydantic:**
+```python
+class Config(BaseModel):
+    port: int
+
+config = Config(port="8080")  # ✅ Converts "8080" to 8080
+```
+
+**Why not in Go:**
+- Go is statically typed - `"8080"` is a string, not an int
+- `encoding/json` errors on type mismatch
+- Implicit coercion violates Go's explicit philosophy
+
+**Workaround:**
+```go
+// Provide correct types in JSON
+json := `{"port": 8080}`  // number, not string
+
+// Or use json.Number for flexible parsing
+type Config struct {
+    Port json.Number `json:"port"`
+}
+```
+
+---
+
+### 5. Generic Structs (Pydantic's Dynamic Pattern)
+
+**Source:** Pydantic `Generic[T]`
+
+**Pydantic:**
+```python
+from typing import Generic, TypeVar
+T = TypeVar('T')
+
+class Response(BaseModel, Generic[T]):
+    data: T
+    status: int
+
+# Construct type at runtime
+response = Response[User](data=user, status=200)
+schema = Response[User].model_json_schema()  # Schema for User
+schema = Response[Order].model_json_schema() # Schema for Order - same class!
+```
+
+**Why not in Go:**
+- Go requires concrete types at compile time
+- Can't construct `Response[SomeType]` dynamically from a string/variable
+- Each `Response[User]` and `Response[Order]` is a distinct type at compile time
+
+**Note:** Go generics DO work with reflection. Pedantigo's `Validator[T]` uses this. The limitation is runtime type construction, not reflection.
+
+**Workaround:**
+```go
+// Define concrete types (Go's approach)
+type UserResponse struct {
+    Data   User `json:"data"`
+    Status int  `json:"status"`
+}
+
+type OrderResponse struct {
+    Data   Order `json:"data"`
+    Status int   `json:"status"`
+}
+
+// Both work with Pedantigo
+userValidator := pedantigo.New[UserResponse]()
+orderValidator := pedantigo.New[OrderResponse]()
+```
+
+---
+
+### 6. ORM Mode / from_attributes
+
+**Source:** Pydantic `from_attributes=True`
+
+**Pydantic:**
+```python
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    name: str
+
+# Convert SQLAlchemy model to Pydantic
+user_out = UserOut.model_validate(sqlalchemy_user)
+```
+
+**Why not in Go:**
+- Python-specific pattern for SQLAlchemy integration
+- Go ORMs (GORM, sqlx) use struct tags directly
+- No need for conversion layer
+
+**Workaround:**
+```go
+// GORM and JSON use same struct
+type User struct {
+    ID   uint   `gorm:"primaryKey" json:"id"`
+    Name string `gorm:"column:name" json:"name"`
+}
+
+// Already works - no conversion needed
+```
+
+---
+
+### 7. BaseSettings / Environment Variables
+
+**Source:** Pydantic `BaseSettings`
+
+**Pydantic:**
+```python
+class Settings(BaseSettings):
+    database_url: str
+    debug: bool = False
+
+    class Config:
+        env_file = '.env'
+
+settings = Settings()  # Auto-loads from environment
+```
+
+**Why not in Go:**
+- Python-specific pattern
+- Go has mature alternatives
+- Different philosophy (explicit vs magic)
+
+**Workaround:**
+```go
+// Use envconfig
+import "github.com/kelseyhightower/envconfig"
+
+type Settings struct {
+    DatabaseURL string `envconfig:"DATABASE_URL" required:"true"`
+    Debug       bool   `envconfig:"DEBUG" default:"false"`
+}
+
+envconfig.Process("", &settings)
+
+// Or use viper for complex configs
+import "github.com/spf13/viper"
+```
+
+---
+
+### 8. TypeAdapter
+
+**Source:** Pydantic `TypeAdapter`
+
+**Pydantic:**
+```python
+adapter = TypeAdapter(list[int])
+result = adapter.validate_python([1, 2, "3"])  # Validates + coerces
+```
+
+**Why not in Go:**
+- Python's dynamic typing allows runtime type construction
+- Go types are fixed at compile time
+- `Validator[T]` already handles this case
+
+**Workaround:**
+```go
+// Define type explicitly
+type IntList []int
+
+validator := pedantigo.New[IntList]()
+```
+
+---
+
+### 9. RootModel
+
+**Source:** Pydantic `RootModel`
+
+**Pydantic:**
+```python
+class UserList(RootModel[list[User]]):
+    pass
+
+users = UserList.model_validate([{"name": "Alice"}, {"name": "Bob"}])
+```
+
+**Why not in Go:**
+- Can't have methods on `[]T` in Go
+- Would need wrapper struct anyway
+- Validator already supports slices directly
+
+**Workaround:**
+```go
+type UserList struct {
+    Users []User `json:"users"`
+}
+
+// Or validate slice directly
+validator := pedantigo.New[[]User]()
+```
+
+---
+
+### 10. Cross-Struct Validation (eqcsfield, etc.)
+
+**Source:** go-playground/validator `eqcsfield`, `necsfield`, etc.
+
+**validator:**
+```go
+type Outer struct {
+    Inner Inner
+    Max   int `validate:"gtcsfield=Inner.Value"`  // Compare across structs
+}
+```
+
+**Why not in Pedantigo:**
+- Adds significant complexity to field resolution
+- Rarely needed in practice
+- Can always use `Validate()` method for complex cases
+
+**Workaround:**
+```go
+func (o *Outer) Validate() error {
+    if o.Max <= o.Inner.Value {
+        return errors.New("Max must be greater than Inner.Value")
+    }
+    return nil
+}
+```
+
+---
+
+### 11. Validator Context
+
+**Source:** go-playground/validator `FieldLevel`
+
+**validator:**
+```go
+validate.RegisterValidationCtx("custom", func(ctx context.Context, fl validator.FieldLevel) bool {
+    userID := ctx.Value("user_id").(string)
+    // Use context in validation
+})
+```
+
+**Why not in Pedantigo:**
+- Adds complexity to validation API
+- Context belongs at service layer, not field level
+- Can use struct fields to pass context
+
+**Workaround:**
+```go
+type Request struct {
+    UserID string  // Include context as field
+    Data   string `pedantigo:"required"`
+}
+
+func (r *Request) Validate() error {
+    // Use r.UserID for context-aware validation
+}
+```
+
+---
+
+### 12. Country/Currency/Language Codes
+
+**Source:** go-playground/validator `iso3166_1_alpha2`, `iso4217`, `bcp47_language_tag`
+
+**Why not in Pedantigo:**
+- Requires maintaining ISO code databases
+- Codes change over time (countries added/removed)
+- Significant maintenance burden
+
+**Workaround:**
+```go
+// Use oneof with explicit codes
+type Address struct {
+    Country string `pedantigo:"oneof=US CA GB DE FR"`
+}
+
+// Or use regexp for format validation
+type Currency struct {
+    Code string `pedantigo:"regexp=^[A-Z]{3}$"`  // 3 uppercase letters
+}
+```
+
+---
+
+### 13. Postal Codes
+
+**Source:** go-playground/validator `postcode_iso3166_alpha2`
+
+**Why not in Pedantigo:**
+- Every country has different format
+- Would need 200+ regex patterns
+- Maintenance nightmare
+
+**Workaround:**
+```go
+// Validate format for specific country
+type USAddress struct {
+    ZIP string `pedantigo:"regexp=^[0-9]{5}(-[0-9]{4})?$"`
+}
+
+type UKAddress struct {
+    Postcode string `pedantigo:"regexp=^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$"`
+}
+```
+
+---
+
+## Features That May Be Added Later
+
+These are not currently supported but could be added if demand exists:
+
+| Feature | Complexity | Notes |
+|---------|------------|-------|
+| Strict types (StrictInt, etc.) | Medium | Planned for Phase 12 |
+| Secret types (SecretStr) | Medium | Planned for Phase 12 |
+| Path validation (FilePath) | Low | Planned for Phase 12 |
+| time.Duration | Low | Parse from string like "5m30s" |
+| Set/Tuple types | Low | Not idiomatic in Go |
+| Alias generators | Medium | Could use go:generate |
+| i18n/l10n | High | Community contribution welcome |
+
+---
+
+## Philosophy
+
+Pedantigo prioritizes:
+
+1. **Go idioms** over Pydantic patterns
+2. **Compile-time safety** over runtime magic
+3. **Explicit behavior** over implicit coercion
+4. **Simplicity** over feature completeness
+
+If a Pydantic feature requires fighting Go's design, we document the workaround rather than add non-idiomatic code.

@@ -103,7 +103,7 @@ class DateRange(BaseModel):
 // Simple field comparison - use declarative tags
 type DateRange struct {
     StartDate time.Time `pedantigo:"required"`
-    EndDate   time.Time `pedantigo:"required,gtField=StartDate"`
+    EndDate   time.Time `pedantigo:"required,gtfield=StartDate"`
 }
 
 // Complex conditional logic - implement Validate()
@@ -127,7 +127,7 @@ func (u *User) Validate() error {
 }
 ```
 
-**Key difference:** Pydantic requires custom code for all cross-field validation. Pedantigo offers declarative tags (`gtField`, `gteField`, `ltField`, `lteField`) for simple field comparisons, reducing boilerplate.
+**Key difference:** Pydantic requires custom code for all cross-field validation. Pedantigo offers declarative tags (`gtfield`, `gtefield`, `ltfield`, `ltefield`) for simple field comparisons, reducing boilerplate.
 
 **Note:** `Validate()` is completely optional in Pedantigo. Only implement when struct tags can't express your validation logic.
 
@@ -297,7 +297,19 @@ func (c Cat) GetType() string { return "cat" }
 func (d Dog) GetType() string { return "dog" }
 ```
 
-Full discriminated union support with automatic routing is planned for Phase 5.
+Discriminated union support is now available via `NewUnion()`:
+
+```go
+validator, _ := pedantigo.NewUnion[any](pedantigo.UnionOptions{
+    DiscriminatorField: "pet_type",
+    Variants: []pedantigo.UnionVariant{
+        pedantigo.VariantFor[Cat]("cat"),
+        pedantigo.VariantFor[Dog]("dog"),
+    },
+})
+
+result, _ := validator.Unmarshal(jsonData)
+```
 
 ---
 
@@ -368,12 +380,14 @@ except ValidationError as e:
         print(f"{error['loc']}: {error['msg']}")
 ```
 
-**Pedantigo:** Returns `[]ValidationError` slice
+**Pedantigo:** Returns `*ValidationError` with `Errors []FieldError`
 
 ```go
-_, errs := validator.Unmarshal(jsonData)
-for _, err := range errs {
-    fmt.Printf("%s: %s\n", err.Field, err.Message)
+_, err := validator.Unmarshal(jsonData)
+if ve, ok := err.(*pedantigo.ValidationError); ok {
+    for _, fe := range ve.Errors {
+        fmt.Printf("%s: %s (code: %s)\n", fe.Field, fe.Message, fe.Code)
+    }
 }
 ```
 

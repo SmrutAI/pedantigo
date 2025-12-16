@@ -11,7 +11,8 @@ import (
 type FieldMetadata struct {
 	FieldIndex      int
 	JSONName        string
-	ExcludeContexts map[string]bool // Set for O(1) lookup
+	ExcludeContexts map[string]bool // Set for O(1) lookup (blacklist)
+	IncludeContexts map[string]bool // Set for O(1) lookup (whitelist)
 	OmitZero        bool
 	OmitEmpty       bool // From json:",omitempty"
 }
@@ -44,6 +45,7 @@ func BuildFieldMetadata(typ reflect.Type) map[string]FieldMetadata {
 
 		constraintsMap := tags.ParseTag(field.Tag)
 		excludeContexts := make(map[string]bool)
+		includeContexts := make(map[string]bool)
 		var omitZero bool
 
 		if constraintsMap != nil {
@@ -56,6 +58,15 @@ func BuildFieldMetadata(typ reflect.Type) map[string]FieldMetadata {
 					}
 				}
 			}
+			// Parse include:context1|context2 (pipe-separated)
+			if includeVal, ok := constraintsMap["include"]; ok {
+				for _, ctx := range strings.Split(includeVal, "|") {
+					ctx = strings.TrimSpace(ctx)
+					if ctx != "" {
+						includeContexts[ctx] = true
+					}
+				}
+			}
 			_, omitZero = constraintsMap["omitzero"]
 		}
 
@@ -63,6 +74,7 @@ func BuildFieldMetadata(typ reflect.Type) map[string]FieldMetadata {
 			FieldIndex:      i,
 			JSONName:        jsonName,
 			ExcludeContexts: excludeContexts,
+			IncludeContexts: includeContexts,
 			OmitZero:        omitZero,
 			OmitEmpty:       omitEmpty,
 		}

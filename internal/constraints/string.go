@@ -19,16 +19,17 @@ type (
 		pattern string
 		regex   *regexp.Regexp
 	}
-	lenConstraint        struct{ length int }
-	asciiConstraint      struct{}
-	alphaConstraint      struct{}
-	alphanumConstraint   struct{}
-	containsConstraint   struct{ substring string }
-	excludesConstraint   struct{ substring string }
-	startswithConstraint struct{ prefix string }
-	endswithConstraint   struct{ suffix string }
-	lowercaseConstraint  struct{}
-	uppercaseConstraint  struct{}
+	lenConstraint             struct{ length int }
+	asciiConstraint           struct{}
+	alphaConstraint           struct{}
+	alphanumConstraint        struct{}
+	containsConstraint        struct{ substring string }
+	excludesConstraint        struct{ substring string }
+	startswithConstraint      struct{ prefix string }
+	endswithConstraint        struct{ suffix string }
+	lowercaseConstraint       struct{}
+	uppercaseConstraint       struct{}
+	stripWhitespaceConstraint struct{}
 )
 
 // emailConstraint validates that a string is a valid email format.
@@ -347,6 +348,29 @@ func (c uppercaseConstraint) Validate(value any) error {
 	// Check if string is all uppercase
 	if str != strings.ToUpper(str) {
 		return NewConstraintError(CodeMustBeUppercase, "must be all uppercase")
+	}
+
+	return nil
+}
+
+// stripWhitespaceConstraint validates that a string has no leading/trailing whitespace.
+// Used in Validate() mode to check if string is already stripped.
+func (c stripWhitespaceConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("strip_whitespace constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check if string has leading/trailing whitespace
+	if str != strings.TrimSpace(str) {
+		return NewConstraintError(CodeMustBeStripped, "must not have leading or trailing whitespace")
 	}
 
 	return nil

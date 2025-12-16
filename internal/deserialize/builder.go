@@ -8,6 +8,13 @@ import (
 	"github.com/SmrutAI/Pedantigo/internal/tags"
 )
 
+// StringTransformations holds flags for string transformations to apply during deserialization.
+type StringTransformations struct {
+	StripWhitespace bool
+	ToLower         bool
+	ToUpper         bool
+}
+
 // MissingFieldSentinel is a sentinel value to distinguish missing fields from explicit null.
 type MissingFieldSentinel struct{}
 
@@ -88,6 +95,8 @@ func BuildFieldDeserializers(
 		var staticDefault *string
 		var methodName *string
 
+		// Parse string transformations
+		var transformations StringTransformations
 		if constraints != nil {
 			if defVal, hasDefault := constraints["default"]; hasDefault {
 				staticDefault = &defVal
@@ -99,12 +108,22 @@ func BuildFieldDeserializers(
 					panic(fmt.Sprintf("field %s: %v", field.Name, err))
 				}
 			}
+
+			// Parse transformation tags
+			_, transformations.StripWhitespace = constraints["strip_whitespace"]
+			_, transformations.ToLower = constraints["to_lower"]
+			_, transformations.ToUpper = constraints["to_upper"]
 		}
+
+		// Check if this is a string field (for transformations)
+		isStringField := field.Type.Kind() == reflect.String ||
+			(field.Type.Kind() == reflect.Ptr && field.Type.Elem().Kind() == reflect.String)
 
 		// Create field deserializer closure
 		fieldIndex := i
 		fieldType := field.Type
 		_, hasRequired := constraints["required"] // Check if key exists, not if value is non-empty
+		fieldTransformations := transformations   // Capture for closure
 
 		deserializers[fieldName] = func(outPtr *reflect.Value, inValue any) error {
 			fieldValue := outPtr.Field(fieldIndex)
@@ -117,6 +136,10 @@ func BuildFieldDeserializers(
 				if staticDefault != nil {
 					// Apply static default
 					setDefaultValueFunc(fieldValue, *staticDefault)
+					// Apply transformations to default value
+					if isStringField {
+						applyStringTransformations(fieldValue, fieldTransformations)
+					}
 					return nil
 				}
 
@@ -133,6 +156,10 @@ func BuildFieldDeserializers(
 						}
 						// Set the value
 						fieldValue.Set(results[0])
+						// Apply transformations to default value
+						if isStringField {
+							applyStringTransformations(fieldValue, fieldTransformations)
+						}
 					}
 					return nil
 				}
@@ -146,11 +173,52 @@ func BuildFieldDeserializers(
 			}
 
 			// Field is present in JSON - set the value
-			return setFieldValueFunc(fieldValue, inValue, fieldType)
+			if err := setFieldValueFunc(fieldValue, inValue, fieldType); err != nil {
+				return err
+			}
+
+			// Apply string transformations after setting the value
+			if isStringField {
+				applyStringTransformations(fieldValue, fieldTransformations)
+			}
+
+			return nil
 		}
 	}
 
 	return deserializers
+}
+
+// applyStringTransformations applies string transformations to a field value.
+// Order of operations: strip_whitespace first, then to_lower/to_upper.
+func applyStringTransformations(fieldValue reflect.Value, transforms StringTransformations) {
+	// Handle pointer to string
+	if fieldValue.Kind() == reflect.Ptr {
+		if fieldValue.IsNil() {
+			return
+		}
+		fieldValue = fieldValue.Elem()
+	}
+
+	if fieldValue.Kind() != reflect.String || !fieldValue.CanSet() {
+		return
+	}
+
+	str := fieldValue.String()
+
+	// Apply strip_whitespace first
+	if transforms.StripWhitespace {
+		str = strings.TrimSpace(str)
+	}
+
+	// Apply case transformations (to_lower takes precedence if both specified)
+	if transforms.ToLower {
+		str = strings.ToLower(str)
+	} else if transforms.ToUpper {
+		str = strings.ToUpper(str)
+	}
+
+	fieldValue.SetString(str)
 }
 
 // ValidateDefaultMethod checks that a method exists and has the correct signature.

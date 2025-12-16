@@ -105,6 +105,7 @@ const (
 	CodeMustEndWith     = "MUST_END_WITH"
 	CodeMustBeLowercase = "MUST_BE_LOWERCASE"
 	CodeMustBeUppercase = "MUST_BE_UPPERCASE"
+	CodeMustBeStripped  = "MUST_BE_STRIPPED"
 
 	// Enum/const constraints.
 	CodeInvalidEnum   = "INVALID_ENUM"

@@ -661,6 +661,50 @@ func TestApplyConstraints(t *testing.T) {
 				assert.Empty(t, schema.Examples[0])
 			},
 		},
+		{
+			name:      "deprecated simple",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"deprecated": "",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.True(t, schema.Deprecated)
+				assert.Empty(t, schema.Description)
+			},
+		},
+		{
+			name:      "deprecated with message",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"deprecated": "Use newField instead",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.True(t, schema.Deprecated)
+				assert.Equal(t, "Deprecated: Use newField instead", schema.Description)
+			},
+		},
+		{
+			name:      "deprecated with existing description",
+			fieldType: reflect.TypeOf(""),
+			constraints: map[string]string{
+				"description": "Old field for legacy support",
+				"deprecated":  "Will be removed in v3.0",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.True(t, schema.Deprecated)
+				assert.Equal(t, "Old field for legacy support. Deprecated: Will be removed in v3.0", schema.Description)
+			},
+		},
+		{
+			name:      "deprecated with int field",
+			fieldType: reflect.TypeOf(0),
+			constraints: map[string]string{
+				"deprecated": "",
+			},
+			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
+				assert.True(t, schema.Deprecated)
+			},
+		},
 	}
 
 	for _, tt := range tests {

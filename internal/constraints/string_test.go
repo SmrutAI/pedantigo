@@ -597,3 +597,38 @@ func TestUppercaseConstraint(t *testing.T) {
 		{"invalid type - bool", true, true},
 	})
 }
+
+// TestStripWhitespaceConstraint tests stripWhitespaceConstraint.Validate()
+// This constraint checks if string has NO leading/trailing whitespace.
+func TestStripWhitespaceConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, stripWhitespaceConstraint{}, []simpleTestCase{
+		// Valid cases - no leading/trailing whitespace
+		{"no whitespace", "hello", false},
+		{"no whitespace with internal spaces", "hello world", false},
+		{"no whitespace with tabs inside", "hello\tworld", false},
+		{"numbers only", "12345", false},
+		{"special chars", "@#$%", false},
+		{"mixed content", "hello 123 world!", false},
+		{"single char", "a", false},
+
+		// Invalid cases - has leading/trailing whitespace
+		{"leading space", " hello", true},
+		{"trailing space", "hello ", true},
+		{"both leading and trailing", " hello ", true},
+		{"leading tab", "\thello", true},
+		{"trailing tab", "hello\t", true},
+		{"leading newline", "\nhello", true},
+		{"trailing newline", "hello\n", true},
+		{"multiple leading spaces", "   hello", true},
+		{"multiple trailing spaces", "hello   ", true},
+		{"only whitespace", "   ", true},
+
+		// Edge cases
+		{"empty string", "", false},
+		{"nil pointer", (*string)(nil), false},
+
+		// Invalid types
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
+}

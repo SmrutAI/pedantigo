@@ -173,6 +173,7 @@ func TestShouldIncludeField_NoExclusion(t *testing.T) {
 		FieldIndex:      0,
 		JSONName:        "name",
 		ExcludeContexts: make(map[string]bool),
+		IncludeContexts: make(map[string]bool),
 		OmitZero:        false,
 		OmitEmpty:       false,
 	}
@@ -183,7 +184,7 @@ func TestShouldIncludeField_NoExclusion(t *testing.T) {
 	}
 
 	fieldValue := reflect.ValueOf("Alice")
-	result := ShouldIncludeField(meta, fieldValue, opts)
+	result := ShouldIncludeField(meta, fieldValue, opts, false)
 
 	assert.True(t, result, "field with no exclusions should be included")
 }
@@ -193,6 +194,7 @@ func TestShouldIncludeField_ExcludeContext_Matches(t *testing.T) {
 		FieldIndex:      0,
 		JSONName:        "password",
 		ExcludeContexts: map[string]bool{"response": true, "log": true},
+		IncludeContexts: make(map[string]bool),
 		OmitZero:        false,
 		OmitEmpty:       false,
 	}
@@ -203,7 +205,7 @@ func TestShouldIncludeField_ExcludeContext_Matches(t *testing.T) {
 	}
 
 	fieldValue := reflect.ValueOf("secret123")
-	result := ShouldIncludeField(meta, fieldValue, opts)
+	result := ShouldIncludeField(meta, fieldValue, opts, false)
 
 	assert.False(t, result, "field should be excluded in 'response' context")
 }
@@ -213,6 +215,7 @@ func TestShouldIncludeField_ExcludeContext_NoMatch(t *testing.T) {
 		FieldIndex:      0,
 		JSONName:        "password",
 		ExcludeContexts: map[string]bool{"log": true},
+		IncludeContexts: make(map[string]bool),
 		OmitZero:        false,
 		OmitEmpty:       false,
 	}
@@ -223,7 +226,7 @@ func TestShouldIncludeField_ExcludeContext_NoMatch(t *testing.T) {
 	}
 
 	fieldValue := reflect.ValueOf("secret123")
-	result := ShouldIncludeField(meta, fieldValue, opts)
+	result := ShouldIncludeField(meta, fieldValue, opts, false)
 
 	assert.True(t, result, "field should be included when context doesn't match exclusion")
 }
@@ -239,8 +242,9 @@ func TestShouldIncludeField_OmitZero_ZeroValue(t *testing.T) {
 		{
 			name: "zero int with omitzero enabled",
 			meta: FieldMetadata{
-				JSONName: "port",
-				OmitZero: true,
+				JSONName:        "port",
+				OmitZero:        true,
+				IncludeContexts: make(map[string]bool),
 			},
 			opts: SerializeOptions{
 				OmitZero: true,
@@ -251,8 +255,9 @@ func TestShouldIncludeField_OmitZero_ZeroValue(t *testing.T) {
 		{
 			name: "zero string with omitzero enabled",
 			meta: FieldMetadata{
-				JSONName: "name",
-				OmitZero: true,
+				JSONName:        "name",
+				OmitZero:        true,
+				IncludeContexts: make(map[string]bool),
 			},
 			opts: SerializeOptions{
 				OmitZero: true,
@@ -263,8 +268,9 @@ func TestShouldIncludeField_OmitZero_ZeroValue(t *testing.T) {
 		{
 			name: "false bool with omitzero enabled",
 			meta: FieldMetadata{
-				JSONName: "enabled",
-				OmitZero: true,
+				JSONName:        "enabled",
+				OmitZero:        true,
+				IncludeContexts: make(map[string]bool),
 			},
 			opts: SerializeOptions{
 				OmitZero: true,
@@ -277,7 +283,7 @@ func TestShouldIncludeField_OmitZero_ZeroValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fieldValue := reflect.ValueOf(tt.fieldValue)
-			result := ShouldIncludeField(tt.meta, fieldValue, tt.opts)
+			result := ShouldIncludeField(tt.meta, fieldValue, tt.opts, false)
 			assert.Equal(t, tt.want, result)
 		})
 	}
@@ -285,8 +291,9 @@ func TestShouldIncludeField_OmitZero_ZeroValue(t *testing.T) {
 
 func TestShouldIncludeField_OmitZero_NonZeroValue(t *testing.T) {
 	meta := FieldMetadata{
-		JSONName: "port",
-		OmitZero: true,
+		JSONName:        "port",
+		OmitZero:        true,
+		IncludeContexts: make(map[string]bool),
 	}
 
 	opts := SerializeOptions{
@@ -294,15 +301,16 @@ func TestShouldIncludeField_OmitZero_NonZeroValue(t *testing.T) {
 	}
 
 	fieldValue := reflect.ValueOf(8080)
-	result := ShouldIncludeField(meta, fieldValue, opts)
+	result := ShouldIncludeField(meta, fieldValue, opts, false)
 
 	assert.True(t, result, "non-zero value should be included even with omitzero")
 }
 
 func TestShouldIncludeField_OmitZero_NilPointer(t *testing.T) {
 	meta := FieldMetadata{
-		JSONName: "count",
-		OmitZero: true,
+		JSONName:        "count",
+		OmitZero:        true,
+		IncludeContexts: make(map[string]bool),
 	}
 
 	opts := SerializeOptions{
@@ -311,15 +319,16 @@ func TestShouldIncludeField_OmitZero_NilPointer(t *testing.T) {
 
 	var ptr *int
 	fieldValue := reflect.ValueOf(ptr)
-	result := ShouldIncludeField(meta, fieldValue, opts)
+	result := ShouldIncludeField(meta, fieldValue, opts, false)
 
 	assert.False(t, result, "nil pointer should be omitted with omitzero")
 }
 
 func TestShouldIncludeField_OmitZero_NonNilPointer(t *testing.T) {
 	meta := FieldMetadata{
-		JSONName: "count",
-		OmitZero: true,
+		JSONName:        "count",
+		OmitZero:        true,
+		IncludeContexts: make(map[string]bool),
 	}
 
 	opts := SerializeOptions{
@@ -328,15 +337,16 @@ func TestShouldIncludeField_OmitZero_NonNilPointer(t *testing.T) {
 
 	val := 42
 	fieldValue := reflect.ValueOf(&val)
-	result := ShouldIncludeField(meta, fieldValue, opts)
+	result := ShouldIncludeField(meta, fieldValue, opts, false)
 
 	assert.True(t, result, "non-nil pointer should be included")
 }
 
 func TestShouldIncludeField_OmitZero_Disabled(t *testing.T) {
 	meta := FieldMetadata{
-		JSONName: "port",
-		OmitZero: true,
+		JSONName:        "port",
+		OmitZero:        true,
+		IncludeContexts: make(map[string]bool),
 	}
 
 	opts := SerializeOptions{
@@ -344,7 +354,7 @@ func TestShouldIncludeField_OmitZero_Disabled(t *testing.T) {
 	}
 
 	fieldValue := reflect.ValueOf(0)
-	result := ShouldIncludeField(meta, fieldValue, opts)
+	result := ShouldIncludeField(meta, fieldValue, opts, false)
 
 	assert.True(t, result, "zero value should be included when OmitZero is disabled in options")
 }
@@ -354,6 +364,7 @@ func TestShouldIncludeField_CombinedExcludeAndOmitZero(t *testing.T) {
 	meta := FieldMetadata{
 		JSONName:        "internal",
 		ExcludeContexts: map[string]bool{"response": true},
+		IncludeContexts: make(map[string]bool),
 		OmitZero:        true,
 	}
 
@@ -363,7 +374,7 @@ func TestShouldIncludeField_CombinedExcludeAndOmitZero(t *testing.T) {
 		OmitZero: true,
 	}
 	fieldValue1 := reflect.ValueOf("value")
-	assert.False(t, ShouldIncludeField(meta, fieldValue1, opts1), "should be excluded by context")
+	assert.False(t, ShouldIncludeField(meta, fieldValue1, opts1, false), "should be excluded by context")
 
 	// Test 2: Not excluded by context, but zero value (should exclude by omitzero)
 	opts2 := SerializeOptions{
@@ -371,7 +382,7 @@ func TestShouldIncludeField_CombinedExcludeAndOmitZero(t *testing.T) {
 		OmitZero: true,
 	}
 	fieldValue2 := reflect.ValueOf("")
-	assert.False(t, ShouldIncludeField(meta, fieldValue2, opts2), "should be excluded by omitzero")
+	assert.False(t, ShouldIncludeField(meta, fieldValue2, opts2, false), "should be excluded by omitzero")
 
 	// Test 3: Not excluded by context, non-zero value (should include)
 	opts3 := SerializeOptions{
@@ -379,7 +390,217 @@ func TestShouldIncludeField_CombinedExcludeAndOmitZero(t *testing.T) {
 		OmitZero: true,
 	}
 	fieldValue3 := reflect.ValueOf("value")
-	assert.True(t, ShouldIncludeField(meta, fieldValue3, opts3), "should be included")
+	assert.True(t, ShouldIncludeField(meta, fieldValue3, opts3, false), "should be included")
+}
+
+// ==================== Include Context (Whitelist) Tests ====================
+
+func TestShouldIncludeField_IncludeContext_HasWhitelist_FieldIncluded(t *testing.T) {
+	// Field has include:summary tag
+	meta := FieldMetadata{
+		FieldIndex:      0,
+		JSONName:        "id",
+		ExcludeContexts: make(map[string]bool),
+		IncludeContexts: map[string]bool{"summary": true},
+	}
+
+	opts := SerializeOptions{
+		Context: "summary",
+	}
+
+	fieldValue := reflect.ValueOf(123)
+	hasWhitelist := true
+	result := ShouldIncludeField(meta, fieldValue, opts, hasWhitelist)
+
+	assert.True(t, result, "field with include:summary should be included in summary context")
+}
+
+func TestShouldIncludeField_IncludeContext_HasWhitelist_FieldNotIncluded(t *testing.T) {
+	// Field does NOT have include:summary tag
+	meta := FieldMetadata{
+		FieldIndex:      0,
+		JSONName:        "password",
+		ExcludeContexts: make(map[string]bool),
+		IncludeContexts: make(map[string]bool), // No include tags
+	}
+
+	opts := SerializeOptions{
+		Context: "summary",
+	}
+
+	fieldValue := reflect.ValueOf("secret")
+	hasWhitelist := true
+	result := ShouldIncludeField(meta, fieldValue, opts, hasWhitelist)
+
+	assert.False(t, result, "field without include:summary should be excluded when whitelist is active")
+}
+
+func TestShouldIncludeField_IncludeContext_NoWhitelist(t *testing.T) {
+	// No whitelist active - field should be included
+	meta := FieldMetadata{
+		FieldIndex:      0,
+		JSONName:        "password",
+		ExcludeContexts: make(map[string]bool),
+		IncludeContexts: make(map[string]bool),
+	}
+
+	opts := SerializeOptions{
+		Context: "other",
+	}
+
+	fieldValue := reflect.ValueOf("secret")
+	hasWhitelist := false
+	result := ShouldIncludeField(meta, fieldValue, opts, hasWhitelist)
+
+	assert.True(t, result, "field should be included when no whitelist is active")
+}
+
+func TestShouldIncludeField_ExcludeOverridesInclude(t *testing.T) {
+	// Field has BOTH exclude:api and include:api (conflicting)
+	// Exclude should win
+	meta := FieldMetadata{
+		FieldIndex:      0,
+		JSONName:        "conflicting",
+		ExcludeContexts: map[string]bool{"api": true},
+		IncludeContexts: map[string]bool{"api": true},
+	}
+
+	opts := SerializeOptions{
+		Context: "api",
+	}
+
+	fieldValue := reflect.ValueOf("value")
+	result := ShouldIncludeField(meta, fieldValue, opts, true)
+
+	assert.False(t, result, "exclude should take precedence over include for same context")
+}
+
+// ==================== HasWhitelistContext Tests ====================
+
+func TestHasWhitelistContext_ReturnsTrue(t *testing.T) {
+	metadata := map[string]FieldMetadata{
+		"id": {
+			JSONName:        "id",
+			IncludeContexts: map[string]bool{"summary": true},
+		},
+		"name": {
+			JSONName:        "name",
+			IncludeContexts: make(map[string]bool),
+		},
+	}
+
+	result := HasWhitelistContext(metadata, "summary")
+	assert.True(t, result, "should return true when any field has include:summary")
+}
+
+func TestHasWhitelistContext_ReturnsFalse(t *testing.T) {
+	metadata := map[string]FieldMetadata{
+		"id": {
+			JSONName:        "id",
+			IncludeContexts: make(map[string]bool),
+		},
+		"name": {
+			JSONName:        "name",
+			IncludeContexts: make(map[string]bool),
+		},
+	}
+
+	result := HasWhitelistContext(metadata, "summary")
+	assert.False(t, result, "should return false when no field has include:summary")
+}
+
+func TestHasWhitelistContext_EmptyContext(t *testing.T) {
+	metadata := map[string]FieldMetadata{
+		"id": {
+			JSONName:        "id",
+			IncludeContexts: map[string]bool{"summary": true},
+		},
+	}
+
+	result := HasWhitelistContext(metadata, "")
+	assert.False(t, result, "should return false for empty context")
+}
+
+// ==================== BuildFieldMetadata Include Tests ====================
+
+type TestIncludeUser struct {
+	ID       int    `json:"id" pedantigo:"include:summary|public"`
+	Email    string `json:"email" pedantigo:"include:summary|contact"`
+	Phone    string `json:"phone" pedantigo:"include:contact"`
+	Password string `json:"password"` // No include tags
+}
+
+func TestBuildFieldMetadata_IncludeContexts(t *testing.T) {
+	metadata := BuildFieldMetadata(reflect.TypeOf(TestIncludeUser{}))
+
+	// ID has include:summary and include:public
+	idMeta := metadata["id"]
+	assert.True(t, idMeta.IncludeContexts["summary"])
+	assert.True(t, idMeta.IncludeContexts["public"])
+	assert.False(t, idMeta.IncludeContexts["contact"])
+
+	// Email has include:summary and include:contact
+	emailMeta := metadata["email"]
+	assert.True(t, emailMeta.IncludeContexts["summary"])
+	assert.True(t, emailMeta.IncludeContexts["contact"])
+
+	// Phone has include:contact only
+	phoneMeta := metadata["phone"]
+	assert.True(t, phoneMeta.IncludeContexts["contact"])
+	assert.False(t, phoneMeta.IncludeContexts["summary"])
+
+	// Password has no include contexts
+	passwordMeta := metadata["password"]
+	assert.Empty(t, passwordMeta.IncludeContexts)
+}
+
+// ==================== ToFilteredMap Include Tests ====================
+
+func TestToFilteredMap_IncludeWhitelist(t *testing.T) {
+	user := TestIncludeUser{
+		ID:       1,
+		Email:    "alice@example.com",
+		Phone:    "555-1234",
+		Password: "secret",
+	}
+
+	metadata := BuildFieldMetadata(reflect.TypeOf(user))
+
+	// Test "summary" context - should only include ID and Email
+	optsSummary := SerializeOptions{
+		Context:  "summary",
+		OmitZero: false,
+	}
+	resultSummary := ToFilteredMap(reflect.ValueOf(user), metadata, optsSummary)
+
+	assert.Contains(t, resultSummary, "id")
+	assert.Contains(t, resultSummary, "email")
+	assert.NotContains(t, resultSummary, "phone")
+	assert.NotContains(t, resultSummary, "password")
+
+	// Test "contact" context - should only include Email and Phone
+	optsContact := SerializeOptions{
+		Context:  "contact",
+		OmitZero: false,
+	}
+	resultContact := ToFilteredMap(reflect.ValueOf(user), metadata, optsContact)
+
+	assert.NotContains(t, resultContact, "id")
+	assert.Contains(t, resultContact, "email")
+	assert.Contains(t, resultContact, "phone")
+	assert.NotContains(t, resultContact, "password")
+
+	// Test no context - should include all fields
+	optsNone := SerializeOptions{
+		Context:  "",
+		OmitZero: false,
+	}
+	resultNone := ToFilteredMap(reflect.ValueOf(user), metadata, optsNone)
+
+	assert.Contains(t, resultNone, "id")
+	assert.Contains(t, resultNone, "email")
+	assert.Contains(t, resultNone, "phone")
+	assert.Contains(t, resultNone, "password")
 }
 
 // ==================== ToFilteredMap Tests ====================
