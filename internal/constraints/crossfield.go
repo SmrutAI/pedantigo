@@ -16,64 +16,64 @@ type CrossFieldConstraint interface {
 // Cross-field constraint types.
 type (
 	eqFieldConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
 	}
 	neFieldConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
 	}
 	gtFieldConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
 	}
 	gteFieldConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
 	}
 	ltFieldConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
 	}
 	lteFieldConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
 	}
 	requiredIfConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
-		compareValue     string
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
+		compareValue    string
 	}
 	requiredUnlessConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
-		compareValue     string
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
+		compareValue    string
 	}
 	requiredWithConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
 	}
 	requiredWithoutConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
 	}
 	excludedIfConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
-		compareValue     string
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
+		compareValue    string
 	}
 	excludedUnlessConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
-		compareValue     string
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
+		compareValue    string
 	}
 	excludedWithConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
 	}
 	excludedWithoutConstraint struct {
-		targetFieldName  string
-		targetFieldIndex int
+		targetFieldName string     // Keep for error messages
+		targetFieldPath *FieldPath // Replace targetFieldIndex
 	}
 )
 
@@ -86,71 +86,59 @@ func BuildCrossFieldConstraintsForField(constraints map[string]string, structTyp
 	for name, value := range constraints {
 		switch name {
 		case "eqfield":
-			targetIdx := resolveAndValidateField(structType, value, fieldIndex, fieldName, "eqfield")
-			result = append(result, eqFieldConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
+			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "eqfield")
+			result = append(result, eqFieldConstraint{targetFieldName: value, targetFieldPath: fp})
 		case "nefield":
-			targetIdx := resolveAndValidateField(structType, value, fieldIndex, fieldName, "nefield")
-			result = append(result, neFieldConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
+			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "nefield")
+			result = append(result, neFieldConstraint{targetFieldName: value, targetFieldPath: fp})
 		case "gtfield":
-			targetIdx := resolveAndValidateField(structType, value, fieldIndex, fieldName, "gtfield")
-			result = append(result, gtFieldConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
+			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "gtfield")
+			result = append(result, gtFieldConstraint{targetFieldName: value, targetFieldPath: fp})
 		case "gtefield":
-			targetIdx := resolveAndValidateField(structType, value, fieldIndex, fieldName, "gtefield")
-			result = append(result, gteFieldConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
+			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "gtefield")
+			result = append(result, gteFieldConstraint{targetFieldName: value, targetFieldPath: fp})
 		case "ltfield":
-			targetIdx := resolveAndValidateField(structType, value, fieldIndex, fieldName, "ltfield")
-			result = append(result, ltFieldConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
+			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "ltfield")
+			result = append(result, ltFieldConstraint{targetFieldName: value, targetFieldPath: fp})
 		case "ltefield":
-			targetIdx := resolveAndValidateField(structType, value, fieldIndex, fieldName, "ltefield")
-			result = append(result, lteFieldConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
+			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "ltefield")
+			result = append(result, lteFieldConstraint{targetFieldName: value, targetFieldPath: fp})
 		case "required_if":
 			if fieldName, compareValue, ok := parseConditionalConstraint(value, ":"); ok {
-				targetIdx := resolveFieldIndexSilent(structType, fieldName)
-				result = append(result, requiredIfConstraint{targetFieldName: fieldName, targetFieldIndex: targetIdx, compareValue: compareValue})
+				fp := ParseFieldPath(structType, fieldName)
+				result = append(result, requiredIfConstraint{targetFieldName: fieldName, targetFieldPath: fp, compareValue: compareValue})
 			}
 		case "required_unless":
 			if fieldName, compareValue, ok := parseConditionalConstraint(value, ":"); ok {
-				targetIdx := resolveFieldIndexSilent(structType, fieldName)
-				result = append(result, requiredUnlessConstraint{targetFieldName: fieldName, targetFieldIndex: targetIdx, compareValue: compareValue})
+				fp := ParseFieldPath(structType, fieldName)
+				result = append(result, requiredUnlessConstraint{targetFieldName: fieldName, targetFieldPath: fp, compareValue: compareValue})
 			}
 		case "required_with":
-			targetIdx := resolveFieldIndexSilent(structType, value)
-			result = append(result, requiredWithConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
+			fp := ParseFieldPath(structType, value)
+			result = append(result, requiredWithConstraint{targetFieldName: value, targetFieldPath: fp})
 		case "required_without":
-			targetIdx := resolveFieldIndexSilent(structType, value)
-			result = append(result, requiredWithoutConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
+			fp := ParseFieldPath(structType, value)
+			result = append(result, requiredWithoutConstraint{targetFieldName: value, targetFieldPath: fp})
 		case "excluded_if":
 			if fieldName, compareValue, ok := parseConditionalConstraint(value, " "); ok {
-				targetIdx := resolveFieldIndexSilent(structType, fieldName)
-				result = append(result, excludedIfConstraint{targetFieldName: fieldName, targetFieldIndex: targetIdx, compareValue: compareValue})
+				fp := ParseFieldPath(structType, fieldName)
+				result = append(result, excludedIfConstraint{targetFieldName: fieldName, targetFieldPath: fp, compareValue: compareValue})
 			}
 		case "excluded_unless":
 			if fieldName, compareValue, ok := parseConditionalConstraint(value, " "); ok {
-				targetIdx := resolveFieldIndexSilent(structType, fieldName)
-				result = append(result, excludedUnlessConstraint{targetFieldName: fieldName, targetFieldIndex: targetIdx, compareValue: compareValue})
+				fp := ParseFieldPath(structType, fieldName)
+				result = append(result, excludedUnlessConstraint{targetFieldName: fieldName, targetFieldPath: fp, compareValue: compareValue})
 			}
 		case "excluded_with":
-			targetIdx := resolveFieldIndexSilent(structType, value)
-			result = append(result, excludedWithConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
+			fp := ParseFieldPath(structType, value)
+			result = append(result, excludedWithConstraint{targetFieldName: value, targetFieldPath: fp})
 		case "excluded_without":
-			targetIdx := resolveFieldIndexSilent(structType, value)
-			result = append(result, excludedWithoutConstraint{targetFieldName: value, targetFieldIndex: targetIdx})
+			fp := ParseFieldPath(structType, value)
+			result = append(result, excludedWithoutConstraint{targetFieldName: value, targetFieldPath: fp})
 		}
 	}
 
 	return result
-}
-
-// resolveFieldIndexSilent resolves a field name to its index, returning -1 if not found.
-func resolveFieldIndexSilent(structType reflect.Type, fieldName string) int {
-	for i := 0; i < structType.NumField(); i++ {
-		field := structType.Field(i)
-		// Only match exported fields with exact case-sensitive name match
-		if field.IsExported() && field.Name == fieldName {
-			return i
-		}
-	}
-	return -1 // Field not found or not exported
 }
 
 // ============================================================================
@@ -324,16 +312,17 @@ func CompareToString(value any) string {
 	}
 }
 
-// resolveAndValidateField resolves a field, validates it exists and is not self-referencing, panics on error.
-func resolveAndValidateField(structType reflect.Type, targetFieldName string, currentFieldIndex int, currentFieldName, constraintName string) int {
-	targetIdx := resolveFieldIndexSilent(structType, targetFieldName)
-	if targetIdx == -1 {
-		panic(fmt.Sprintf("field %s references non-existent field %s in %s constraint", currentFieldName, targetFieldName, constraintName))
-	}
-	if targetIdx == currentFieldIndex {
+// resolveAndValidateField resolves a field path, validates it exists and is not self-referencing, panics on error.
+func resolveAndValidateField(structType reflect.Type, targetFieldName string, currentFieldIndex int, currentFieldName, constraintName string) *FieldPath {
+	// Use ParseFieldPath which already panics on invalid fields
+	fp := ParseFieldPath(structType, targetFieldName)
+
+	// Check for self-reference (only for single-level paths)
+	if len(fp.Parts) == 1 && fp.IndexAtLevel[0] == currentFieldIndex {
 		panic(fmt.Sprintf("field %s cannot reference itself in %s constraint", currentFieldName, constraintName))
 	}
-	return targetIdx
+
+	return fp
 }
 
 // parseConditionalConstraint parses "field:value" or "field value" syntax.

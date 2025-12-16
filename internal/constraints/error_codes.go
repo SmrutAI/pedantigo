@@ -140,4 +140,8 @@ const (
 	CodeUnknownField    = "UNKNOWN_FIELD"
 	CodeInvalidType     = "INVALID_TYPE"
 	CodeUnsupportedType = "UNSUPPORTED_TYPE"
+
+	// Custom validation constraints.
+	CodeFieldPathError   = "FIELD_PATH_ERROR"  // Nil pointer encountered in field path resolution
+	CodeCustomValidation = "CUSTOM_VALIDATION" // Custom validator failed
 )

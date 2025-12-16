@@ -278,35 +278,37 @@ func TestCrossField_CaseSensitivity(t *testing.T) {
 // ==================================================
 
 // TestCrossField_NestedStruct tests CrossField nestedstruct.
+// Comprehensive tests are in crossfield_nested_test.go.
 func TestCrossField_NestedStruct(t *testing.T) {
-	tests := []struct {
-		name string
-		skip bool
-	}{
-		{
-			name: "cross-field validation within nested structs",
-			skip: true,
-		},
-		{
-			name: "dotted field notation for nested struct cross-field validation",
-			skip: true,
-		},
+	// Feature implemented - see crossfield_nested_test.go for comprehensive tests
+	type Inner struct {
+		Value int
+	}
+	type Outer struct {
+		Inner Inner
+		Check int `pedantigo:"eqfield=Inner.Value"`
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.skip {
-				t.Skip("TODO: Nested struct cross-field validation not yet implemented")
-			}
-		})
-	}
+	t.Run("nested field reference - valid", func(t *testing.T) {
+		outer := Outer{Inner: Inner{Value: 42}, Check: 42}
+		validator := New[Outer]()
+		err := validator.Validate(&outer)
+		assert.NoError(t, err, "expected no errors for matching nested field values")
+	})
+
+	t.Run("nested field reference - invalid", func(t *testing.T) {
+		outer := Outer{Inner: Inner{Value: 42}, Check: 100}
+		validator := New[Outer]()
+		err := validator.Validate(&outer)
+		assert.Error(t, err, "expected error for mismatched nested field values")
+	})
 }
 
 // ==================================================
 // Edge Case 6: Multiple Cross-Field Constraints
 // ==================================================
 
-// TestCrossField_MultipleConstraints tests CrossField multipleconstraints.
+// TestCrossField_MultipleConstraints tests CrossField multiple constraints.
 func TestCrossField_MultipleConstraints(t *testing.T) {
 	tests := []struct {
 		name      string

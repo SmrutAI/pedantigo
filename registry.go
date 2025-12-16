@@ -5,11 +5,25 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+
+	"github.com/SmrutAI/Pedantigo/internal/constraints"
 )
 
 // ValidationFunc is the signature for custom field-level validation functions.
-// It receives the field value and returns an error if validation fails.
-type ValidationFunc func(value any) error
+// It receives the field value and param string, returns an error if validation fails.
+type ValidationFunc func(value any, param string) error
+
+func init() {
+	// Wire up custom validator lookup to constraints package
+	constraints.SetCustomValidatorLookup(func(name string) (constraints.CustomValidationFunc, bool) {
+		if fn, ok := GetCustomValidator(name); ok {
+			// Convert pedantigo.ValidationFunc to constraints.CustomValidationFunc
+			// Both have the same signature: func(value any, param string) error
+			return constraints.CustomValidationFunc(fn), true
+		}
+		return nil, false
+	})
+}
 
 // StructLevelFunc is the signature for struct-level validation functions.
 // It receives the entire struct and returns an error if validation fails.

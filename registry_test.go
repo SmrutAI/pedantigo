@@ -12,7 +12,7 @@ import (
 
 // TestRegisterValidation_Success tests successful registration of a custom validator.
 func TestRegisterValidation_Success(t *testing.T) {
-	validatorFunc := func(value any) error {
+	validatorFunc := func(value any, param string) error {
 		s, ok := value.(string)
 		if !ok {
 			return errors.New("expected string")
@@ -34,7 +34,7 @@ func TestRegisterValidation_Success(t *testing.T) {
 
 // TestRegisterValidation_EmptyName tests that empty name returns error.
 func TestRegisterValidation_EmptyName(t *testing.T) {
-	validatorFunc := func(value any) error {
+	validatorFunc := func(value any, param string) error {
 		return nil
 	}
 
@@ -58,7 +58,7 @@ func TestRegisterValidation_BuiltInConflict(t *testing.T) {
 		"lt", "lte", "oneof", "const", "ascii", "alpha",
 	}
 
-	validatorFunc := func(value any) error {
+	validatorFunc := func(value any, param string) error {
 		return nil
 	}
 
@@ -102,7 +102,7 @@ func TestRegisterStructValidation_NilFunc(t *testing.T) {
 
 // TestGetCustomValidator_Exists tests retrieval of registered validator.
 func TestGetCustomValidator_Exists(t *testing.T) {
-	validatorFunc := func(value any) error {
+	validatorFunc := func(value any, param string) error {
 		return errors.New("test error")
 	}
 
@@ -114,7 +114,7 @@ func TestGetCustomValidator_Exists(t *testing.T) {
 	assert.NotNil(t, fn)
 
 	// Verify the function works
-	err = fn("test")
+	err = fn("test", "")
 	require.Error(t, err)
 	assert.Equal(t, "test error", err.Error())
 }
@@ -136,7 +136,7 @@ func TestConcurrentRegistration(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 			name := fmt.Sprintf("custom_%d", idx)
-			_ = RegisterValidation(name, func(value any) error {
+			_ = RegisterValidation(name, func(value any, param string) error {
 				return nil
 			})
 		}(i)
@@ -160,7 +160,7 @@ func TestRegisterValidation_ConcurrentWithValidation(t *testing.T) {
 	}
 
 	// First, register the validator
-	err := RegisterValidation("custom_code", func(value any) error {
+	err := RegisterValidation("custom_code", func(value any, param string) error {
 		s, ok := value.(string)
 		if !ok {
 			return errors.New("expected string")
@@ -218,7 +218,7 @@ func TestRegisterStructValidation_ConcurrentAccess(t *testing.T) {
 // TestRegisterValidation_MultipleCustomValidators tests registering multiple validators.
 func TestRegisterValidation_MultipleCustomValidators(t *testing.T) {
 	validators := map[string]ValidationFunc{
-		"is_even": func(value any) error {
+		"is_even": func(value any, param string) error {
 			num, ok := value.(int)
 			if !ok {
 				return errors.New("expected int")
@@ -228,7 +228,7 @@ func TestRegisterValidation_MultipleCustomValidators(t *testing.T) {
 			}
 			return nil
 		},
-		"is_positive": func(value any) error {
+		"is_positive": func(value any, param string) error {
 			num, ok := value.(int)
 			if !ok {
 				return errors.New("expected int")
@@ -238,7 +238,7 @@ func TestRegisterValidation_MultipleCustomValidators(t *testing.T) {
 			}
 			return nil
 		},
-		"divisible_by_3": func(value any) error {
+		"divisible_by_3": func(value any, param string) error {
 			num, ok := value.(int)
 			if !ok {
 				return errors.New("expected int")
@@ -309,7 +309,7 @@ func TestRegisterStructValidation_MultipleDifferentTypes(t *testing.T) {
 
 // TestGetCustomValidator_CaseSensitive tests that validator names are case-sensitive.
 func TestGetCustomValidator_CaseSensitive(t *testing.T) {
-	validatorFunc := func(value any) error {
+	validatorFunc := func(value any, param string) error {
 		return nil
 	}
 
@@ -334,7 +334,7 @@ func TestGetCustomValidator_CaseSensitive(t *testing.T) {
 // TestRegisterValidation_OverwriteCustomValidator tests overwriting a custom validator.
 func TestRegisterValidation_OverwriteCustomValidator(t *testing.T) {
 	// Register first validator
-	firstValidator := func(value any) error {
+	firstValidator := func(value any, param string) error {
 		return errors.New("first validator")
 	}
 
@@ -344,11 +344,11 @@ func TestRegisterValidation_OverwriteCustomValidator(t *testing.T) {
 	// Verify first validator works
 	fn, ok := GetCustomValidator("overwrite_test")
 	require.True(t, ok)
-	err = fn("test")
+	err = fn("test", "")
 	require.EqualError(t, err, "first validator")
 
 	// Register second validator with same name (should overwrite or error)
-	secondValidator := func(value any) error {
+	secondValidator := func(value any, param string) error {
 		return errors.New("second validator")
 	}
 
@@ -359,7 +359,7 @@ func TestRegisterValidation_OverwriteCustomValidator(t *testing.T) {
 		// Overwriting is allowed - verify the new validator is active
 		fn, ok := GetCustomValidator("overwrite_test")
 		require.True(t, ok)
-		err = fn("test")
+		err = fn("test", "")
 		assert.EqualError(t, err, "second validator", "should use the new validator")
 	} else {
 		// Overwriting is denied - verify error message
@@ -395,7 +395,7 @@ func TestRegisterStructValidation_DuplicateRegistration(t *testing.T) {
 
 // TestValidationFunc_TypeAssertion tests that custom validators handle type assertions.
 func TestValidationFunc_TypeAssertion(t *testing.T) {
-	stringValidator := func(value any) error {
+	stringValidator := func(value any, param string) error {
 		s, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("expected string, got %T", value)
@@ -413,14 +413,14 @@ func TestValidationFunc_TypeAssertion(t *testing.T) {
 	require.True(t, ok)
 
 	// Test with correct type
-	err = fn("hello")
+	err = fn("hello", "")
 	require.NoError(t, err)
 
-	err = fn("")
+	err = fn("", "")
 	require.EqualError(t, err, "string cannot be empty")
 
 	// Test with incorrect type
-	err = fn(123)
+	err = fn(123, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "expected string")
 }
@@ -449,7 +449,7 @@ func TestStructLevelFunc_CrossFieldValidation(t *testing.T) {
 // TestRegisterValidation_ComplexValidator tests a complex custom validator.
 func TestRegisterValidation_ComplexValidator(t *testing.T) {
 	// Password validator: must have uppercase, lowercase, digit, and special char
-	passwordValidator := func(value any) error {
+	passwordValidator := func(value any, param string) error {
 		s, ok := value.(string)
 		if !ok {
 			return errors.New("expected string")
@@ -496,7 +496,7 @@ func TestRegisterValidation_ComplexValidator(t *testing.T) {
 	require.True(t, ok)
 
 	// Test valid password
-	err = fn("Passw0rd!")
+	err = fn("Passw0rd!", "")
 	require.NoError(t, err)
 
 	// Test invalid passwords
@@ -513,7 +513,7 @@ func TestRegisterValidation_ComplexValidator(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.password, func(t *testing.T) {
-			err := fn(tc.password)
+			err := fn(tc.password, "")
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.errMsg)
 		})

@@ -1,16 +1,20 @@
 package constraints
 
 import (
+	"fmt"
 	"reflect"
 )
 
 // ValidateCrossField for eqFieldConstraint: field must equal another field.
 func (c eqFieldConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
-	targetValue := structValue.Field(c.targetFieldIndex).Interface()
+	targetValue, err := c.targetFieldPath.ResolveValue(structValue)
+	if err != nil {
+		return NewConstraintError(CodeFieldPathError, fmt.Sprintf("cannot resolve field %s: %s", c.targetFieldName, err.Error()))
+	}
 
 	// Check type compatibility
 	if err := CheckTypeCompatibility(fieldValue, targetValue); err != nil {
-		return err
+		return NewConstraintError(CodeMustEqualField, "cannot compare incompatible types")
 	}
 
 	if Compare(fieldValue, targetValue) != 0 {
@@ -21,11 +25,14 @@ func (c eqFieldConstraint) ValidateCrossField(fieldValue any, structValue reflec
 
 // ValidateCrossField for neFieldConstraint: field must NOT equal another field.
 func (c neFieldConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
-	targetValue := structValue.Field(c.targetFieldIndex).Interface()
+	targetValue, err := c.targetFieldPath.ResolveValue(structValue)
+	if err != nil {
+		return NewConstraintError(CodeFieldPathError, fmt.Sprintf("cannot resolve field %s: %s", c.targetFieldName, err.Error()))
+	}
 
 	// Check type compatibility
 	if err := CheckTypeCompatibility(fieldValue, targetValue); err != nil {
-		return err
+		return NewConstraintError(CodeMustNotEqualField, "cannot compare incompatible types")
 	}
 
 	if Compare(fieldValue, targetValue) == 0 {
@@ -36,11 +43,14 @@ func (c neFieldConstraint) ValidateCrossField(fieldValue any, structValue reflec
 
 // ValidateCrossField for gtFieldConstraint: field must be > another field.
 func (c gtFieldConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
-	targetValue := structValue.Field(c.targetFieldIndex).Interface()
+	targetValue, err := c.targetFieldPath.ResolveValue(structValue)
+	if err != nil {
+		return NewConstraintError(CodeFieldPathError, fmt.Sprintf("cannot resolve field %s: %s", c.targetFieldName, err.Error()))
+	}
 
 	// Check type compatibility
 	if err := CheckTypeCompatibility(fieldValue, targetValue); err != nil {
-		return err
+		return NewConstraintError(CodeMustBeGTField, "cannot compare incompatible types")
 	}
 
 	if Compare(fieldValue, targetValue) <= 0 {
@@ -51,11 +61,14 @@ func (c gtFieldConstraint) ValidateCrossField(fieldValue any, structValue reflec
 
 // ValidateCrossField for gteFieldConstraint: field must be >= another field.
 func (c gteFieldConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
-	targetValue := structValue.Field(c.targetFieldIndex).Interface()
+	targetValue, err := c.targetFieldPath.ResolveValue(structValue)
+	if err != nil {
+		return NewConstraintError(CodeFieldPathError, fmt.Sprintf("cannot resolve field %s: %s", c.targetFieldName, err.Error()))
+	}
 
 	// Check type compatibility
 	if err := CheckTypeCompatibility(fieldValue, targetValue); err != nil {
-		return err
+		return NewConstraintError(CodeMustBeGTEField, "cannot compare incompatible types")
 	}
 
 	if Compare(fieldValue, targetValue) < 0 {
@@ -66,11 +79,14 @@ func (c gteFieldConstraint) ValidateCrossField(fieldValue any, structValue refle
 
 // ValidateCrossField for ltFieldConstraint: field must be < another field.
 func (c ltFieldConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
-	targetValue := structValue.Field(c.targetFieldIndex).Interface()
+	targetValue, err := c.targetFieldPath.ResolveValue(structValue)
+	if err != nil {
+		return NewConstraintError(CodeFieldPathError, fmt.Sprintf("cannot resolve field %s: %s", c.targetFieldName, err.Error()))
+	}
 
 	// Check type compatibility
 	if err := CheckTypeCompatibility(fieldValue, targetValue); err != nil {
-		return err
+		return NewConstraintError(CodeMustBeLTField, "cannot compare incompatible types")
 	}
 
 	if Compare(fieldValue, targetValue) >= 0 {
@@ -81,11 +97,14 @@ func (c ltFieldConstraint) ValidateCrossField(fieldValue any, structValue reflec
 
 // ValidateCrossField for lteFieldConstraint: field must be <= another field.
 func (c lteFieldConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
-	targetValue := structValue.Field(c.targetFieldIndex).Interface()
+	targetValue, err := c.targetFieldPath.ResolveValue(structValue)
+	if err != nil {
+		return NewConstraintError(CodeFieldPathError, fmt.Sprintf("cannot resolve field %s: %s", c.targetFieldName, err.Error()))
+	}
 
 	// Check type compatibility
 	if err := CheckTypeCompatibility(fieldValue, targetValue); err != nil {
-		return err
+		return NewConstraintError(CodeMustBeLTEField, "cannot compare incompatible types")
 	}
 
 	if Compare(fieldValue, targetValue) > 0 {

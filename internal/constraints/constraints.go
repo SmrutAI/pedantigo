@@ -246,6 +246,13 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 		// Filesystem constraints.
 		case CFilepath, CDirpath, CFile, CDir:
 			result = appendFilesystemConstraint(result, name)
+
+		default:
+			// Check for custom validators
+			if c, ok := BuildCustomConstraint(name, value); ok {
+				result = append(result, c)
+			}
+			// Unknown constraints are silently ignored (fail-fast happens at registry level)
 		}
 	}
 
