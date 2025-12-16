@@ -1842,3 +1842,137 @@ func TestValidator_MarshalWithOptions_MultipleExclusionContexts(t *testing.T) {
 		})
 	}
 }
+
+// TestNewModel_JSON tests NewModel with JSON byte input.
+func TestNewModel_JSON(t *testing.T) {
+	type User struct {
+		Name  string `json:"name" pedantigo:"required"`
+		Email string `json:"email" pedantigo:"required,email"`
+	}
+
+	validator := New[User]()
+
+	user, err := validator.NewModel([]byte(`{"name": "John", "email": "john@example.com"}`))
+	require.NoError(t, err)
+	assert.Equal(t, "John", user.Name)
+	assert.Equal(t, "john@example.com", user.Email)
+}
+
+// TestNewModel_Struct tests NewModel with struct input.
+func TestNewModel_Struct(t *testing.T) {
+	type User struct {
+		Name  string `json:"name" pedantigo:"required,min=2"`
+		Email string `json:"email" pedantigo:"email"`
+	}
+
+	validator := New[User]()
+
+	user, err := validator.NewModel(User{Name: "John", Email: "john@example.com"})
+	require.NoError(t, err)
+	assert.Equal(t, "John", user.Name)
+	assert.Equal(t, "john@example.com", user.Email)
+}
+
+// TestNewModel_StructPointer tests NewModel with pointer to struct input.
+func TestNewModel_StructPointer(t *testing.T) {
+	type User struct {
+		Name  string `json:"name" pedantigo:"required,min=2"`
+		Email string `json:"email" pedantigo:"email"`
+	}
+
+	validator := New[User]()
+
+	input := &User{Name: "John", Email: "john@example.com"}
+	user, err := validator.NewModel(input)
+	require.NoError(t, err)
+	assert.Equal(t, "John", user.Name)
+	assert.Same(t, input, user) // Same pointer
+}
+
+// TestNewModel_Map tests NewModel with map[string]any input (kwargs).
+func TestNewModel_Map(t *testing.T) {
+	type User struct {
+		Name  string `json:"name" pedantigo:"required"`
+		Email string `json:"email" pedantigo:"required,email"`
+		Age   int    `json:"age" pedantigo:"min=18"`
+	}
+
+	validator := New[User]()
+
+	user, err := validator.NewModel(map[string]any{
+		"name":  "John",
+		"email": "john@example.com",
+		"age":   25,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "John", user.Name)
+	assert.Equal(t, "john@example.com", user.Email)
+	assert.Equal(t, 25, user.Age)
+}
+
+// TestNewModel_MapWithDefaults tests NewModel with map input using defaults.
+func TestNewModel_MapWithDefaults(t *testing.T) {
+	type Config struct {
+		Host string `json:"host" pedantigo:"default=localhost"`
+		Port int    `json:"port" pedantigo:"default=8080"`
+	}
+
+	validator := New[Config]()
+
+	// Empty map - should apply defaults
+	config, err := validator.NewModel(map[string]any{})
+	require.NoError(t, err)
+	assert.Equal(t, "localhost", config.Host)
+	assert.Equal(t, 8080, config.Port)
+}
+
+// TestNewModel_ValidationError tests NewModel returns validation errors.
+func TestNewModel_ValidationError(t *testing.T) {
+	type User struct {
+		Name  string `json:"name" pedantigo:"required,min=2"`
+		Email string `json:"email" pedantigo:"required,email"`
+	}
+
+	validator := New[User]()
+
+	// Struct with invalid email
+	_, err := validator.NewModel(User{Name: "Jo", Email: "invalid"})
+	require.Error(t, err)
+
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve)
+	assert.NotEmpty(t, ve.Errors)
+}
+
+// TestNewModel_UnsupportedType tests NewModel with unsupported input type.
+func TestNewModel_UnsupportedType(t *testing.T) {
+	type User struct {
+		Name string `json:"name"`
+	}
+
+	validator := New[User]()
+
+	_, err := validator.NewModel(12345) // int is not supported
+	require.Error(t, err)
+
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve)
+	assert.Contains(t, ve.Errors[0].Message, "unsupported input type")
+}
+
+// TestNewModel_NilPointer tests NewModel with nil pointer.
+func TestNewModel_NilPointer(t *testing.T) {
+	type User struct {
+		Name string `json:"name"`
+	}
+
+	validator := New[User]()
+
+	var nilPtr *User
+	_, err := validator.NewModel(nilPtr)
+	require.Error(t, err)
+
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve)
+	assert.Contains(t, ve.Errors[0].Message, "nil pointer")
+}

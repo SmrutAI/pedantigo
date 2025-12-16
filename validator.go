@@ -457,3 +457,75 @@ func (v *Validator[T]) Dict(obj *T) (map[string]interface{}, error) {
 	}
 	return dict, nil
 }
+
+// NewModel creates a validated instance of T from various input types.
+// Accepts: []byte (JSON), T (struct), *T (pointer), or map[string]any (kwargs).
+// This is the unified constructor that validates regardless of input source.
+func (v *Validator[T]) NewModel(input any) (*T, error) {
+	switch val := input.(type) {
+	case []byte:
+		return v.Unmarshal(val)
+	case *T:
+		if val == nil {
+			return nil, &ValidationError{
+				Errors: []FieldError{{Field: "root", Message: "cannot validate nil pointer"}},
+			}
+		}
+		if err := v.Validate(val); err != nil {
+			return val, err
+		}
+		return val, nil
+	case map[string]any:
+		return v.unmarshalFromMap(val)
+	case T:
+		if err := v.Validate(&val); err != nil {
+			return &val, err
+		}
+		return &val, nil
+	default:
+		var zero T
+		return nil, &ValidationError{
+			Errors: []FieldError{{
+				Field:   "root",
+				Message: fmt.Sprintf("unsupported input type: %T, expected []byte, %T, *%T, or map[string]any", input, zero, zero),
+			}},
+		}
+	}
+}
+
+// unmarshalFromMap creates a validated struct from a map (kwargs pattern).
+// Reuses the same deserialization logic as Unmarshal.
+func (v *Validator[T]) unmarshalFromMap(jsonMap map[string]any) (*T, error) {
+	// Create new struct instance
+	var obj T
+	objValue := reflect.ValueOf(&obj).Elem()
+
+	// Apply field deserializers (same logic as Unmarshal)
+	var fieldErrors []FieldError
+	for fieldName, deserializer := range v.fieldDeserializers {
+		var inValue any
+		if val, exists := jsonMap[fieldName]; exists {
+			inValue = val
+		} else {
+			inValue = deserialize.FieldMissingSentinel
+		}
+
+		if err := deserializer(&objValue, inValue); err != nil {
+			fieldErrors = append(fieldErrors, FieldError{
+				Field:   fieldName,
+				Message: err.Error(),
+			})
+		}
+	}
+
+	if len(fieldErrors) > 0 {
+		return &obj, &ValidationError{Errors: fieldErrors}
+	}
+
+	// Run validation constraints
+	if err := v.Validate(&obj); err != nil {
+		return &obj, err
+	}
+
+	return &obj, nil
+}
