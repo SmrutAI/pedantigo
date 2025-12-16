@@ -20,20 +20,20 @@ build:
 	@echo "Building..."
 	go build -v ./...
 
-# Run all tests
+# Run all tests (parallel with race detection)
 test:
-	@echo "Running tests..."
-	go test -v -race ./...
+	@echo "Running tests (parallel, race detection enabled)..."
+	go test -race -parallel 8 -count=1 ./...
 
 # Run tests with verbose output
 test-verbose:
 	@echo "Running tests (verbose)..."
-	go test -v -race -count=1 ./...
+	go test -v -race -parallel 8 -count=1 ./...
 
 # Run tests with coverage
 test-coverage:
 	@echo "Running tests with coverage..."
-	go test -v -race -cover -coverprofile=coverage.out ./...
+	go test -race -parallel 8 -cover -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 	@echo "Checking coverage threshold..."
