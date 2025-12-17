@@ -31,6 +31,9 @@ go.work.sum
 # Editor/IDE
 .idea/
 # .vscode/
-docs/
+internal-docs/
 CLAUDE.md
 /etc/
+
+# Documentation site (separate repo)
+pedantigo-docs/
