@@ -1,4 +1,4 @@
-.PHONY: help build test test-verbose test-coverage vet fmt lint clean install run bench
+.PHONY: help build test test-verbose test-coverage test-ci test-ci-cov vet fmt lint clean install run bench
 
 # Default target
 help:
@@ -48,6 +48,17 @@ test-coverage:
 		exit 1; \
 	fi
 
+# CI: Run tests with JUnit XML output
+test-ci:
+	@echo "Running tests (CI mode, JUnit XML output)..."
+	go test -race -parallel 8 -count=1 -v ./... 2>&1 | go-junit-report -set-exit-code > test-results.xml
+
+# CI: Run tests with coverage + JUnit XML output (single run)
+test-ci-cov:
+	@echo "Running tests with coverage (CI mode)..."
+	go test -race -parallel 8 -v -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | go-junit-report -set-exit-code > test-results.xml
+	go tool cover -func=coverage.out | grep total | awk '{print $$3}' > coverage.txt
+
 # Run go vet
 vet:
 	@echo "Running go vet..."
@@ -78,7 +89,7 @@ bench:
 clean:
 	@echo "Cleaning..."
 	go clean
-	rm -f coverage.out coverage.html
+	rm -f coverage.out coverage.html coverage.txt test-results.xml
 
 # Install/update dependencies
 install:

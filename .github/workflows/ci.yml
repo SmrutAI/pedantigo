@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install tools
+        run: |
+          # Go tools
+          go install github.com/jstemmer/go-junit-report/v2@latest
+          go install golang.org/x/tools/cmd/goimports@latest
+
+          # golangci-lint
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.62.2
+
+          # gitleaks
+          go install github.com/gitleaks/gitleaks/v8@latest
+
+          # pre-commit
+          pip install pre-commit
+
+      - name: Run pre-commit checks
+        run: pre-commit run --all-files
+
+      - name: Run tests with coverage
+        run: make test-ci-cov
+
+      - name: Upload test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: test-results.xml
+          comment_mode: always
+          check_name: Test Results
+
+      - name: Generate coverage report
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: coverage.out
+          format: markdown
+          output: both
+          badge: true
+          fail_below_min: true
+          thresholds: '80 90'
+
+      - name: Add coverage PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: github.event_name == 'pull_request'
+        with:
+          recreate: true
+          path: code-coverage-results.md
+
+      - name: Extract coverage percentage
+        if: github.ref == 'refs/heads/main'
+        id: coverage
+        run: |
+          COVERAGE=$(cat coverage.txt | sed 's/%//')
+          echo "COVERAGE=$COVERAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Update coverage badge
+        if: github.ref == 'refs/heads/main'
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_TOKEN }}
+          gistID: ${{ secrets.GIST_ID }}
+          filename: pedantigo-coverage.json
+          label: coverage
+          message: ${{ steps.coverage.outputs.COVERAGE }}%
+          valColorRange: ${{ steps.coverage.outputs.COVERAGE }}
+          maxColorRange: 100
+          minColorRange: 0
