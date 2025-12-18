@@ -8,7 +8,7 @@ Type-safe JSON validation and schema generation for Go.
 go get github.com/SmrutAI/pedantigo
 ```
 
-Requires Go 1.25.4+
+Requires Go 1.21+
 
 ## When to Use Pedantigo
 

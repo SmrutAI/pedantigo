@@ -1,6 +1,6 @@
 module github.com/SmrutAI/pedantigo
 
-go 1.25.4
+go 1.21
 
 require (
 	github.com/invopop/jsonschema v0.13.0
