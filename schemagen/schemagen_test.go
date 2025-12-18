@@ -1086,33 +1086,33 @@ func splitKeyValue(part string) (key, value string, found bool) {
 
 // CatUnion represents a cat variant with validation constraints.
 type CatUnion struct {
-	Name  string `json:"name" validate:"required"`
-	Lives int    `json:"lives" validate:"min=1,max=9"`
+	Name  string `json:"name" pedantigo:"required"`
+	Lives int    `json:"lives" pedantigo:"min=1,max=9"`
 }
 
 // DogUnion represents a dog variant with validation constraints.
 type DogUnion struct {
-	Name  string `json:"name" validate:"required"`
+	Name  string `json:"name" pedantigo:"required"`
 	Breed string `json:"breed"`
 }
 
 // BirdUnion represents a bird variant with validation constraints.
 type BirdUnion struct {
-	Name string `json:"name" validate:"required"`
-	Eggs int    `json:"eggs" validate:"min=0"`
+	Name string `json:"name" pedantigo:"required"`
+	Eggs int    `json:"eggs" pedantigo:"min=0"`
 }
 
 // NestedVariant represents a variant with nested struct fields.
 type NestedVariant struct {
-	ID    string       `json:"id" validate:"required"`
-	Owner SimpleStruct `json:"owner" validate:"required"`
+	ID    string       `json:"id" pedantigo:"required"`
+	Owner SimpleStruct `json:"owner" pedantigo:"required"`
 }
 
 // TestGenerateVariantSchema_BasicVariant tests GenerateVariantSchema
 // generates schema for variant type with properties.
 func TestGenerateVariantSchema_BasicVariant(t *testing.T) {
 	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
-		validateTag := tag.Get("validate")
+		validateTag := tag.Get("pedantigo")
 		if validateTag == "" {
 			return nil
 		}
@@ -1181,7 +1181,7 @@ func TestGenerateVariantSchema_DiscriminatorConstConstraint(t *testing.T) {
 	}
 
 	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
-		validateTag := tag.Get("validate")
+		validateTag := tag.Get("pedantigo")
 		if validateTag == "" {
 			return nil
 		}
@@ -1223,7 +1223,7 @@ func TestGenerateVariantSchema_DiscriminatorConstConstraint(t *testing.T) {
 // GenerateVariantSchema includes validation constraints from pedantigo tags.
 func TestGenerateVariantSchema_IncludesValidationConstraints(t *testing.T) {
 	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
-		validateTag := tag.Get("validate")
+		validateTag := tag.Get("pedantigo")
 		if validateTag == "" {
 			return nil
 		}
@@ -1269,7 +1269,7 @@ func TestGenerateVariantSchema_IncludesValidationConstraints(t *testing.T) {
 // GenerateVariantSchema handles nested struct fields.
 func TestGenerateVariantSchema_HandlesNestedStructs(t *testing.T) {
 	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
-		validateTag := tag.Get("validate")
+		validateTag := tag.Get("pedantigo")
 		if validateTag == "" {
 			return nil
 		}
@@ -1345,7 +1345,7 @@ func TestGenerateUnionSchema_ReturnsOneOfSchema(t *testing.T) {
 	}
 
 	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
-		validateTag := tag.Get("validate")
+		validateTag := tag.Get("pedantigo")
 		if validateTag == "" {
 			return nil
 		}
@@ -1407,7 +1407,7 @@ func TestGenerateUnionSchema_OneOfArrayLength(t *testing.T) {
 	}
 
 	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
-		validateTag := tag.Get("validate")
+		validateTag := tag.Get("pedantigo")
 		if validateTag == "" {
 			return nil
 		}
@@ -1449,7 +1449,7 @@ func TestGenerateUnionSchema_EachVariantProperlyGenerated(t *testing.T) {
 	}
 
 	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
-		validateTag := tag.Get("validate")
+		validateTag := tag.Get("pedantigo")
 		if validateTag == "" {
 			return nil
 		}
@@ -1493,7 +1493,7 @@ func TestGenerateUnionSchema_DiscriminatorConstInEachVariant(t *testing.T) {
 	}
 
 	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
-		validateTag := tag.Get("validate")
+		validateTag := tag.Get("pedantigo")
 		if validateTag == "" {
 			return nil
 		}
@@ -1543,7 +1543,7 @@ func TestGenerateUnionSchema_VariantPropertiesIncluded(t *testing.T) {
 	}
 
 	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
-		validateTag := tag.Get("validate")
+		validateTag := tag.Get("pedantigo")
 		if validateTag == "" {
 			return nil
 		}
@@ -1644,7 +1644,7 @@ func TestGenerateUnionSchema_WithValidationConstraints(t *testing.T) {
 	}
 
 	mockParseTagFunc := func(tag reflect.StructTag) map[string]string {
-		validateTag := tag.Get("validate")
+		validateTag := tag.Get("pedantigo")
 		if validateTag == "" {
 			return nil
 		}

@@ -14,7 +14,7 @@ import (
 // Example:
 //
 //	type Config struct {
-//	    APIKey SecretStr `json:"api_key" validate:"required"`
+//	    APIKey SecretStr `json:"api_key" pedantigo:"required"`
 //	}
 //
 //	// JSON output: {"api_key": "**********"}
@@ -65,7 +65,7 @@ func (s *SecretStr) UnmarshalJSON(data []byte) error {
 // Example:
 //
 //	type Config struct {
-//	    EncryptionKey SecretBytes `json:"encryption_key" validate:"required"`
+//	    EncryptionKey SecretBytes `json:"encryption_key" pedantigo:"required"`
 //	}
 type SecretBytes struct {
 	value []byte

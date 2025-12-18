@@ -748,12 +748,12 @@ Validate JSON where a field determines which variant type applies. Like Pydantic
 ```go
 // Define variant types
 type Cat struct {
-    Name  string `json:"name" validate:"required"`
-    Lives int    `json:"lives" validate:"min=1,max=9"`
+    Name  string `json:"name" pedantigo:"required"`
+    Lives int    `json:"lives" pedantigo:"min=1,max=9"`
 }
 
 type Dog struct {
-    Name  string `json:"name" validate:"required"`
+    Name  string `json:"name" pedantigo:"required"`
     Breed string `json:"breed"`
 }
 

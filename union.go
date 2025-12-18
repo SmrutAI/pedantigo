@@ -197,7 +197,7 @@ func (v *UnionValidator[T]) validateVariant(variantValue reflect.Value, variantT
 
 		// Parse validation tags
 		constraintsMap := make(map[string]string)
-		if validateTag := field.Tag.Get("validate"); validateTag != "" {
+		if validateTag := field.Tag.Get("pedantigo"); validateTag != "" {
 			// Simple tag parsing: split by comma
 			parts := splitTags(validateTag)
 			for _, part := range parts {
@@ -296,10 +296,10 @@ func splitKeyValue(pair string) []string {
 // each with a const constraint on the discriminator field.
 // Implementation.
 func (v *UnionValidator[T]) Schema() *jsonschema.Schema {
-	// Create a parseTagFunc that parses "validate" struct tags from variant structs
+	// Create a parseTagFunc that parses "pedantigo" struct tags from variant structs
 	// This function will be used by GenerateVariantSchema to apply validation constraints
 	parseTagFunc := func(tag reflect.StructTag) map[string]string {
-		validateTag := tag.Get("validate")
+		validateTag := tag.Get("pedantigo")
 		if validateTag == "" {
 			return nil
 		}
