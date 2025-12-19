@@ -13,7 +13,9 @@ This document describes the GitHub Actions workflows across the Pedantigo ecosys
 │                         │                         │                         │
 │  Workflows:             │  Workflows:             │  Workflows:             │
 │  - ci.yml               │  - benchmark.yml        │  - deploy.yml           │
-│  - notify-benchmarks.yml│                         │                         │
+│  - notify-benchmarks.yml│  - benchmark-pr-self.yml│                         │
+│  - notify-benchmarks-   │  - benchmark-pr-        │                         │
+│      pr.yml             │      external.yml       │                         │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -132,6 +134,107 @@ This document describes the GitHub Actions workflows across the Pedantigo ecosys
 
 ---
 
+## Workflow 3: Benchmark PR (`notify-benchmarks-pr.yml`)
+
+**Triggers:**
+- Pull request to `main` branch
+
+**Purpose:** Triggers benchmark run for PRs. Results are posted as a comment on the PR (not committed to docs).
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      BENCHMARK PR WORKFLOW (pedantigo)                       │
+│                                                                             │
+│  Trigger: PR to main                                                        │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ Step 1: Trigger benchmark for PR                                    │   │
+│  │   - Uses: peter-evans/repository-dispatch@v3                        │   │
+│  │   - Target: SmrutAI/pedantigo-benchmarks                            │   │
+│  │   - Event: "pedantigo-pr"                                           │   │
+│  │   - Payload: {pr_number, branch, sha}                               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│                    ┌───────────────────────────────┐                        │
+│                    │ pedantigo-benchmarks receives │                        │
+│                    │   "pedantigo-pr" event        │                        │
+│                    │   + PR info in payload        │                        │
+│                    └───────────────────────────────┘                        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Secrets Required:**
+- `BENCHMARK_TRIGGER_TOKEN` - Same token used for main branch dispatch
+
+---
+
+## Workflow 4: Benchmark PR Self (`benchmark-pr-self.yml`)
+
+**Repository:** pedantigo-benchmarks
+
+**Triggers:**
+- Pull request to `main` branch (in pedantigo-benchmarks itself)
+
+**Purpose:** Run benchmarks when the benchmark code itself changes. Comments results on own PR.
+
+**Branch Logic:**
+- Benchmarks: PR branch (automatic via checkout)
+- Pedantigo: main branch (cloned)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                  BENCHMARK PR SELF WORKFLOW (pedantigo-benchmarks)           │
+│                                                                             │
+│  Trigger: PR to main in pedantigo-benchmarks                                │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ 1. Checkout benchmarks (PR branch - automatic)                      │   │
+│  │ 2. Clone pedantigo (main branch)                                    │   │
+│  │ 3. Run benchmarks                                                   │   │
+│  │ 4. Comment BENCHMARK.md on own PR                                   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Workflow 5: Benchmark PR External (`benchmark-pr-external.yml`)
+
+**Repository:** pedantigo-benchmarks
+
+**Triggers:**
+- `repository_dispatch` with event type: `pedantigo-pr`
+
+**Purpose:** Run benchmarks for PRs in pedantigo. Comments results back on the pedantigo PR.
+
+**Branch Logic:**
+- Benchmarks: main branch (automatic via checkout)
+- Pedantigo: PR branch (from payload)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│               BENCHMARK PR EXTERNAL WORKFLOW (pedantigo-benchmarks)          │
+│                                                                             │
+│  Trigger: repository_dispatch "pedantigo-pr"                                │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ 1. Checkout benchmarks (main branch - automatic)                    │   │
+│  │ 2. Clone pedantigo (PR branch from payload)                         │   │
+│  │ 3. Run benchmarks                                                   │   │
+│  │ 4. Comment BENCHMARK.md on pedantigo PR                             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Secrets Required:**
+- `PEDANTIGO_PR_TOKEN` - PAT with `repo` scope to comment on pedantigo PRs
+
+---
+
 ## Cross-Repository Event Flow
 
 ```
@@ -183,6 +286,42 @@ This document describes the GitHub Actions workflows across the Pedantigo ecosys
               │  - Build Docusaurus          │
               │  - Deploy to GitHub Pages    │
               └──────────────────────────────┘
+```
+
+---
+
+## PR Benchmark Flow
+
+### PR in pedantigo (branch X)
+
+```
+pedantigo PR (branch X)
+    │
+    └── notify-benchmarks-pr.yml
+            │
+            └── Dispatch: pedantigo-pr
+                payload: {pr_number, branch: X, sha}
+                    │
+                    └── pedantigo-benchmarks
+                        benchmark-pr-external.yml
+                            │
+                            ├── Checkout benchmarks: main
+                            ├── Clone pedantigo: branch X
+                            ├── Run benchmarks
+                            └── Comment on pedantigo PR #N
+```
+
+### PR in pedantigo-benchmarks (branch Y)
+
+```
+pedantigo-benchmarks PR (branch Y)
+    │
+    └── benchmark-pr-self.yml
+            │
+            ├── Checkout benchmarks: branch Y (automatic)
+            ├── Clone pedantigo: main
+            ├── Run benchmarks
+            └── Comment on own PR
 ```
 
 ---
@@ -320,6 +459,7 @@ t+2m   pedantigo-docs receives event
 | `GIST_ID` | pedantigo | Gist ID for coverage badge |
 | `BENCHMARK_TRIGGER_TOKEN` | pedantigo | Dispatch to pedantigo-benchmarks |
 | `DOCS_TRIGGER_TOKEN` | pedantigo-benchmarks | Dispatch to pedantigo-docs |
+| `PEDANTIGO_PR_TOKEN` | pedantigo-benchmarks | Comment on pedantigo PRs |
 
 ---
 
