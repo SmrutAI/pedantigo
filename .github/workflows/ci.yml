@@ -25,8 +25,8 @@ jobs:
           go install github.com/jstemmer/go-junit-report/v2@latest
           go install golang.org/x/tools/cmd/goimports@latest
 
-          # golangci-lint (for make lint)
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.62.2
+          # golangci-lint v2.x (for make lint - matches local version)
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.7.2
 
           # pre-commit (gitleaks installed automatically by pre-commit)
           pip install pre-commit
