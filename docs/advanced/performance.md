@@ -11,7 +11,7 @@ Get the best performance from Pedantigo. Learn about caching strategies, benchma
 
 ## Built-in Optimizations
 
-Pedantigo is designed for high performance with minimal configuration. Two key optimizations work automatically.
+Pedantigo is designed for high performance with minimal configuration. Several key optimizations work automatically.
 
 ### Schema Caching (240x Speedup)
 

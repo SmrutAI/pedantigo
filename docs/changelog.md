@@ -89,7 +89,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+- **sync.Pool for validation contexts** - Reduced allocations during validation by reusing context buffers
+- **Field constraint caching** - Constraints are now built once at validator creation time, not on each validation call
+- **Cross-field constraint optimization** - Merged into cached field structure for faster lookups
+
+### Fixed
+- **Collection element validation** - `dive` tag is now required to validate struct fields inside slices/maps (matches go-playground/validator behavior)
+- **Empty ValidationError message** - Now returns "no errors found" instead of confusing "validation failed"
+
+### Changed
+- Removed unused internal validation package (internal cleanup, no API changes)
+
 ### Planned
 - Additional format validators
-- Performance improvements
 - Extended OpenAPI support
