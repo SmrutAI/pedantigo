@@ -143,7 +143,7 @@ Use the explicit Validator when you need:
 - Discriminated unions (type-based routing)
 - Custom validator registration
 
-See [Initialization & Configuration](/docs/api/initialization) for all initialization methods and options.
+See [Initialization & Configuration](../api/initialization) for all initialization methods and options.
 :::
 
 ## Error Handling

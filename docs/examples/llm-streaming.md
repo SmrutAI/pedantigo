@@ -357,7 +357,7 @@ func (al *AgentLoop) Run(input string) error {
 
 ## Capturing Unexpected LLM Fields
 
-LLMs may include fields you didn't request. Use [ExtraAllow](/docs/api/initialization#extra-allow) to capture these fields for debugging prompts and evaluating model accuracy:
+LLMs may include fields you didn't request. Use [ExtraAllow](../api/initialization#extra-allow) to capture these fields for debugging prompts and evaluating model accuracy:
 
 ```go
 type LLMResponse struct {
@@ -395,7 +395,7 @@ func processLLMOutput(output []byte) {
 - **Model accuracy evaluation**: Track field adherence across prompts
 - **Prompt iteration**: Use captured extras to refine instructions
 
-See [ExtraAllow Use Cases](/docs/api/initialization#extra-allow-use-cases) for more patterns.
+See [ExtraAllow Use Cases](../api/initialization#extra-allow-use-cases) for more patterns.
 
 ## Performance Tips
 
