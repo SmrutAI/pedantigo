@@ -26,6 +26,9 @@ const (
 	CUrl     = "url"
 	CUri     = "uri"
 	CUuid    = "uuid"
+	CUuid3   = "uuid3"
+	CUuid4   = "uuid4"
+	CUuid5   = "uuid5"
 	CRegexp  = "regexp"
 	CIpv4    = "ipv4"
 	CIpv6    = "ipv6"
@@ -58,6 +61,8 @@ const (
 	CExcludesrune    = "excludesrune"
 	CLowercase       = "lowercase"
 	CUppercase       = "uppercase"
+	CMultibyte       = "multibyte"
+	CUrnRfc2141      = "urn_rfc2141"
 	CStripWhitespace = "strip_whitespace"
 	CToLower         = "to_lower"
 	CToUpper         = "to_upper"
@@ -89,6 +94,7 @@ const (
 	CUdpAddr         = "udp_addr"
 	CTcp4Addr        = "tcp4_addr"
 	CHttpUrl         = "http_url"
+	CHttpsUrl        = "https_url"
 
 	// Finance constraints.
 	CCreditCard    = "credit_card"
@@ -123,6 +129,8 @@ const (
 	CBase64       = "base64"
 	CBase64url    = "base64url"
 	CBase64rawurl = "base64rawurl"
+	CDatauri      = "datauri"
+	CBase32       = "base32"
 
 	// Hash constraints.
 	CMd4     = "md4"
@@ -138,6 +146,7 @@ const (
 	CSemver   = "semver"
 	CUlid     = "ulid"
 	CDatetime = "datetime"
+	CTimezone = "timezone"
 
 	// Special.
 	CRequired = "required"
@@ -150,6 +159,10 @@ var (
 	alphaRegex    = regexp.MustCompile(`^[a-zA-Z]+$`)
 	alphanumRegex = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 	numericRegex  = regexp.MustCompile(`^[-+]?\d+(?:\.\d+)?$`)
+	// URN regex pattern (RFC 2141): urn:<NID>:<NSS>
+	// NID: starts with letter, contains letters/digits/hyphens, max 32 chars
+	// NSS: non-empty, no whitespace
+	urnRegex = regexp.MustCompile(`(?i)^urn:[a-z][a-z0-9\-]{0,31}:\S+$`)
 )
 
 // extractNumericValue converts a reflect.Value to a float64 for numeric comparisons.
@@ -221,11 +234,11 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			continue
 
 		// Core constraints.
-		case CMin, CMax, CGt, CGte, CLt, CLte, CEmail, CUrl, CUri, CUuid, CRegexp, CIpv4, CIpv6, COneof, COneofci, CEq, CNe, CLen, CHttpUrl:
+		case CMin, CMax, CGt, CGte, CLt, CLte, CEmail, CUrl, CUri, CUuid, CUuid3, CUuid4, CUuid5, CRegexp, CIpv4, CIpv6, COneof, COneofci, CEq, CNe, CLen, CHttpUrl:
 			result = appendCoreConstraint(result, name, value, fieldType)
 
 		// String constraints.
-		case CAscii, CAlpha, CAlphanum, CAlphaspace, CAlphanumspace, CPrintascii, CNumeric, CNumber, CHexadecimal, CAlphaunicode, CAlphanumunicode, CContains, CExcludes, CStartswith, CEndswith, CStartsnotwith, CEndsnotwith, CContainsany, CExcludesall, CExcludesrune, CLowercase, CUppercase, CStripWhitespace, CToLower, CToUpper:
+		case CAscii, CAlpha, CAlphanum, CAlphaspace, CAlphanumspace, CPrintascii, CNumeric, CNumber, CHexadecimal, CAlphaunicode, CAlphanumunicode, CContains, CExcludes, CStartswith, CEndswith, CStartsnotwith, CEndsnotwith, CContainsany, CExcludesall, CExcludesrune, CLowercase, CUppercase, CMultibyte, CUrnRfc2141, CStripWhitespace, CToLower, CToUpper:
 			result = appendStringConstraint(result, name, value)
 
 		// Numeric constraints.
@@ -237,7 +250,7 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			result = appendCollectionConstraint(result, name, value)
 
 		// Network constraints.
-		case CIp, CCidr, CCidrv4, CCidrv6, CMac, CHostname, CHostnameRfc1123, CHostnamePort, CFqdn, CPort, CTcpAddr, CUdpAddr, CTcp4Addr:
+		case CIp, CCidr, CCidrv4, CCidrv6, CMac, CHostname, CHostnameRfc1123, CHostnamePort, CFqdn, CPort, CTcpAddr, CUdpAddr, CTcp4Addr, CHttpsUrl:
 			result = appendNetworkConstraint(result, name)
 
 		// Finance constraints.
@@ -257,7 +270,7 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			result = appendColorConstraint(result, name)
 
 		// Encoding constraints.
-		case CJwt, CJson, CBase64, CBase64url, CBase64rawurl:
+		case CJwt, CJson, CBase64, CBase64url, CBase64rawurl, CDatauri, CBase32:
 			result = appendEncodingConstraint(result, name)
 
 		// Hash constraints.
@@ -265,7 +278,7 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			result = appendHashConstraint(result, name)
 
 		// Misc constraints.
-		case CHtml, CCron, CSemver, CUlid, CDatetime:
+		case CHtml, CCron, CSemver, CUlid, CDatetime, CTimezone:
 			result = appendMiscConstraint(result, name, value)
 
 		// ISO code constraints.
@@ -323,6 +336,12 @@ func appendCoreConstraint(result []Constraint, name, value string, fieldType ref
 		return append(result, uriConstraint{})
 	case "uuid":
 		return append(result, uuidConstraint{})
+	case "uuid3":
+		return append(result, uuid3Constraint{})
+	case "uuid4":
+		return append(result, uuid4Constraint{})
+	case "uuid5":
+		return append(result, uuid5Constraint{})
 	case "regexp":
 		return append(result, buildRegexConstraint(value))
 	case "ipv4":
@@ -416,6 +435,10 @@ func appendStringConstraint(result []Constraint, name, value string) []Constrain
 		return append(result, lowercaseConstraint{})
 	case "uppercase":
 		return append(result, uppercaseConstraint{})
+	case "multibyte":
+		return append(result, multibyteConstraint{})
+	case "urn_rfc2141":
+		return append(result, urnRfc2141Constraint{})
 	case "strip_whitespace":
 		// In Validate mode: check if string has no leading/trailing whitespace
 		return append(result, stripWhitespaceConstraint{})
@@ -494,6 +517,8 @@ func appendNetworkConstraint(result []Constraint, name string) []Constraint {
 		return append(result, udpAddrConstraint{})
 	case "tcp4_addr":
 		return append(result, tcp4AddrConstraint{})
+	case "https_url":
+		return append(result, httpsURLConstraint{})
 	}
 	return result
 }
@@ -577,6 +602,10 @@ func appendEncodingConstraint(result []Constraint, name string) []Constraint {
 		return append(result, base64urlConstraint{})
 	case "base64rawurl":
 		return append(result, base64rawurlConstraint{})
+	case "datauri":
+		return append(result, datauriConstraint{})
+	case "base32":
+		return append(result, base32Constraint{})
 	}
 	return result
 }
@@ -615,6 +644,8 @@ func appendMiscConstraint(result []Constraint, name, value string) []Constraint 
 		if c, ok := buildDatetimeConstraint(value); ok {
 			return append(result, c)
 		}
+	case "timezone":
+		return append(result, timezoneConstraint{})
 	}
 	return result
 }

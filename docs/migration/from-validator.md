@@ -44,7 +44,7 @@ These validator tags work identically in Pedantigo:
 `required`, `min`, `max`, `len`, `eq`, `ne`, `gt`, `gte`, `lt`, `lte`
 
 ### String Constraints
-`email`, `url`, `uri`, `uuid`, `alpha`, `alphanum`, `alphaunicode`, `alphanumunicode`, `numeric`, `number`, `hexadecimal`, `ascii`, `printascii`, `lowercase`, `uppercase`, `contains`, `excludes`, `startswith`, `endswith`, `startsnotwith`, `endsnotwith`, `containsany`, `excludesall`, `excludesrune`
+`email`, `url`, `uri`, `uuid`, `uuid3`, `uuid4`, `uuid5`, `alpha`, `alphanum`, `alphaunicode`, `alphanumunicode`, `numeric`, `number`, `hexadecimal`, `ascii`, `printascii`, `multibyte`, `lowercase`, `uppercase`, `contains`, `excludes`, `startswith`, `endswith`, `startsnotwith`, `endsnotwith`, `containsany`, `excludesall`, `excludesrune`
 
 ### Enum/Choice
 `oneof`, `oneofci`
@@ -56,10 +56,10 @@ These validator tags work identically in Pedantigo:
 `required_if`, `required_unless`, `required_with`, `required_without`, `required_with_all`, `required_without_all`, `excluded_if`, `excluded_unless`, `excluded_with`, `excluded_without`, `excluded_with_all`, `excluded_without_all`
 
 ### Network
-`ip`, `ipv4`, `ipv6`, `cidr`, `cidrv4`, `cidrv6`, `mac`, `hostname`, `hostname_rfc1123`, `fqdn`, `tcp_addr`, `udp_addr`, `hostname_port`, `http_url`
+`ip`, `ipv4`, `ipv6`, `cidr`, `cidrv4`, `cidrv6`, `mac`, `hostname`, `hostname_rfc1123`, `fqdn`, `tcp_addr`, `udp_addr`, `hostname_port`, `http_url`, `https_url`
 
 ### Format Validators
-`datetime`, `credit_card`, `isbn`, `isbn10`, `isbn13`, `issn`, `ssn`, `ein`, `e164`, `base64`, `base64url`, `base64rawurl`, `json`, `jwt`, `html`, `hexcolor`, `rgb`, `rgba`, `hsl`, `hsla`, `latitude`, `longitude`, `md4`, `md5`, `sha256`, `sha384`, `sha512`, `mongodb`, `cron`, `semver`, `ulid`, `luhn_checksum`, `bitcoin_addr`, `bitcoin_addr_bech32`, `ethereum_addr`
+`datetime`, `timezone`, `credit_card`, `isbn`, `isbn10`, `isbn13`, `issn`, `ssn`, `ein`, `e164`, `base64`, `base64url`, `base64rawurl`, `base32`, `datauri`, `urn_rfc2141`, `json`, `jwt`, `html`, `hexcolor`, `rgb`, `rgba`, `hsl`, `hsla`, `latitude`, `longitude`, `md4`, `md5`, `sha256`, `sha384`, `sha512`, `mongodb`, `cron`, `semver`, `ulid`, `luhn_checksum`, `bitcoin_addr`, `bitcoin_addr_bech32`, `ethereum_addr`
 
 ### ISO Codes
 `iso3166_1_alpha2`, `iso3166_1_alpha3`, `iso3166_1_alpha_numeric`, `iso4217`, `bcp47_language_tag`, `postcode_iso3166_alpha2`
@@ -142,13 +142,6 @@ The following validator features are **not available** in Pedantigo:
 | `eq_ignore_case`        | Case-insensitive equality      | Use `to_lower,eq=value`                     |
 | `ne_ignore_case`        | Case-insensitive not-equal     | Use `to_lower,ne=value`                     |
 | `containsrune`          | Contains specific rune         | Use `containsany=X` with single char        |
-| `https_url`             | URL with https:// only         | Use `http_url` or `url,startswith=https://` |
-| `multibyte`             | Has multibyte characters       | Use regexp                                  |
-| `datauri`               | Data URI format                | Use regexp                                  |
-| `base32`                | Base32 encoding                | Use regexp                                  |
-| `urn_rfc2141`           | URN format                     | Use regexp                                  |
-| `uuid3/4/5`             | Specific UUID version          | `uuid` accepts all versions                 |
-| `timezone`              | IANA timezone                  | Custom validator                            |
 | `image`                 | File is image                  | Filesystem check in code                    |
 
 For a complete feature comparison, see [API Parity](./api-parity.md).
