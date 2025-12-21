@@ -2,6 +2,7 @@
 package constraints
 
 import (
+	"encoding/base32"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -16,10 +17,15 @@ type (
 	base64Constraint       struct{} // base64: validates base64 encoding (RFC 4648)
 	base64urlConstraint    struct{} // base64url: validates base64url encoding (RFC 4648 section 5)
 	base64rawurlConstraint struct{} // base64rawurl: validates base64 raw URL encoding (RFC 4648 section 3.2)
+	datauriConstraint      struct{} // datauri: validates Data URI format (RFC 2397)
+	base32Constraint       struct{} // base32: validates Base32 encoding (RFC 4648)
 )
 
 // Pre-compiled regex for JWT format validation.
 var jwtRegex = regexp.MustCompile(`^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$`)
+
+// Data URI regex pattern (RFC 2397): data:[<mediatype>][;base64],<data>
+var dataURIRegex = regexp.MustCompile(`^data:([a-zA-Z0-9]+/[a-zA-Z0-9\-\+\.]+)?(;charset=[a-zA-Z0-9\-]+)?(;base64)?,.*$`)
 
 // Validate checks if the value is a valid JWT (3 base64url parts separated by dots).
 func (c jwtConstraint) Validate(value any) error {
@@ -159,6 +165,56 @@ func (c base64rawurlConstraint) Validate(value any) error {
 	_, decodeErr := base64.RawURLEncoding.DecodeString(str)
 	if decodeErr != nil {
 		return NewConstraintError(CodeInvalidBase64RawURL, "must be valid base64 raw URL encoding (no padding)")
+	}
+
+	return nil
+}
+
+// Validate checks if the value is a valid Data URI (RFC 2397).
+func (c datauriConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("datauri constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Empty strings are handled by required constraint
+	}
+
+	// Check if it starts with "data:"
+	if len(str) < 5 || str[:5] != "data:" {
+		return NewConstraintError(CodeInvalidDataURI, "must be a valid Data URI")
+	}
+
+	// Validate full Data URI format
+	if !dataURIRegex.MatchString(str) {
+		return NewConstraintError(CodeInvalidDataURI, "must be a valid Data URI")
+	}
+
+	return nil
+}
+
+// Validate checks if the value is valid Base32 encoding (RFC 4648).
+func (c base32Constraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("base32 constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Empty strings are handled by required constraint
+	}
+
+	// Try decoding with standard Base32 encoding
+	_, decodeErr := base32.StdEncoding.DecodeString(str)
+	if decodeErr != nil {
+		return NewConstraintError(CodeInvalidBase32, "must be valid base32 encoding")
 	}
 
 	return nil

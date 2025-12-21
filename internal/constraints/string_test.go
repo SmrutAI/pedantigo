@@ -994,3 +994,307 @@ func TestAlphanumunicodeConstraint(t *testing.T) {
 		{"invalid type - bool", true, true},
 	})
 }
+
+func TestMultibyteConstraint(t *testing.T) {
+	c := multibyteConstraint{}
+
+	tests := []struct {
+		name      string
+		input     any
+		wantErr   bool
+		errorCode string
+	}{
+		// Valid - contains multibyte characters
+		{"emoji", "hello 👋", false, ""},
+		{"chinese", "你好", false, ""},
+		{"japanese", "こんにちは", false, ""},
+		{"korean", "안녕하세요", false, ""},
+		{"cyrillic", "привет", false, ""},
+		{"accented", "café", false, ""},
+		{"mixed with emoji", "test🎉", false, ""},
+		{"single emoji", "🔥", false, ""},
+
+		// Edge cases
+		{"empty string skipped", "", false, ""},
+		{"nil skipped", nil, false, ""},
+
+		// Invalid - ASCII only
+		{"ascii only letters", "hello world", true, CodeInvalidMultibyte},
+		{"ascii only numbers", "12345", true, CodeInvalidMultibyte},
+		{"ascii only special", "!@#$%^&*()", true, CodeInvalidMultibyte},
+		{"ascii mixed", "Hello, World! 123", true, CodeInvalidMultibyte},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := c.Validate(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				var ce *ConstraintError
+				require.ErrorAs(t, err, &ce)
+				assert.Equal(t, tt.errorCode, ce.Code)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestURNRfc2141Constraint(t *testing.T) {
+	c := urnRfc2141Constraint{}
+
+	tests := []struct {
+		name      string
+		input     any
+		wantErr   bool
+		errorCode string
+	}{
+		// Valid URNs (RFC 2141)
+		{"isbn urn", "urn:isbn:0451450523", false, ""},
+		{"uuid urn", "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66", false, ""},
+		{"oid urn", "urn:oid:1.3.6.1.4.1", false, ""},
+		{"ietf urn", "urn:ietf:rfc:2141", false, ""},
+		{"uppercase URN", "URN:ISBN:0451450523", false, ""},
+		{"mixed case", "Urn:Isbn:0451450523", false, ""},
+
+		// Edge cases
+		{"empty string skipped", "", false, ""},
+		{"nil skipped", nil, false, ""},
+
+		// Invalid URNs
+		{"missing urn prefix", "isbn:0451450523", true, CodeInvalidURN},
+		{"invalid NID starts with number", "urn:1invalid:test", true, CodeInvalidURN},
+		{"empty NID", "urn::test", true, CodeInvalidURN},
+		{"empty NSS", "urn:isbn:", true, CodeInvalidURN},
+		{"just urn:", "urn:", true, CodeInvalidURN},
+		{"random string", "not-a-urn", true, CodeInvalidURN},
+		{"url not urn", "https://example.com", true, CodeInvalidURN},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := c.Validate(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				var ce *ConstraintError
+				require.ErrorAs(t, err, &ce)
+				assert.Equal(t, tt.errorCode, ce.Code)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHTTPSURLConstraint(t *testing.T) {
+	c := httpsURLConstraint{}
+
+	tests := []struct {
+		name      string
+		input     any
+		wantErr   bool
+		errorCode string
+	}{
+		// Valid HTTPS URLs
+		{"simple https", "https://example.com", false, ""},
+		{"https with path", "https://example.com/path", false, ""},
+		{"https with port", "https://example.com:443", false, ""},
+		{"https with query", "https://example.com?foo=bar", false, ""},
+		{"https with fragment", "https://example.com#section", false, ""},
+		{"https complex", "https://user:pass@example.com:8080/path?q=1#frag", false, ""},
+
+		// Edge cases
+		{"empty string skipped", "", false, ""},
+		{"nil skipped", nil, false, ""},
+
+		// Invalid - HTTP (not HTTPS)
+		{"http not allowed", "http://example.com", true, CodeInvalidHTTPSURL},
+		{"http with path", "http://example.com/path", true, CodeInvalidHTTPSURL},
+
+		// Invalid - Other schemes
+		{"ftp not allowed", "ftp://example.com", true, CodeInvalidHTTPSURL},
+		{"file not allowed", "file:///path", true, CodeInvalidHTTPSURL},
+
+		// Invalid format
+		{"no scheme", "example.com", true, CodeInvalidHTTPSURL},
+		{"no host", "https://", true, CodeInvalidHTTPSURL},
+		{"not a url", "not-a-url", true, CodeInvalidHTTPSURL},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := c.Validate(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				var ce *ConstraintError
+				require.ErrorAs(t, err, &ce)
+				assert.Equal(t, tt.errorCode, ce.Code)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestUUID3Constraint tests uuid3Constraint.Validate() for UUID version 3.
+func TestUUID3Constraint(t *testing.T) {
+	c := uuid3Constraint{}
+
+	tests := []struct {
+		name      string
+		input     any
+		wantErr   bool
+		errorCode string
+	}{
+		// Valid UUID v3
+		{"valid uuid3", "6ba7b810-9dad-31d1-80b4-00c04fd430c8", false, ""},
+		{"valid uuid3 uppercase", "6BA7B810-9DAD-31D1-80B4-00C04FD430C8", false, ""},
+		{"valid uuid3 mixed case", "6ba7B810-9DAD-31d1-80B4-00c04FD430c8", false, ""},
+
+		// Edge cases
+		{"empty string skipped", "", false, ""},
+		{"nil skipped", nil, false, ""},
+
+		// Wrong version
+		{"uuid4 not valid as uuid3", "550e8400-e29b-41d4-a716-446655440000", true, CodeInvalidUUIDv3},
+		{"uuid5 not valid as uuid3", "886313e1-3b8a-5372-9b90-0c9aee199e5d", true, CodeInvalidUUIDv3},
+		{"uuid1 not valid as uuid3", "6ba7b810-9dad-11d1-80b4-00c04fd430c8", true, CodeInvalidUUIDv3},
+		{"uuid2 not valid as uuid3", "6ba7b810-9dad-21d1-80b4-00c04fd430c8", true, CodeInvalidUUIDv3},
+
+		// Invalid format
+		{"not a uuid", "not-a-uuid", true, CodeInvalidUUIDv3},
+		{"missing dashes", "6ba7b8109dad31d180b400c04fd430c8", true, CodeInvalidUUIDv3},
+		{"wrong length", "6ba7b810-9dad-31d1-80b4", true, CodeInvalidUUIDv3},
+		{"invalid hex char", "6ba7b810-9dad-31d1-80b4-00c04fd430cx", true, CodeInvalidUUIDv3},
+		{"extra dashes", "6ba7b810--9dad-31d1-80b4-00c04fd430c8", true, CodeInvalidUUIDv3},
+
+		// Invalid types
+		{"invalid type - int", 123, true, ""},
+		{"invalid type - bool", true, true, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := c.Validate(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errorCode != "" {
+					var ce *ConstraintError
+					require.ErrorAs(t, err, &ce)
+					assert.Equal(t, tt.errorCode, ce.Code)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestUUID4Constraint tests uuid4Constraint.Validate() for UUID version 4.
+func TestUUID4Constraint(t *testing.T) {
+	c := uuid4Constraint{}
+
+	tests := []struct {
+		name      string
+		input     any
+		wantErr   bool
+		errorCode string
+	}{
+		// Valid UUID v4
+		{"valid uuid4", "550e8400-e29b-41d4-a716-446655440000", false, ""},
+		{"valid uuid4 lowercase", "550e8400-e29b-41d4-a716-446655440000", false, ""},
+		{"valid uuid4 uppercase", "550E8400-E29B-41D4-A716-446655440000", false, ""},
+		{"valid uuid4 mixed case", "550e8400-E29B-41D4-a716-446655440000", false, ""},
+
+		// Edge cases
+		{"empty string skipped", "", false, ""},
+		{"nil skipped", nil, false, ""},
+
+		// Wrong version
+		{"uuid3 not valid as uuid4", "6ba7b810-9dad-31d1-80b4-00c04fd430c8", true, CodeInvalidUUIDv4},
+		{"uuid5 not valid as uuid4", "886313e1-3b8a-5372-9b90-0c9aee199e5d", true, CodeInvalidUUIDv4},
+		{"uuid1 not valid as uuid4", "6ba7b810-9dad-11d1-80b4-00c04fd430c8", true, CodeInvalidUUIDv4},
+		{"uuid2 not valid as uuid4", "6ba7b810-9dad-21d1-80b4-00c04fd430c8", true, CodeInvalidUUIDv4},
+
+		// Invalid format
+		{"not a uuid", "not-a-uuid", true, CodeInvalidUUIDv4},
+		{"invalid chars", "550e8400-e29b-41d4-g716-446655440000", true, CodeInvalidUUIDv4},
+		{"missing dashes", "550e8400e29b41d4a716446655440000", true, CodeInvalidUUIDv4},
+		{"wrong length", "550e8400-e29b-41d4-a716", true, CodeInvalidUUIDv4},
+		{"spaces", "550e8400 -e29b-41d4-a716-446655440000", true, CodeInvalidUUIDv4},
+
+		// Invalid types
+		{"invalid type - int", 123, true, ""},
+		{"invalid type - bool", true, true, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := c.Validate(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errorCode != "" {
+					var ce *ConstraintError
+					require.ErrorAs(t, err, &ce)
+					assert.Equal(t, tt.errorCode, ce.Code)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestUUID5Constraint tests uuid5Constraint.Validate() for UUID version 5.
+func TestUUID5Constraint(t *testing.T) {
+	c := uuid5Constraint{}
+
+	tests := []struct {
+		name      string
+		input     any
+		wantErr   bool
+		errorCode string
+	}{
+		// Valid UUID v5
+		{"valid uuid5", "886313e1-3b8a-5372-9b90-0c9aee199e5d", false, ""},
+		{"valid uuid5 uppercase", "886313E1-3B8A-5372-9B90-0C9AEE199E5D", false, ""},
+		{"valid uuid5 mixed case", "886313e1-3B8A-5372-9b90-0C9AEE199E5D", false, ""},
+
+		// Edge cases
+		{"empty string skipped", "", false, ""},
+		{"nil skipped", nil, false, ""},
+
+		// Wrong version
+		{"uuid3 not valid as uuid5", "6ba7b810-9dad-31d1-80b4-00c04fd430c8", true, CodeInvalidUUIDv5},
+		{"uuid4 not valid as uuid5", "550e8400-e29b-41d4-a716-446655440000", true, CodeInvalidUUIDv5},
+		{"uuid1 not valid as uuid5", "6ba7b810-9dad-11d1-80b4-00c04fd430c8", true, CodeInvalidUUIDv5},
+		{"uuid2 not valid as uuid5", "6ba7b810-9dad-21d1-80b4-00c04fd430c8", true, CodeInvalidUUIDv5},
+
+		// Invalid format
+		{"not a uuid", "not-a-uuid", true, CodeInvalidUUIDv5},
+		{"missing dashes", "886313e13b8a53729b900c9aee199e5d", true, CodeInvalidUUIDv5},
+		{"wrong length", "886313e1-3b8a-5372-9b90", true, CodeInvalidUUIDv5},
+		{"invalid hex char", "886313e1-3b8a-5372-9b90-0c9aee199e5x", true, CodeInvalidUUIDv5},
+		{"extra dashes", "886313e1--3b8a-5372-9b90-0c9aee199e5d", true, CodeInvalidUUIDv5},
+
+		// Invalid types
+		{"invalid type - int", 123, true, ""},
+		{"invalid type - bool", true, true, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := c.Validate(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errorCode != "" {
+					var ce *ConstraintError
+					require.ErrorAs(t, err, &ce)
+					assert.Equal(t, tt.errorCode, ce.Code)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

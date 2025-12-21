@@ -46,6 +46,12 @@ type (
 	lowercaseConstraint       struct{}
 	uppercaseConstraint       struct{}
 	stripWhitespaceConstraint struct{}
+	uuid3Constraint           struct{} // uuid3: validates UUID version 3
+	uuid4Constraint           struct{} // uuid4: validates UUID version 4
+	uuid5Constraint           struct{} // uuid5: validates UUID version 5
+	multibyteConstraint       struct{} // multibyte: validates string has multibyte chars
+	urnRfc2141Constraint      struct{} // urn_rfc2141: validates URN format (RFC 2141)
+	httpsURLConstraint        struct{} // https_url: validates HTTPS URL only
 )
 
 // emailConstraint validates that a string is a valid email format.
@@ -864,4 +870,176 @@ func buildExcludesruneConstraint(value string) (Constraint, bool) {
 	}
 	runes := []rune(value)
 	return excludesruneConstraint{r: runes[0]}, true
+}
+
+// uuid3Constraint validates that a string is a valid UUID version 3.
+func (c uuid3Constraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("uuid3 constraint %w", err)
+	}
+	if str == "" {
+		return nil
+	}
+
+	// Check UUID format first
+	if !uuidRegex.MatchString(str) {
+		return NewConstraintError(CodeInvalidUUIDv3, "must be a valid UUID version 3")
+	}
+
+	// Check version byte (position 14 must be '3')
+	if str[14] != '3' {
+		return NewConstraintError(CodeInvalidUUIDv3, "must be a valid UUID version 3")
+	}
+
+	// Check variant byte (position 19 must be 8, 9, a, b, A, B for RFC 4122)
+	v := str[19]
+	if v != '8' && v != '9' && v != 'a' && v != 'b' && v != 'A' && v != 'B' {
+		return NewConstraintError(CodeInvalidUUIDv3, "must be a valid UUID version 3")
+	}
+
+	return nil
+}
+
+// uuid4Constraint validates that a string is a valid UUID version 4.
+func (c uuid4Constraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("uuid4 constraint %w", err)
+	}
+	if str == "" {
+		return nil
+	}
+
+	// Check UUID format first
+	if !uuidRegex.MatchString(str) {
+		return NewConstraintError(CodeInvalidUUIDv4, "must be a valid UUID version 4")
+	}
+
+	// Check version byte (position 14 must be '4')
+	if str[14] != '4' {
+		return NewConstraintError(CodeInvalidUUIDv4, "must be a valid UUID version 4")
+	}
+
+	// Check variant byte (position 19 must be 8, 9, a, b, A, B for RFC 4122)
+	v := str[19]
+	if v != '8' && v != '9' && v != 'a' && v != 'b' && v != 'A' && v != 'B' {
+		return NewConstraintError(CodeInvalidUUIDv4, "must be a valid UUID version 4")
+	}
+
+	return nil
+}
+
+// uuid5Constraint validates that a string is a valid UUID version 5.
+func (c uuid5Constraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("uuid5 constraint %w", err)
+	}
+	if str == "" {
+		return nil
+	}
+
+	// Check UUID format first
+	if !uuidRegex.MatchString(str) {
+		return NewConstraintError(CodeInvalidUUIDv5, "must be a valid UUID version 5")
+	}
+
+	// Check version byte (position 14 must be '5')
+	if str[14] != '5' {
+		return NewConstraintError(CodeInvalidUUIDv5, "must be a valid UUID version 5")
+	}
+
+	// Check variant byte (position 19 must be 8, 9, a, b, A, B for RFC 4122)
+	v := str[19]
+	if v != '8' && v != '9' && v != 'a' && v != 'b' && v != 'A' && v != 'B' {
+		return NewConstraintError(CodeInvalidUUIDv5, "must be a valid UUID version 5")
+	}
+
+	return nil
+}
+
+// multibyteConstraint validates that a string contains at least one multibyte character.
+func (c multibyteConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("multibyte constraint %w", err)
+	}
+	if str == "" {
+		return nil
+	}
+
+	// Check if string contains any multibyte character (> 127 in UTF-8)
+	for _, r := range str {
+		if r > 127 {
+			return nil // Found a multibyte character
+		}
+	}
+
+	return NewConstraintError(CodeInvalidMultibyte, "must contain at least one multibyte character")
+}
+
+// urnRfc2141Constraint validates that a string is a valid URN per RFC 2141.
+func (c urnRfc2141Constraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("urn_rfc2141 constraint %w", err)
+	}
+	if str == "" {
+		return nil
+	}
+
+	// Validate URN format: urn:<NID>:<NSS>
+	if !urnRegex.MatchString(str) {
+		return NewConstraintError(CodeInvalidURN, "must be a valid URN (RFC 2141)")
+	}
+
+	return nil
+}
+
+// httpsURLConstraint validates that a string is a valid HTTPS URL.
+func (c httpsURLConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("https_url constraint %w", err)
+	}
+	if str == "" {
+		return nil
+	}
+
+	// Parse the URL
+	parsedURL, parseErr := url.Parse(str)
+	if parseErr != nil {
+		return NewConstraintError(CodeInvalidHTTPSURL, "must be a valid HTTPS URL")
+	}
+
+	// Check scheme is https (case-insensitive)
+	if !strings.EqualFold(parsedURL.Scheme, "https") {
+		return NewConstraintError(CodeInvalidHTTPSURL, "must be a valid HTTPS URL")
+	}
+
+	// Check host is non-empty
+	if parsedURL.Host == "" {
+		return NewConstraintError(CodeInvalidHTTPSURL, "must be a valid HTTPS URL")
+	}
+
+	return nil
 }

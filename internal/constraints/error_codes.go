@@ -90,6 +90,14 @@ const (
 	CodeInvalidBase64RawURL = "INVALID_BASE64_RAW_URL"
 	CodeInvalidJSON         = "INVALID_JSON"
 	CodeInvalidJWT          = "INVALID_JWT"
+	CodeInvalidUUIDv3       = "INVALID_UUID_V3"
+	CodeInvalidUUIDv4       = "INVALID_UUID_V4"
+	CodeInvalidUUIDv5       = "INVALID_UUID_V5"
+	CodeInvalidMultibyte    = "INVALID_MULTIBYTE"
+	CodeInvalidDataURI      = "INVALID_DATA_URI"
+	CodeInvalidBase32       = "INVALID_BASE32"
+	CodeInvalidURN          = "INVALID_URN"
+	CodeInvalidHTTPSURL     = "INVALID_HTTPS_URL"
 
 	// Length constraints.
 	CodeMinLength   = "MIN_LENGTH"

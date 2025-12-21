@@ -1,6 +1,11 @@
 package constraints
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 // TestJwtConstraint tests jwtConstraint.Validate() for valid JWT format (3 base64url parts).
 func TestJwtConstraint(t *testing.T) {
@@ -143,4 +148,123 @@ func TestBase64rawurlConstraint(t *testing.T) {
 		{"invalid type - int", 123, true},
 		{"invalid type - bool", true, true},
 	})
+}
+
+func TestDataURIConstraint(t *testing.T) {
+	c := datauriConstraint{}
+
+	tests := []struct {
+		name      string
+		input     any
+		wantErr   bool
+		errorCode string
+	}{
+		// Valid Data URIs (RFC 2397)
+		{"minimal data uri", "data:,hello", false, ""},
+		{"text plain", "data:text/plain,hello%20world", false, ""},
+		{"text plain base64", "data:text/plain;base64,SGVsbG8gV29ybGQ=", false, ""},
+		{"image png base64", "data:image/png;base64,iVBORw0KGgo=", false, ""},
+		{"with charset", "data:text/plain;charset=utf-8,hello", false, ""},
+		{"html content", "data:text/html,<h1>Hello</h1>", false, ""},
+		{"json content", "data:application/json,{}", false, ""},
+		{"svg", "data:image/svg+xml,<svg></svg>", false, ""},
+
+		// Edge cases
+		{"empty string skipped", "", false, ""},
+		{"nil skipped", nil, false, ""},
+
+		// Invalid Data URIs
+		{"missing data prefix", "text/plain,hello", true, CodeInvalidDataURI},
+		{"missing comma", "data:text/plain", true, CodeInvalidDataURI},
+		{"just data:", "data:", true, CodeInvalidDataURI},
+		{"not a data uri", "https://example.com", true, CodeInvalidDataURI},
+		{"random string", "hello world", true, CodeInvalidDataURI},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := c.Validate(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				var ce *ConstraintError
+				require.ErrorAs(t, err, &ce)
+				assert.Equal(t, tt.errorCode, ce.Code)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestBase32Constraint(t *testing.T) {
+	c := base32Constraint{}
+
+	// Test data: "Hello" in various encodings
+	// Base32 of "Hello" = "JBSWY3DP" (without padding) or "JBSWY3DP======" (with padding)
+	// Base32 uses A-Z and 2-7
+
+	tests := []struct {
+		name      string
+		input     any
+		wantErr   bool
+		errorCode string
+	}{
+		// Valid Base32
+		{"valid base32 with padding", "JBSWY3DPEHPK3PXP", false, ""},
+		{"valid base32 hello", "JBSWY3DP", false, ""},
+		{"valid with padding", "MFRGGZDFMY======", false, ""},
+		{"valid uppercase", "GEZDGNBVGY3TQOJQ", false, ""},
+		{"empty encoding", "", false, ""}, // Empty is valid (skip)
+
+		// Edge cases
+		{"nil skipped", nil, false, ""},
+
+		// Invalid Base32
+		{"lowercase invalid", "jbswy3dp", true, CodeInvalidBase32},
+		{"contains 0", "JBSWY30P", true, CodeInvalidBase32},
+		{"contains 1", "JBSWY31P", true, CodeInvalidBase32},
+		{"contains 8", "JBSWY38P", true, CodeInvalidBase32},
+		{"contains 9", "JBSWY39P", true, CodeInvalidBase32},
+		{"invalid chars", "JBSWY3DP!!!", true, CodeInvalidBase32},
+		{"wrong padding", "JBSWY3DP=", true, CodeInvalidBase32},
+		{"spaces", "JBSW Y3DP", true, CodeInvalidBase32},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := c.Validate(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				var ce *ConstraintError
+				require.ErrorAs(t, err, &ce)
+				assert.Equal(t, tt.errorCode, ce.Code)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestDataURIConstraint_PointerTypes(t *testing.T) {
+	c := datauriConstraint{}
+
+	// Valid pointer
+	valid := "data:text/plain,hello"
+	assert.NoError(t, c.Validate(&valid))
+
+	// Nil pointer
+	var nilPtr *string
+	assert.NoError(t, c.Validate(nilPtr))
+}
+
+func TestBase32Constraint_PointerTypes(t *testing.T) {
+	c := base32Constraint{}
+
+	// Valid pointer
+	valid := "JBSWY3DP"
+	assert.NoError(t, c.Validate(&valid))
+
+	// Nil pointer
+	var nilPtr *string
+	assert.NoError(t, c.Validate(nilPtr))
 }

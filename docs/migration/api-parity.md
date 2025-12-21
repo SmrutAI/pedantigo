@@ -35,11 +35,13 @@ How Pedantigo compares to Pydantic v2 and go-playground/validator v10.
 | URL                   |     ✓     |    ✓     |     ✓     |    [Format](../constraints/format#url)     |
 | URI                   |     ✓     |    ✗     |     ✓     |    [Format](../constraints/format#uri)     |
 | UUID                  |     ✓     |    ✓     |     ✓     |    [Format](../constraints/format#uuid)     |
+| UUID3/UUID4/UUID5     |     ✓     |    ✗     |     ✓     |    [Format](../constraints/format#uuid3--uuid4--uuid5)     |
 | Regex/Pattern         |     ✓     |    ✓     |     ✓     |    [String](../constraints/string#regexp)     |
 | Enum/OneOf            |     ✓     |    ✓     |     ✓     | [Constraints](../concepts/constraints) |
 | Enum case-insensitive |     ✓     |    ✗     |     ✓     | [Constraints](../concepts/constraints) |
 | Alpha/Alphanumeric    |     ✓     |    ✗     |     ✓     |    [String](../constraints/string#alpha)     |
 | ASCII only            |     ✓     |    ✗     |     ✓     |    [String](../constraints/string#ascii)     |
+| Multibyte chars       |     ✓     |    ✗     |     ✓     |    [String](../constraints/string#multibyte)     |
 | Contains/Excludes     |     ✓     |    ✗     |     ✓     |    [String](../constraints/string#contains)     |
 | Starts/Ends with      |     ✓     |    ✗     |     ✓     |    [String](../constraints/string#startswith)     |
 | Case validation       |     ✓     |    ✗     |     ✓     |    [String](../constraints/string#lowercase)     |
@@ -77,6 +79,8 @@ How Pedantigo compares to Pydantic v2 and go-playground/validator v10.
 | FQDN             |     ✓     |    ✗     |     ✓     | DNS standard         | [Format](../constraints/format#fqdn) |
 | Port             |     ✓     |    ✗     |     ✓     | 0-65535              | [Format](../constraints/format#port) |
 | TCP/UDP address  |     ✓     |    ✗     |     ✓     | `net.ResolveTCPAddr` | [Format](../constraints/format#tcp_addr) |
+| HTTP URL         |     ✓     |    ✗     |     ✓     | RFC 3986             | [Format](../constraints/format#http_url) |
+| HTTPS URL        |     ✓     |    ✗     |     ✓     | RFC 3986             | [Format](../constraints/format#https_url) |
 | Credit card      |     ✓     |    ✓     |     ✓     | ISO/IEC 7812         | [Format](../constraints/format#credit_card) |
 | Bitcoin address  |     ✓     |    ✗     |     ✓     | Base58Check          | [Format](../constraints/format#btc_addr) |
 | Bitcoin Bech32   |     ✓     |    ✗     |     ✓     | BIP-0173             | [Format](../constraints/format#btc_addr_bech32) |
@@ -99,6 +103,9 @@ How Pedantigo compares to Pydantic v2 and go-playground/validator v10.
 | Base64           |     ✓     |    ✓     |     ✓     | RFC 4648             | [Format](../constraints/format#base64--base64url--base64rawurl) |
 | Base64URL        |     ✓     |    ✓     |     ✓     | RFC 4648 §5          | [Format](../constraints/format#base64--base64url--base64rawurl) |
 | Base64RawURL     |     ✓     |    ✗     |     ✓     | RFC 4648 §3.2        | [Format](../constraints/format#base64--base64url--base64rawurl) |
+| Base32           |     ✓     |    ✗     |     ✓     | RFC 4648 §6          | [Format](../constraints/format#base32) |
+| Data URI         |     ✓     |    ✗     |     ✓     | RFC 2397             | [Format](../constraints/format#datauri) |
+| URN (RFC 2141)   |     ✓     |    ✗     |     ✓     | RFC 2141             | [Format](../constraints/format#urn_rfc2141) |
 | MD4              |     ✓     |    ✗     |     ✓     | RFC 1320             | [Format](../constraints/format#md5--md4--sha256--sha384--sha512) |
 | MD5              |     ✓     |    ✗     |     ✓     | RFC 1321             | [Format](../constraints/format#md5--md4--sha256--sha384--sha512) |
 | SHA256/384/512   |     ✓     |    ✗     |     ✓     | FIPS 180-4           | [Format](../constraints/format#md5--md4--sha256--sha384--sha512) |
@@ -106,6 +113,7 @@ How Pedantigo compares to Pydantic v2 and go-playground/validator v10.
 | Cron             |     ✓     |    ✗     |     ✓     | Cron expr            | [Format](../constraints/format#cron) |
 | Semver           |     ✓     |    ~     |     ✓     | Semver 2.0           | [Format](../constraints/format#semver) |
 | Datetime format  |     ✓     |    ✓     |     ✓     | Go layout            | [Format](../constraints/format#datetime) |
+| Timezone (IANA)  |     ✓     |    ✗     |     ✓     | IANA tz database     | [Format](../constraints/format#timezone) |
 | ULID             |     ✓     |    ✗     |     ✓     | Crockford            | [Format](../constraints/format#ulid) |
 | Luhn checksum    |     ✓     |    ✗     |     ✓     | ISO 7812             | [Format](../constraints/format#luhn_checksum) |
 | Country codes    |     ✓     |    ~     |     ✓     | ISO 3166-1           | [Format](../constraints/format#iso3166_alpha2--iso3166_alpha3) |
