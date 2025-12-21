@@ -39,11 +39,23 @@ const (
 	CAscii           = "ascii"
 	CAlpha           = "alpha"
 	CAlphanum        = "alphanum"
+	CAlphaspace      = "alphaspace"
+	CAlphanumspace   = "alphanumspace"
+	CPrintascii      = "printascii"
 	CNumeric         = "numeric"
+	CNumber          = "number"
+	CHexadecimal     = "hexadecimal"
+	CAlphaunicode    = "alphaunicode"
+	CAlphanumunicode = "alphanumunicode"
 	CContains        = "contains"
 	CExcludes        = "excludes"
 	CStartswith      = "startswith"
 	CEndswith        = "endswith"
+	CStartsnotwith   = "startsnotwith"
+	CEndsnotwith     = "endsnotwith"
+	CContainsany     = "containsany"
+	CExcludesall     = "excludesall"
+	CExcludesrune    = "excludesrune"
 	CLowercase       = "lowercase"
 	CUppercase       = "uppercase"
 	CStripWhitespace = "strip_whitespace"
@@ -70,11 +82,13 @@ const (
 	CMac             = "mac"
 	CHostname        = "hostname"
 	CHostnameRfc1123 = "hostname_rfc1123"
+	CHostnamePort    = "hostname_port"
 	CFqdn            = "fqdn"
 	CPort            = "port"
 	CTcpAddr         = "tcp_addr"
 	CUdpAddr         = "udp_addr"
 	CTcp4Addr        = "tcp4_addr"
+	CHttpUrl         = "http_url"
 
 	// Finance constraints.
 	CCreditCard    = "credit_card"
@@ -135,7 +149,7 @@ var (
 	uuidRegex     = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 	alphaRegex    = regexp.MustCompile(`^[a-zA-Z]+$`)
 	alphanumRegex = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
-	numericRegex  = regexp.MustCompile(`^\d+$`)
+	numericRegex  = regexp.MustCompile(`^[-+]?\d+(?:\.\d+)?$`)
 )
 
 // extractNumericValue converts a reflect.Value to a float64 for numeric comparisons.
@@ -207,11 +221,11 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			continue
 
 		// Core constraints.
-		case CMin, CMax, CGt, CGte, CLt, CLte, CEmail, CUrl, CUri, CUuid, CRegexp, CIpv4, CIpv6, COneof, COneofci, CEq, CNe, CLen:
+		case CMin, CMax, CGt, CGte, CLt, CLte, CEmail, CUrl, CUri, CUuid, CRegexp, CIpv4, CIpv6, COneof, COneofci, CEq, CNe, CLen, CHttpUrl:
 			result = appendCoreConstraint(result, name, value, fieldType)
 
 		// String constraints.
-		case CAscii, CAlpha, CAlphanum, CNumeric, CContains, CExcludes, CStartswith, CEndswith, CLowercase, CUppercase, CStripWhitespace, CToLower, CToUpper:
+		case CAscii, CAlpha, CAlphanum, CAlphaspace, CAlphanumspace, CPrintascii, CNumeric, CNumber, CHexadecimal, CAlphaunicode, CAlphanumunicode, CContains, CExcludes, CStartswith, CEndswith, CStartsnotwith, CEndsnotwith, CContainsany, CExcludesall, CExcludesrune, CLowercase, CUppercase, CStripWhitespace, CToLower, CToUpper:
 			result = appendStringConstraint(result, name, value)
 
 		// Numeric constraints.
@@ -223,7 +237,7 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			result = appendCollectionConstraint(result, name, value)
 
 		// Network constraints.
-		case CIp, CCidr, CCidrv4, CCidrv6, CMac, CHostname, CHostnameRfc1123, CFqdn, CPort, CTcpAddr, CUdpAddr, CTcp4Addr:
+		case CIp, CCidr, CCidrv4, CCidrv6, CMac, CHostname, CHostnameRfc1123, CHostnamePort, CFqdn, CPort, CTcpAddr, CUdpAddr, CTcp4Addr:
 			result = appendNetworkConstraint(result, name)
 
 		// Finance constraints.
@@ -331,6 +345,8 @@ func appendCoreConstraint(result []Constraint, name, value string, fieldType ref
 		if c, ok := buildLenConstraint(value); ok {
 			return append(result, c)
 		}
+	case "http_url":
+		return append(result, httpURLConstraint{})
 	}
 	return result
 }
@@ -344,8 +360,22 @@ func appendStringConstraint(result []Constraint, name, value string) []Constrain
 		return append(result, alphaConstraint{})
 	case "alphanum":
 		return append(result, alphanumConstraint{})
+	case "alphaspace":
+		return append(result, alphaspaceConstraint{})
+	case "alphanumspace":
+		return append(result, alphanumspaceConstraint{})
+	case "printascii":
+		return append(result, printasciiConstraint{})
 	case "numeric":
 		return append(result, numericConstraint{})
+	case "number":
+		return append(result, numberConstraint{})
+	case "hexadecimal":
+		return append(result, hexadecimalConstraint{})
+	case "alphaunicode":
+		return append(result, alphaunicodeConstraint{})
+	case "alphanumunicode":
+		return append(result, alphanumunicodeConstraint{})
 	case "contains":
 		if c, ok := buildContainsConstraint(value); ok {
 			return append(result, c)
@@ -360,6 +390,26 @@ func appendStringConstraint(result []Constraint, name, value string) []Constrain
 		}
 	case "endswith":
 		if c, ok := buildEndswithConstraint(value); ok {
+			return append(result, c)
+		}
+	case "startsnotwith":
+		if c, ok := buildStartsnotwithConstraint(value); ok {
+			return append(result, c)
+		}
+	case "endsnotwith":
+		if c, ok := buildEndsnotwithConstraint(value); ok {
+			return append(result, c)
+		}
+	case "containsany":
+		if c, ok := buildContainsanyConstraint(value); ok {
+			return append(result, c)
+		}
+	case "excludesall":
+		if c, ok := buildExcludesallConstraint(value); ok {
+			return append(result, c)
+		}
+	case "excludesrune":
+		if c, ok := buildExcludesruneConstraint(value); ok {
 			return append(result, c)
 		}
 	case "lowercase":
@@ -432,6 +482,8 @@ func appendNetworkConstraint(result []Constraint, name string) []Constraint {
 		return append(result, hostnameConstraint{})
 	case "hostname_rfc1123":
 		return append(result, hostnameRFC1123Constraint{})
+	case "hostname_port":
+		return append(result, hostnamePortConstraint{})
 	case "fqdn":
 		return append(result, fqdnConstraint{})
 	case "port":

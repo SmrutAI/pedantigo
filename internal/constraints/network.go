@@ -17,6 +17,26 @@ var (
 	hostnameRFC1123LabelRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$`)
 )
 
+// looksLikeIPv4 checks if a string looks like an IPv4 address (4 numeric octets separated by dots).
+// This is used to reject invalid IP-like strings from being treated as hostnames.
+func looksLikeIPv4(s string) bool {
+	parts := strings.Split(s, ".")
+	if len(parts) != 4 {
+		return false
+	}
+	for _, part := range parts {
+		if part == "" {
+			return false
+		}
+		for _, c := range part {
+			if c < '0' || c > '9' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // isValidPort checks if a port string represents a valid port number (0-65535).
 func isValidPort(portStr string) bool {
 	// Port must be numeric
@@ -47,6 +67,7 @@ type (
 	hostnameRFC1123Constraint struct{} // hostname_rfc1123: validates RFC 1123 hostname (digits first OK)
 	fqdnConstraint            struct{} // fqdn: validates fully qualified domain name
 	portConstraint            struct{} // port: validates port number 0-65535 (integer)
+	hostnamePortConstraint    struct{} // hostname_port: validates hostname:port (port 1-65535)
 	tcpAddrConstraint         struct{} // tcp_addr: validates TCP address (host:port)
 	udpAddrConstraint         struct{} // udp_addr: validates UDP address (host:port)
 	tcp4AddrConstraint        struct{} // tcp4_addr: validates IPv4 TCP address
@@ -372,6 +393,73 @@ func (c portConstraint) Validate(value any) error {
 	default:
 		return NewConstraintError(CodeInvalidPort, "port constraint requires integer value")
 	}
+}
+
+// hostnamePortConstraint validates that a string is a valid hostname:port (port 1-65535).
+// This validates hostname or FQDN or IP with port. Unlike tcp_addr, port 0 is NOT allowed.
+func (c hostnamePortConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("hostname_port constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Empty strings are handled by required constraint
+	}
+
+	// Parse host:port format
+	host, portStr, splitErr := net.SplitHostPort(str)
+	if splitErr != nil {
+		return NewConstraintError(CodeInvalidHostnamePort, "must be a valid hostname:port")
+	}
+	if host == "" || portStr == "" {
+		return NewConstraintError(CodeInvalidHostnamePort, "must be a valid hostname:port")
+	}
+
+	// Validate port is 1-65535 (NOT 0)
+	port := 0
+	for _, c := range portStr {
+		if c < '0' || c > '9' {
+			return NewConstraintError(CodeInvalidHostnamePort, "must be a valid hostname:port")
+		}
+		port = port*10 + int(c-'0')
+		if port > 65535 {
+			return NewConstraintError(CodeInvalidHostnamePort, "must be a valid hostname:port")
+		}
+	}
+	if port < 1 {
+		return NewConstraintError(CodeInvalidHostnamePort, "must be a valid hostname:port")
+	}
+
+	// Validate host - IP or hostname
+	if ip := net.ParseIP(host); ip != nil {
+		return nil // Valid IP
+	}
+
+	// Check if host looks like an IP address (numeric with dots)
+	// If so, reject it since it failed IP parsing above
+	if looksLikeIPv4(host) {
+		return NewConstraintError(CodeInvalidHostnamePort, "must be a valid hostname:port")
+	}
+
+	// Validate as hostname/FQDN using RFC 1123 rules
+	if len(host) > 253 {
+		return NewConstraintError(CodeInvalidHostnamePort, "must be a valid hostname:port")
+	}
+	labels := strings.Split(host, ".")
+	for _, label := range labels {
+		if label == "" || len(label) > 63 {
+			return NewConstraintError(CodeInvalidHostnamePort, "must be a valid hostname:port")
+		}
+		if !hostnameRFC1123LabelRegex.MatchString(label) {
+			return NewConstraintError(CodeInvalidHostnamePort, "must be a valid hostname:port")
+		}
+	}
+
+	return nil
 }
 
 // tcpAddrConstraint validates that a string is a valid TCP address (host:port).

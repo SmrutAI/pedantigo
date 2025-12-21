@@ -8,9 +8,43 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestUrlConstraint tests urlConstraint.Validate() for valid URLs.
+// TestUrlConstraint tests urlConstraint.Validate() for valid URLs (any scheme).
 func TestUrlConstraint(t *testing.T) {
 	runSimpleConstraintTests(t, urlConstraint{}, []simpleTestCase{
+		// Valid HTTP/HTTPS URLs
+		{"http URL simple", "http://example.com", false},
+		{"http URL with path", "http://example.com/path", false},
+		{"https URL simple", "https://example.com", false},
+		{"https URL with port", "https://example.com:443", false},
+		// Valid URLs with other schemes (BREAKING CHANGE - now accepted)
+		{"ftp scheme", "ftp://example.com", false},
+		{"postgres scheme", "postgres://localhost:5432/db", false},
+		{"redis scheme", "redis://localhost:6379", false},
+		{"mongodb scheme", "mongodb://localhost:27017/testdb", false},
+		{"file scheme", "file:///etc/passwd", false},
+		{"ssh scheme", "ssh://git@github.com/user/repo.git", false},
+		{"s3 scheme", "s3://bucket-name/key", false},
+		{"custom scheme", "custom://example.com/path", false},
+		// Empty string - should be skipped
+		{"empty string", "", false},
+		// Invalid URLs - missing scheme
+		{"invalid URL - no scheme", "example.com", true},
+		{"invalid URL - only path", "/path/to/resource", true},
+		{"invalid URL - relative path", "path/to/resource", true},
+		// Invalid URLs - missing host
+		{"invalid URL - missing host", "http://", true},
+		{"invalid URL - empty scheme", "://example.com", true},
+		// Nil pointer - should skip validation
+		{"nil pointer", (*string)(nil), false},
+		// Invalid types
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
+}
+
+// TestHttpUrlConstraint tests httpURLConstraint.Validate() for HTTP/HTTPS only URLs.
+func TestHttpUrlConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, httpURLConstraint{}, []simpleTestCase{
 		// Valid HTTP URLs
 		{"http URL simple", "http://example.com", false},
 		{"http URL with path", "http://example.com/path", false},
@@ -24,16 +58,21 @@ func TestUrlConstraint(t *testing.T) {
 		{"https URL with query", "https://example.com/path?key=value", false},
 		{"https URL with subdomain", "https://api.example.com", false},
 		{"https URL with port", "https://example.com:443", false},
+		{"https URL localhost", "http://localhost:8080", false},
 		// Empty string - should be skipped
 		{"empty string", "", false},
-		// Invalid schemes
+		// Invalid schemes - non-HTTP/HTTPS
 		{"ftp scheme", "ftp://example.com", true},
+		{"postgres scheme", "postgres://localhost:5432/db", true},
+		{"redis scheme", "redis://localhost:6379", true},
+		{"mongodb scheme", "mongodb://localhost:27017/testdb", true},
 		{"file scheme", "file:///etc/passwd", true},
+		{"mailto scheme", "mailto:test@example.com", true},
+		{"ssh scheme", "ssh://git@github.com/user/repo.git", true},
 		{"data scheme", "data:text/plain,hello", true},
 		// Invalid URLs
 		{"invalid URL - missing host", "http://", true},
 		{"invalid URL - no scheme", "example.com", true},
-		{"invalid URL - malformed", "http://exa mple.com", true},
 		{"invalid URL - only path", "/path/to/resource", true},
 		// Nil pointer - should skip validation
 		{"nil pointer", (*string)(nil), false},
@@ -422,6 +461,121 @@ func TestAlphanumConstraint(t *testing.T) {
 	}
 }
 
+func TestAlphaspaceConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, alphaspaceConstraint{}, []simpleTestCase{
+		{"letters only", "hello", false},
+		{"letters with spaces", "hello world", false},
+		{"mixed case with space", "Hello World", false},
+		{"only spaces", "   ", false},
+		{"single space", " ", false},
+		{"letters with multiple spaces", "A B C", false},
+		{"uppercase only", "HELLO", false},
+		{"lowercase only", "world", false},
+		{"invalid with digits", "hello123", true},
+		{"invalid with symbols", "hello!", true},
+		{"invalid with tab", "hello\tworld", true},
+		{"invalid unicode", "café", true},
+		{"invalid cyrillic", "Привет", true},
+		{"invalid with hyphen", "hello-world", true},
+		{"invalid with underscore", "hello_world", true},
+		{"empty string", "", false},
+		{"nil pointer", (*string)(nil), false},
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
+}
+
+func TestAlphanumspaceConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, alphanumspaceConstraint{}, []simpleTestCase{
+		{"letters only", "hello", false},
+		{"letters with spaces", "hello world", false},
+		{"mixed case with space", "Hello World", false},
+		{"digits only", "123", false},
+		{"letters and digits", "hello123", false},
+		{"mixed with spaces", "Hello 123", false},
+		{"only spaces", "   ", false},
+		{"letters digits spaces", "A1 B2 C3", false},
+		{"uppercase with numbers", "ABC 123", false},
+		{"lowercase with numbers", "abc 456", false},
+		{"invalid with symbols", "hello!", true},
+		{"invalid with hyphen", "hello-world", true},
+		{"invalid with underscore", "test_123", true},
+		{"invalid with at sign", "test@123", true},
+		{"invalid with tab", "hello\t123", true},
+		{"invalid with newline", "hello\n123", true},
+		{"invalid unicode", "café", true},
+		{"empty string", "", false},
+		{"nil pointer", (*string)(nil), false},
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
+}
+
+func TestPrintasciiConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, printasciiConstraint{}, []simpleTestCase{
+		{"letters only", "hello", false},
+		{"letters with spaces", "Hello World", false},
+		{"symbols", "@#$%^&*()", false},
+		{"mixed content", "test 123", false},
+		{"exclamation", "Hello World!", false},
+		{"space character", " ", false},
+		{"all printable ascii", "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~", false},
+		{"tilde", "~test~", false},
+		{"brackets", "[test]", false},
+		{"invalid with newline", "hello\n", true},
+		{"invalid with tab", "hello\t", true},
+		{"invalid with null", "hello\x00", true},
+		{"invalid unicode accent", "café", true},
+		{"invalid cyrillic", "Привет", true},
+		{"invalid emoji", "hello👍", true},
+		{"invalid control char", "test\x01", true},
+		{"empty string", "", false},
+		{"nil pointer", (*string)(nil), false},
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
+}
+
+func TestNumericConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, numericConstraint{}, []simpleTestCase{
+		// Valid cases - numeric values including signed decimals
+		{"positive integer", "123", false},
+		{"negative integer", "-123", false},
+		{"positive with plus sign", "+123", false},
+		{"decimal positive", "12.34", false},
+		{"decimal negative", "-12.34", false},
+		{"decimal with plus", "+12.34", false},
+		{"zero", "0", false},
+		{"negative zero", "-0", false},
+		{"decimal starting with zero", "0.5", false},
+		{"negative decimal", "-0.5", false},
+		{"positive decimal", "+0.5", false},
+		{"large number", "999999999", false},
+		{"large decimal", "123456.789", false},
+		// Invalid cases - non-numeric formats
+		{"scientific notation", "12e5", true},
+		{"scientific lowercase", "1.2e-3", true},
+		{"multiple decimals", "1.2.3", true},
+		{"letters", "abc", true},
+		{"alphanumeric", "12abc", true},
+		{"double negative", "--5", true},
+		{"double positive", "++5", true},
+		{"mixed signs", "+-5", true},
+		{"sign in middle", "12-34", true},
+		{"decimal without digits", ".", true},
+		{"trailing decimal", "123.", true},
+		{"leading decimal", ".123", true},
+		{"comma separator", "1,234", true},
+		{"spaces", "12 34", true},
+		// Edge cases
+		{"empty string", "", false},
+		{"nil pointer", (*string)(nil), false},
+		// Invalid types
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
+}
+
 func TestContainsConstraint(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -660,6 +814,176 @@ func TestStripWhitespaceConstraint(t *testing.T) {
 		{"multiple leading spaces", "   hello", true},
 		{"multiple trailing spaces", "hello   ", true},
 		{"only whitespace", "   ", true},
+
+		// Edge cases
+		{"empty string", "", false},
+		{"nil pointer", (*string)(nil), false},
+
+		// Invalid types
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
+}
+
+// TestNumberConstraint tests numberConstraint.Validate() for unsigned integer digits.
+func TestNumberConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, numberConstraint{}, []simpleTestCase{
+		// Valid cases - digits only
+		{"valid digits", "123", false},
+		{"valid zero", "0", false},
+		{"valid single digit", "5", false},
+		{"valid long number", "9999999999", false},
+		{"valid leading zeros", "00123", false},
+
+		// Invalid cases - signs, decimals, scientific notation
+		{"invalid negative", "-123", true},
+		{"invalid positive sign", "+123", true},
+		{"invalid decimal", "12.5", true},
+		{"invalid decimal zero", "0.0", true},
+		{"invalid scientific", "12e5", true},
+		{"invalid scientific uppercase", "12E5", true},
+
+		// Invalid cases - letters and symbols
+		{"invalid letters", "abc", true},
+		{"invalid mixed", "12a", true},
+		{"invalid with space", " 123", true},
+		{"invalid space inside", "12 34", true},
+		{"invalid special char", "12-34", true},
+
+		// Edge cases
+		{"empty string", "", false},
+		{"nil pointer", (*string)(nil), false},
+
+		// Invalid types
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
+}
+
+// TestHexadecimalConstraint tests hexadecimalConstraint.Validate() for hex strings.
+func TestHexadecimalConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, hexadecimalConstraint{}, []simpleTestCase{
+		// Valid cases - hex digits
+		{"valid lowercase", "1a2b3c", false},
+		{"valid uppercase", "1A2B3C", false},
+		{"valid mixed case", "1a2B3c", false},
+		{"valid all letters lowercase", "abcdef", false},
+		{"valid all letters uppercase", "ABCDEF", false},
+		{"valid all digits", "123456", false},
+		{"valid single char", "a", false},
+		{"valid single digit", "5", false},
+
+		// Valid cases - with 0x prefix
+		{"valid with 0x lowercase", "0x1a2b", false},
+		{"valid with 0x uppercase", "0x1A2B", false},
+		{"valid with 0X lowercase", "0X1a2b", false},
+		{"valid with 0X uppercase", "0X1A2B", false},
+		{"valid with 0x mixed case", "0xAbCd", false},
+
+		// Invalid cases - prefix only
+		{"invalid prefix only 0x", "0x", true},
+		{"invalid prefix only 0X", "0X", true},
+
+		// Invalid cases - invalid hex chars
+		{"invalid char G", "1A2B3G", true},
+		{"invalid char g", "1a2b3g", true},
+		{"invalid char Z", "ABCDEFZ", true},
+		{"invalid mixed letters", "GHI", true},
+		{"invalid with space", "1A 2B", true},
+		{"invalid with dash", "1A-2B", true},
+
+		// Invalid cases - prefix misuse
+		{"invalid 0x in middle", "1A0x2B", true},
+		{"invalid x without 0", "x1A2B", true},
+
+		// Edge cases
+		{"empty string", "", false},
+		{"nil pointer", (*string)(nil), false},
+
+		// Invalid types
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
+}
+
+// TestAlphaunicodeConstraint tests alphaunicodeConstraint.Validate() for Unicode letters.
+func TestAlphaunicodeConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, alphaunicodeConstraint{}, []simpleTestCase{
+		// Valid cases - ASCII letters
+		{"valid lowercase", "hello", false},
+		{"valid uppercase", "WORLD", false},
+		{"valid mixed case", "HelloWorld", false},
+		{"valid single letter", "a", false},
+
+		// Valid cases - Unicode letters
+		{"valid French accented", "café", false},
+		{"valid French word", "français", false},
+		{"valid German", "Grüße", false},
+		{"valid Spanish", "español", false},
+		{"valid Russian", "Привет", false},
+		{"valid Chinese", "你好", false},
+		{"valid Japanese Hiragana", "ひらがな", false},
+		{"valid Japanese Katakana", "カタカナ", false},
+		{"valid Arabic", "مرحبا", false},
+		{"valid Greek", "Ελληνικά", false},
+
+		// Invalid cases - numbers
+		{"invalid with digits", "hello123", true},
+		{"invalid only digits", "12345", true},
+
+		// Invalid cases - spaces and symbols
+		{"invalid with space", "hello world", true},
+		{"invalid with exclamation", "hello!", true},
+		{"invalid with dash", "hello-world", true},
+		{"invalid with underscore", "hello_world", true},
+		{"invalid with period", "hello.world", true},
+
+		// Invalid cases - emojis
+		{"invalid emoji", "hello👍", true},
+		{"invalid only emoji", "👍", true},
+
+		// Edge cases
+		{"empty string", "", false},
+		{"nil pointer", (*string)(nil), false},
+
+		// Invalid types
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
+}
+
+// TestAlphanumunicodeConstraint tests alphanumunicodeConstraint.Validate() for Unicode letters and numbers.
+func TestAlphanumunicodeConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, alphanumunicodeConstraint{}, []simpleTestCase{
+		// Valid cases - ASCII letters and digits
+		{"valid lowercase letters", "hello", false},
+		{"valid uppercase letters", "WORLD", false},
+		{"valid only digits", "12345", false},
+		{"valid mixed ASCII", "hello123", false},
+		{"valid mixed case with digits", "Hello123World", false},
+
+		// Valid cases - Unicode letters with digits
+		{"valid French with digits", "café123", false},
+		{"valid Russian with digits", "Привет123", false},
+		{"valid Chinese with digits", "你好456", false},
+		{"valid Japanese with digits", "ひらがな789", false},
+		{"valid Arabic with digits", "مرحبا123", false},
+
+		// Valid cases - Unicode numbers
+		{"valid Chinese numbers", "一二三", false},
+		{"valid Roman numerals", "ⅠⅡⅢ", false},
+
+		// Invalid cases - spaces and symbols
+		{"invalid with space", "hello world", true},
+		{"invalid with exclamation", "hello123!", true},
+		{"invalid with dash", "hello-world", true},
+		{"invalid with underscore", "hello_123", true},
+		{"invalid with period", "hello.123", true},
+		{"invalid with at sign", "user@123", true},
+
+		// Invalid cases - emojis
+		{"invalid emoji", "hello123👍", true},
+		{"invalid only emoji", "👍", true},
 
 		// Edge cases
 		{"empty string", "", false},
