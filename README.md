@@ -59,6 +59,7 @@ schemaBytes, _ := pedantigo.SchemaJSON[User]()
 - [Constraint Reference](https://pedantigo.dev/docs/concepts/constraints) - All 100+ validation rules
 - [Streaming Validation](https://pedantigo.dev/docs/concepts/streaming) - Handle LLM streaming responses
 - [API Reference](https://pedantigo.dev/docs/api/simple-api) - Complete API documentation
+- [Benchmarks](https://github.com/smrutAI/pedantigo-benchmarks) - Performance comparisons with other validation libraries
 
 ## Use Cases
 
