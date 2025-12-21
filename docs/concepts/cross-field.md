@@ -144,8 +144,8 @@ Use `required_if` to require a field when another field has a specific value. Us
 ```go
 type ShippingForm struct {
     Country      string `json:"country" pedantigo:"required,oneof=US CA MX"`
-    State        string `json:"state" pedantigo:"required_if=Country:US"`
-    Province     string `json:"province" pedantigo:"required_if=Country:CA"`
+    State        string `json:"state" pedantigo:"required_if=Country US"`
+    Province     string `json:"province" pedantigo:"required_if=Country CA"`
     PostalCode   string `json:"postal_code" pedantigo:"required"`
 }
 
@@ -179,9 +179,9 @@ _, err := pedantigo.Unmarshal[ShippingForm](badData)
 ```go
 type SubscriptionForm struct {
     HasBusiness      bool   `json:"has_business"`
-    BusinessName     string `json:"business_name" pedantigo:"required_if=HasBusiness:true"`
-    BusinessLicense  string `json:"business_license" pedantigo:"required_if=HasBusiness:true"`
-    PersonalName     string `json:"personal_name" pedantigo:"required_unless=HasBusiness:true"`
+    BusinessName     string `json:"business_name" pedantigo:"required_if=HasBusiness true"`
+    BusinessLicense  string `json:"business_license" pedantigo:"required_if=HasBusiness true"`
+    PersonalName     string `json:"personal_name" pedantigo:"required_unless=HasBusiness true"`
 }
 
 // Valid - business fields provided
@@ -216,9 +216,9 @@ Use `required_with` to require a field only if another field is present (non-zer
 ```go
 type PaymentInfo struct {
     PaymentMethod string `json:"payment_method" pedantigo:"required,oneof=credit_card bank_transfer"`
-    CardNumber    string `json:"card_number" pedantigo:"required_if=PaymentMethod:credit_card"`
+    CardNumber    string `json:"card_number" pedantigo:"required_if=PaymentMethod credit_card"`
     CVV           string `json:"cvv" pedantigo:"required_with=CardNumber"`
-    BankAccount   string `json:"bank_account" pedantigo:"required_if=PaymentMethod:bank_transfer"`
+    BankAccount   string `json:"bank_account" pedantigo:"required_if=PaymentMethod bank_transfer"`
     RoutingNumber string `json:"routing_number" pedantigo:"required_with=BankAccount"`
 }
 
@@ -289,8 +289,8 @@ Use `excluded_if` to forbid a field when another field has a specific value. The
 ```go
 type DiscountCode struct {
     AccountID   string `json:"account_id"`
-    DiscountPercent int    `json:"discount_percent" pedantigo:"excluded_if=AccountID:premium"`
-    Notes       string `json:"notes" pedantigo:"excluded_unless=AccountID:enterprise"`
+    DiscountPercent int    `json:"discount_percent" pedantigo:"excluded_if=AccountID premium"`
+    Notes       string `json:"notes" pedantigo:"excluded_unless=AccountID enterprise"`
 }
 
 // Valid - premium account (no discount percent allowed)
@@ -465,8 +465,8 @@ type EventRegistration struct {
 
     // Conditional requirements
     IsStudent       bool      `json:"is_student"`
-    StudentID       string    `json:"student_id" pedantigo:"required_if=IsStudent:true,len=10"`
-    Company         string    `json:"company" pedantigo:"required_unless=IsStudent:true"`
+    StudentID       string    `json:"student_id" pedantigo:"required_if=IsStudent true,len=10"`
+    Company         string    `json:"company" pedantigo:"required_unless=IsStudent true"`
 
     // Date ranges
     StartDate       time.Time `json:"start_date" pedantigo:"required"`
@@ -558,12 +558,12 @@ Cross-field constraints provide powerful validation capabilities for complex dat
 | `gtefield=Field` | Greater than or equal comparisons |
 | `ltfield=Field` | Upper bounds, before dates |
 | `ltefield=Field` | Less than or equal comparisons |
-| `required_if=Field:Value` | Conditional requirements based on values |
-| `required_unless=Field:Value` | Required unless condition is true |
+| `required_if=Field Value` | Conditional requirements based on values |
+| `required_unless=Field Value` | Required unless condition is true |
 | `required_with=Field` | Required when another field is present |
 | `required_without=Field` | Required when another field is absent |
-| `excluded_if=Field:Value` | Forbidden if condition is true |
-| `excluded_unless=Field:Value` | Forbidden unless condition is true |
+| `excluded_if=Field Value` | Forbidden if condition is true |
+| `excluded_unless=Field Value` | Forbidden unless condition is true |
 | `excluded_with=Field` | Forbidden if another field is present |
 | `excluded_without=Field` | Forbidden if another field is absent |
 | `Validatable` interface | Custom business logic validation |

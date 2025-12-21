@@ -617,13 +617,13 @@ func TestApplyConstraints(t *testing.T) {
 		},
 		// ISO formats
 		{
-			name:      "iso3166_alpha2 format",
+			name:      "iso3166_1_alpha2 format",
 			fieldType: reflect.TypeOf(""),
 			constraints: map[string]string{
-				"iso3166_alpha2": "",
+				"iso3166_1_alpha2": "",
 			},
 			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
-				assert.Equal(t, "iso3166_alpha2", schema.Format)
+				assert.Equal(t, "iso3166_1_alpha2", schema.Format)
 			},
 		},
 		{
@@ -637,13 +637,13 @@ func TestApplyConstraints(t *testing.T) {
 			},
 		},
 		{
-			name:      "bcp47 format",
+			name:      "bcp47_language_tag format",
 			fieldType: reflect.TypeOf(""),
 			constraints: map[string]string{
-				"bcp47": "",
+				"bcp47_language_tag": "",
 			},
 			checkFunc: func(t *testing.T, schema *jsonschema.Schema) {
-				assert.Equal(t, "bcp47", schema.Format)
+				assert.Equal(t, "bcp47_language_tag", schema.Format)
 			},
 		},
 		// Filesystem

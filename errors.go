@@ -7,8 +7,11 @@ const (
 	// ErrMsgUnknownField is returned when ExtraForbid encounters unknown JSON fields.
 	ErrMsgUnknownField = "unknown field in JSON"
 
-	// ErrMsgConstMismatch is returned when a value doesn't match the expected constant.
-	ErrMsgConstMismatch = "must be equal to %s"
+	// ErrMsgEqMismatch is returned when a value doesn't match the expected value.
+	ErrMsgEqMismatch = "must be equal to %s"
+
+	// ErrMsgNeMismatch is returned when a value matches a forbidden value.
+	ErrMsgNeMismatch = "must not be equal to %s"
 
 	// ErrMsgMissingDiscriminator is returned when discriminator field is missing from JSON.
 	ErrMsgMissingDiscriminator = "discriminator field %q is missing"

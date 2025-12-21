@@ -47,7 +47,7 @@ Every `FieldError` includes a machine-readable `Code` for programmatic handling:
 | Code | Triggered By | Description |
 |------|--------------|-------------|
 | `REQUIRED` | `required` | Field missing from JSON |
-| `REQUIRED_IF` | `required_if=Field:Value` | Conditional required not met |
+| `REQUIRED_IF` | `required_if=Field Value` | Conditional required not met |
 | `REQUIRED_WITH` | `required_with=OtherField` | Co-required field missing |
 | `INVALID_EMAIL` | `email` | Invalid email format |
 | `INVALID_URL` | `url` | Invalid URL format |

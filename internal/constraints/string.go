@@ -23,6 +23,7 @@ type (
 	asciiConstraint           struct{}
 	alphaConstraint           struct{}
 	alphanumConstraint        struct{}
+	numericConstraint         struct{}
 	containsConstraint        struct{ substring string }
 	excludesConstraint        struct{ substring string }
 	startswithConstraint      struct{ prefix string }
@@ -215,6 +216,28 @@ func (c alphanumConstraint) Validate(value any) error {
 	// Check if string matches alphanumeric pattern
 	if !alphanumRegex.MatchString(str) {
 		return NewConstraintError(CodeMustBeAlphanum, "must contain only alphanumeric characters")
+	}
+
+	return nil
+}
+
+// numericConstraint validates that a string contains only numeric digits.
+func (c numericConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("numeric constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check if string matches numeric pattern
+	if !numericRegex.MatchString(str) {
+		return NewConstraintError(CodeMustBeNumeric, "must contain only numeric digits")
 	}
 
 	return nil

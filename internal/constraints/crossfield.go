@@ -75,6 +75,30 @@ type (
 		targetFieldName string     // Keep for error messages
 		targetFieldPath *FieldPath // Replace targetFieldIndex
 	}
+
+	// requiredWithAllConstraint: field is required if ALL listed fields are present (non-zero).
+	requiredWithAllConstraint struct {
+		targetFieldNames []string     // Field names for error messages
+		targetFieldPaths []*FieldPath // Pre-computed paths for validation
+	}
+
+	// requiredWithoutAllConstraint: field is required if ALL listed fields are absent (zero).
+	requiredWithoutAllConstraint struct {
+		targetFieldNames []string
+		targetFieldPaths []*FieldPath
+	}
+
+	// excludedWithAllConstraint: field must be absent if ALL listed fields are present.
+	excludedWithAllConstraint struct {
+		targetFieldNames []string
+		targetFieldPaths []*FieldPath
+	}
+
+	// excludedWithoutAllConstraint: field must be absent if ALL listed fields are absent.
+	excludedWithoutAllConstraint struct {
+		targetFieldNames []string
+		targetFieldPaths []*FieldPath
+	}
 )
 
 // BuildCrossFieldConstraintsForField builds cross-field constraint instances from parsed tags.
@@ -103,13 +127,31 @@ func BuildCrossFieldConstraintsForField(constraints map[string]string, structTyp
 		case "ltefield":
 			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "ltefield")
 			result = append(result, lteFieldConstraint{targetFieldName: value, targetFieldPath: fp})
+		case "eqcsfield":
+			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "eqcsfield")
+			result = append(result, eqFieldConstraint{targetFieldName: value, targetFieldPath: fp})
+		case "necsfield":
+			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "necsfield")
+			result = append(result, neFieldConstraint{targetFieldName: value, targetFieldPath: fp})
+		case "gtcsfield":
+			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "gtcsfield")
+			result = append(result, gtFieldConstraint{targetFieldName: value, targetFieldPath: fp})
+		case "gtecsfield":
+			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "gtecsfield")
+			result = append(result, gteFieldConstraint{targetFieldName: value, targetFieldPath: fp})
+		case "ltcsfield":
+			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "ltcsfield")
+			result = append(result, ltFieldConstraint{targetFieldName: value, targetFieldPath: fp})
+		case "ltecsfield":
+			fp := resolveAndValidateField(structType, value, fieldIndex, fieldName, "ltecsfield")
+			result = append(result, lteFieldConstraint{targetFieldName: value, targetFieldPath: fp})
 		case "required_if":
-			if fieldName, compareValue, ok := parseConditionalConstraint(value, ":"); ok {
+			if fieldName, compareValue, ok := parseConditionalConstraint(value, " "); ok {
 				fp := ParseFieldPath(structType, fieldName)
 				result = append(result, requiredIfConstraint{targetFieldName: fieldName, targetFieldPath: fp, compareValue: compareValue})
 			}
 		case "required_unless":
-			if fieldName, compareValue, ok := parseConditionalConstraint(value, ":"); ok {
+			if fieldName, compareValue, ok := parseConditionalConstraint(value, " "); ok {
 				fp := ParseFieldPath(structType, fieldName)
 				result = append(result, requiredUnlessConstraint{targetFieldName: fieldName, targetFieldPath: fp, compareValue: compareValue})
 			}
@@ -135,6 +177,38 @@ func BuildCrossFieldConstraintsForField(constraints map[string]string, structTyp
 		case "excluded_without":
 			fp := ParseFieldPath(structType, value)
 			result = append(result, excludedWithoutConstraint{targetFieldName: value, targetFieldPath: fp})
+		case "required_with_all":
+			names, paths := parseMultiFieldConstraint(structType, value)
+			if len(paths) > 0 {
+				result = append(result, requiredWithAllConstraint{
+					targetFieldNames: names,
+					targetFieldPaths: paths,
+				})
+			}
+		case "required_without_all":
+			names, paths := parseMultiFieldConstraint(structType, value)
+			if len(paths) > 0 {
+				result = append(result, requiredWithoutAllConstraint{
+					targetFieldNames: names,
+					targetFieldPaths: paths,
+				})
+			}
+		case "excluded_with_all":
+			names, paths := parseMultiFieldConstraint(structType, value)
+			if len(paths) > 0 {
+				result = append(result, excludedWithAllConstraint{
+					targetFieldNames: names,
+					targetFieldPaths: paths,
+				})
+			}
+		case "excluded_without_all":
+			names, paths := parseMultiFieldConstraint(structType, value)
+			if len(paths) > 0 {
+				result = append(result, excludedWithoutAllConstraint{
+					targetFieldNames: names,
+					targetFieldPaths: paths,
+				})
+			}
 		}
 	}
 
@@ -333,4 +407,120 @@ func parseConditionalConstraint(value, separator string) (fieldName, compareValu
 		return "", "", false
 	}
 	return parts[0], parts[1], true
+}
+
+// ============================================================================
+// ValidateCrossField methods for *_all constraints
+// ============================================================================
+
+// requiredWithAllConstraint: field is required if ALL listed fields are present (non-zero).
+func (c requiredWithAllConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
+	// Check if ALL target fields are present (non-zero)
+	allPresent := true
+	for _, fp := range c.targetFieldPaths {
+		targetValue, err := fp.ResolveValue(structValue)
+		if err != nil || IsZeroValue(targetValue) {
+			allPresent = false
+			break
+		}
+	}
+
+	if allPresent {
+		// All target fields are present - this field must also be present
+		if IsZeroValue(fieldValue) {
+			return NewConstraintErrorf(CodeRequiredWithAll,
+				"is required when all of [%s] are present",
+				strings.Join(c.targetFieldNames, ", "))
+		}
+	}
+	return nil
+}
+
+// requiredWithoutAllConstraint: field is required if ALL listed fields are absent (zero).
+func (c requiredWithoutAllConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
+	// Check if ALL target fields are absent (zero)
+	allAbsent := true
+	for _, fp := range c.targetFieldPaths {
+		targetValue, err := fp.ResolveValue(structValue)
+		if err == nil && !IsZeroValue(targetValue) {
+			allAbsent = false
+			break
+		}
+	}
+
+	if allAbsent {
+		// All target fields are absent - this field must be present
+		if IsZeroValue(fieldValue) {
+			return NewConstraintErrorf(CodeRequiredWithoutAll,
+				"is required when all of [%s] are absent",
+				strings.Join(c.targetFieldNames, ", "))
+		}
+	}
+	return nil
+}
+
+// excludedWithAllConstraint: field must be absent if ALL listed fields are present.
+func (c excludedWithAllConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
+	allPresent := true
+	for _, fp := range c.targetFieldPaths {
+		targetValue, err := fp.ResolveValue(structValue)
+		if err != nil || IsZeroValue(targetValue) {
+			allPresent = false
+			break
+		}
+	}
+
+	if allPresent {
+		if !IsZeroValue(fieldValue) {
+			return NewConstraintErrorf(CodeExcludedWithAll,
+				"must be absent when all of [%s] are present",
+				strings.Join(c.targetFieldNames, ", "))
+		}
+	}
+	return nil
+}
+
+// excludedWithoutAllConstraint: field must be absent if ALL listed fields are absent.
+func (c excludedWithoutAllConstraint) ValidateCrossField(fieldValue any, structValue reflect.Value, fieldName string) error {
+	allAbsent := true
+	for _, fp := range c.targetFieldPaths {
+		targetValue, err := fp.ResolveValue(structValue)
+		if err == nil && !IsZeroValue(targetValue) {
+			allAbsent = false
+			break
+		}
+	}
+
+	if allAbsent {
+		if !IsZeroValue(fieldValue) {
+			return NewConstraintErrorf(CodeExcludedWithoutAll,
+				"must be absent when all of [%s] are absent",
+				strings.Join(c.targetFieldNames, ", "))
+		}
+	}
+	return nil
+}
+
+// parseMultiFieldConstraint parses space-separated field names and returns paths.
+// Example: "FieldA FieldB FieldC" -> (["FieldA", "FieldB", "FieldC"], [path1, path2, path3]).
+func parseMultiFieldConstraint(structType reflect.Type, value string) ([]string, []*FieldPath) {
+	parts := strings.Fields(value) // Split by whitespace
+	if len(parts) == 0 {
+		return nil, nil
+	}
+
+	names := make([]string, 0, len(parts))
+	paths := make([]*FieldPath, 0, len(parts))
+
+	for _, fieldName := range parts {
+		fieldName = strings.TrimSpace(fieldName)
+		if fieldName == "" {
+			continue
+		}
+		fp := ParseFieldPath(structType, fieldName)
+		names = append(names, fieldName)
+		paths = append(paths, fp)
+	}
+
+	return names, paths
 }

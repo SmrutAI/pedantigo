@@ -404,13 +404,13 @@ func TestParseConditionalConstraint_ErrorPath(t *testing.T) {
 	}
 }
 
-// TestConstConstraint tests the const constraint directly.
-func TestConstConstraint(t *testing.T) {
+// TestEqConstraint tests the eq constraint directly.
+func TestEqConstraint(t *testing.T) {
 	tests := []struct {
-		name       string
-		constValue string
-		input      any
-		wantErr    bool
+		name    string
+		eqValue string
+		input   any
+		wantErr bool
 	}{
 		// String tests
 		{"string exact match", "hello", "hello", false},
@@ -440,23 +440,23 @@ func TestConstConstraint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := constConstraint{value: tt.constValue}
+			c := eqConstraint{value: tt.eqValue}
 			err := c.Validate(tt.input)
 			checkConstraintError(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestConstConstraintUnsupportedType tests const with unsupported types.
-func TestConstConstraintUnsupportedType(t *testing.T) {
-	c := constConstraint{value: "test"}
+// TestEqConstraintUnsupportedType tests eq with unsupported types.
+func TestEqConstraintUnsupportedType(t *testing.T) {
+	c := eqConstraint{value: "test"}
 	err := c.Validate(struct{}{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not supported")
 }
 
-// TestBuildConstConstraint tests buildConstConstraint function.
-func TestBuildConstConstraint(t *testing.T) {
+// TestBuildEqConstraint tests buildEqConstraint function.
+func TestBuildEqConstraint(t *testing.T) {
 	tests := []struct {
 		name    string
 		value   string
@@ -470,11 +470,86 @@ func TestBuildConstConstraint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, ok := buildConstConstraint(tt.value)
+			c, ok := buildEqConstraint(tt.value)
 			assert.Equal(t, tt.wantOk, ok)
 			if ok {
-				cc := c.(constConstraint)
-				assert.Equal(t, tt.wantVal, cc.value)
+				ec := c.(eqConstraint)
+				assert.Equal(t, tt.wantVal, ec.value)
+			}
+		})
+	}
+}
+
+// TestNeConstraint tests the ne (not equal) constraint directly.
+func TestNeConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		neValue string
+		input   any
+		wantErr bool
+	}{
+		// String tests - ne should pass when NOT equal
+		{"string not equal - passes", "banned", "active", false},
+		{"string equal - fails", "banned", "banned", true},
+		{"string empty not equal", "banned", "", false},
+		// Integer tests
+		{"int not equal - passes", "42", 43, false},
+		{"int equal - fails", "42", 42, true},
+		{"int8 not equal - passes", "42", int8(43), false},
+		{"int64 equal - fails", "42", int64(42), true},
+		// Uint tests
+		{"uint not equal - passes", "100", uint(101), false},
+		{"uint equal - fails", "100", uint(100), true},
+		// Float tests
+		{"float not equal - passes", "3.14", 2.71, false},
+		{"float equal - fails", "3.14", 3.14, true},
+		// Bool tests
+		{"bool not equal - passes", "true", false, false},
+		{"bool equal - fails", "true", true, true},
+		// Nil tests
+		{"nil pointer skips", "test", (*string)(nil), false},
+		// Pointer tests
+		{"pointer string not equal - passes", "hello", ptrTo("world"), false},
+		{"pointer string equal - fails", "hello", ptrTo("hello"), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := neConstraint{value: tt.neValue}
+			err := c.Validate(tt.input)
+			checkConstraintError(t, err, tt.wantErr)
+		})
+	}
+}
+
+// TestNeConstraintUnsupportedType tests ne with unsupported types.
+func TestNeConstraintUnsupportedType(t *testing.T) {
+	c := neConstraint{value: "test"}
+	err := c.Validate(struct{}{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not supported")
+}
+
+// TestBuildNeConstraint tests buildNeConstraint function.
+func TestBuildNeConstraint(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		wantOk  bool
+		wantVal string
+	}{
+		{"valid value", "banned", true, "banned"},
+		{"numeric value", "0", true, "0"},
+		{"empty value returns false", "", false, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, ok := buildNeConstraint(tt.value)
+			assert.Equal(t, tt.wantOk, ok)
+			if ok {
+				nc := c.(neConstraint)
+				assert.Equal(t, tt.wantVal, nc.value)
 			}
 		})
 	}

@@ -11,7 +11,8 @@ import (
 // Enum constraint types.
 type (
 	enumConstraint    struct{ values []string }
-	constConstraint   struct{ value string }
+	eqConstraint      struct{ value string }
+	neConstraint      struct{ value string }
 	defaultConstraint struct{ value string }
 )
 
@@ -49,35 +50,40 @@ func (c enumConstraint) Validate(value any) error {
 	return fmt.Errorf("must be one of: %s", strings.Join(c.values, ", "))
 }
 
-// constConstraint validates that value equals a specific constant.
-func (c constConstraint) Validate(value any) error {
+// valueToString converts a reflect.Value to string for comparison.
+// Returns (string, error) where error is non-nil if type is unsupported.
+func valueToString(v reflect.Value, constraintName string) (string, error) {
+	switch v.Kind() {
+	case reflect.String:
+		return v.String(), nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.FormatInt(v.Int(), 10), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return strconv.FormatUint(v.Uint(), 10), nil
+	case reflect.Float32, reflect.Float64:
+		return strconv.FormatFloat(v.Float(), 'f', -1, 64), nil
+	case reflect.Bool:
+		return strconv.FormatBool(v.Bool()), nil
+	default:
+		return "", fmt.Errorf("%s constraint not supported for type %s", constraintName, v.Kind())
+	}
+}
+
+// eqConstraint validates that value equals a specific value.
+func (c eqConstraint) Validate(value any) error {
 	v, ok := derefValue(value)
 	if !ok {
 		return nil // Skip validation for nil/invalid values
 	}
 
-	// Convert value to string for comparison
-	var str string
-	switch v.Kind() {
-	case reflect.String:
-		str = v.String()
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		str = strconv.FormatInt(v.Int(), 10)
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		str = strconv.FormatUint(v.Uint(), 10)
-	case reflect.Float32, reflect.Float64:
-		str = strconv.FormatFloat(v.Float(), 'f', -1, 64)
-	case reflect.Bool:
-		str = strconv.FormatBool(v.Bool())
-	default:
-		return fmt.Errorf("const constraint not supported for type %s", v.Kind())
+	str, err := valueToString(v, "eq")
+	if err != nil {
+		return err
 	}
 
-	// Check if value equals the required constant
 	if str != c.value {
 		return fmt.Errorf("must be equal to %s", c.value)
 	}
-
 	return nil
 }
 
@@ -92,10 +98,36 @@ func buildEnumConstraint(value string) Constraint {
 	return enumConstraint{values: values}
 }
 
-// buildConstConstraint creates a const constraint for a specific value.
-func buildConstConstraint(value string) (Constraint, bool) {
+// buildEqConstraint creates an eq constraint for a specific value.
+func buildEqConstraint(value string) (Constraint, bool) {
 	if value == "" {
 		return nil, false
 	}
-	return constConstraint{value: value}, true
+	return eqConstraint{value: value}, true
+}
+
+// neConstraint validates that value does NOT equal a specific value.
+func (c neConstraint) Validate(value any) error {
+	v, ok := derefValue(value)
+	if !ok {
+		return nil // Skip validation for nil/invalid values
+	}
+
+	str, err := valueToString(v, "ne")
+	if err != nil {
+		return err
+	}
+
+	if str == c.value {
+		return fmt.Errorf("must not be equal to %s", c.value)
+	}
+	return nil
+}
+
+// buildNeConstraint creates a ne constraint for a specific value.
+func buildNeConstraint(value string) (Constraint, bool) {
+	if value == "" {
+		return nil, false
+	}
+	return neConstraint{value: value}, true
 }

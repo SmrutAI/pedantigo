@@ -39,7 +39,8 @@ The fundamental constraints applicable across multiple types:
 | `gte` | Numeric | Greater than or equal | `pedantigo:"gte=1"` |
 | `lt` | Numeric | Less than | `pedantigo:"lt=100"` |
 | `lte` | Numeric | Less than or equal | `pedantigo:"lte=99"` |
-| `const` | Value | Must equal exact value | `pedantigo:"const=active"` |
+| `eq` | Value | Must equal exact value | `pedantigo:"eq=active"` |
+| `ne` | Value | Must NOT equal value | `pedantigo:"ne=banned"` |
 | `oneof` | Space-separated values | Must be one of specified values | `pedantigo:"oneof=red green blue"` |
 | `len` | Numeric | Exact length (strings/arrays) | `pedantigo:"len=32"` |
 
@@ -199,6 +200,7 @@ Constraints for ISO standard codes and formats:
 | `iso4217` | None | ISO 4217 currency code | `pedantigo:"iso4217"` |
 | `iso4217_numeric` | None | ISO 4217 numeric currency code | `pedantigo:"iso4217_numeric"` |
 | `postcode` | Country code | Postal code for specific country | `pedantigo:"postcode=US"` |
+| `postcode_iso3166_alpha2` | Country code | Postal code (alias for `postcode`) | `pedantigo:"postcode_iso3166_alpha2=GB"` |
 | `bcp47` | None | BCP 47 language tag | `pedantigo:"bcp47"` |
 
 ### Filesystem Constraints

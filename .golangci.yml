@@ -62,10 +62,12 @@ linters:
       - comments
       - std-error-handling
     rules:
-      # Allow TODO/FIXME in test code
+      # Allow TODO/FIXME and code duplication in test code
       - path: _test\.go
         linters:
           - godox
+          - dupl
+          - goconst
       # Allow long functions in generated code
       - path: (.*)?_gen\.go
         linters:

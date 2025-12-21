@@ -1239,73 +1239,73 @@ func TestEnum(t *testing.T) {
 	}
 }
 
-// ==================== Const Constraint ====================
+// ==================== Eq Constraint ====================
 
 // ==================================================
-// const constraint tests
+// eq constraint tests
 // ==================================================
 
-// ErrMsgConstMustEqual is the expected error message format for const constraint violations.
-const ErrMsgConstMustEqual = "must be equal to %s"
+// ErrMsgEqMustEqual is the expected error message format for eq constraint violations.
+const ErrMsgEqMustEqual = "must be equal to %s"
 
-// TestConst tests the const constraint for literal/constant value validation.
-func TestConst(t *testing.T) {
+// TestEq tests the eq constraint for literal/constant value validation.
+func TestEq(t *testing.T) {
 	tests := []struct {
 		name       string
 		testType   string // "string_valid", "string_invalid", "int_valid", "int_invalid", "float_valid", "pointer_valid", "pointer_nil"
 		json       string
 		expectErr  bool
 		errorField string
-		constValue string
+		eqValue    string
 	}{
-		// String const tests
+		// String eq tests
 		{
-			name:      "valid string const - exact match",
+			name:      "valid string eq - exact match",
 			testType:  "string_valid",
 			json:      `{"type":"user"}`,
 			expectErr: false,
 		},
 		{
-			name:       "invalid string const - wrong value",
+			name:       "invalid string eq - wrong value",
 			testType:   "string_invalid",
 			json:       `{"type":"admin"}`,
 			expectErr:  true,
 			errorField: "Type",
-			constValue: "user",
+			eqValue:    "user",
 		},
 		{
-			name:       "invalid string const - empty value",
+			name:       "invalid string eq - empty value",
 			testType:   "string_invalid",
 			json:       `{"type":""}`,
 			expectErr:  true,
 			errorField: "Type",
-			constValue: "user",
+			eqValue:    "user",
 		},
-		// Integer const tests
+		// Integer eq tests
 		{
-			name:      "valid int const - exact match",
+			name:      "valid int eq - exact match",
 			testType:  "int_valid",
 			json:      `{"version":1}`,
 			expectErr: false,
 		},
 		{
-			name:       "invalid int const - wrong value",
+			name:       "invalid int eq - wrong value",
 			testType:   "int_invalid",
 			json:       `{"version":2}`,
 			expectErr:  true,
 			errorField: "Version",
-			constValue: "1",
+			eqValue:    "1",
 		},
-		// Float const tests
+		// Float eq tests
 		{
-			name:      "valid float const - exact match",
+			name:      "valid float eq - exact match",
 			testType:  "float_valid",
 			json:      `{"rate":0.5}`,
 			expectErr: false,
 		},
 		// Pointer tests
 		{
-			name:      "valid pointer const - exact match",
+			name:      "valid pointer eq - exact match",
 			testType:  "pointer_valid",
 			json:      `{"kind":"event"}`,
 			expectErr: false,
@@ -1323,7 +1323,7 @@ func TestConst(t *testing.T) {
 			switch tt.testType {
 			case "string_valid":
 				type Message struct {
-					Type string `json:"type" pedantigo:"const=user"`
+					Type string `json:"type" pedantigo:"eq=user"`
 				}
 				validator := New[Message]()
 				msg, err := validator.Unmarshal([]byte(tt.json))
@@ -1332,7 +1332,7 @@ func TestConst(t *testing.T) {
 
 			case "string_invalid":
 				type Message struct {
-					Type string `json:"type" pedantigo:"const=user"`
+					Type string `json:"type" pedantigo:"eq=user"`
 				}
 				validator := New[Message]()
 				_, err := validator.Unmarshal([]byte(tt.json))
@@ -1340,7 +1340,7 @@ func TestConst(t *testing.T) {
 				var ve *ValidationError
 				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 				foundError := false
-				expectedMsg := fmt.Sprintf(ErrMsgConstMustEqual, tt.constValue)
+				expectedMsg := fmt.Sprintf(ErrMsgEqMustEqual, tt.eqValue)
 				for _, fieldErr := range ve.Errors {
 					if fieldErr.Field == tt.errorField && fieldErr.Message == expectedMsg {
 						foundError = true
@@ -1350,7 +1350,7 @@ func TestConst(t *testing.T) {
 
 			case "int_valid":
 				type Config struct {
-					Version int `json:"version" pedantigo:"const=1"`
+					Version int `json:"version" pedantigo:"eq=1"`
 				}
 				validator := New[Config]()
 				cfg, err := validator.Unmarshal([]byte(tt.json))
@@ -1359,7 +1359,7 @@ func TestConst(t *testing.T) {
 
 			case "int_invalid":
 				type Config struct {
-					Version int `json:"version" pedantigo:"const=1"`
+					Version int `json:"version" pedantigo:"eq=1"`
 				}
 				validator := New[Config]()
 				_, err := validator.Unmarshal([]byte(tt.json))
@@ -1367,7 +1367,7 @@ func TestConst(t *testing.T) {
 				var ve *ValidationError
 				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
 				foundError := false
-				expectedMsg := fmt.Sprintf(ErrMsgConstMustEqual, tt.constValue)
+				expectedMsg := fmt.Sprintf(ErrMsgEqMustEqual, tt.eqValue)
 				for _, fieldErr := range ve.Errors {
 					if fieldErr.Field == tt.errorField && fieldErr.Message == expectedMsg {
 						foundError = true
@@ -1377,7 +1377,7 @@ func TestConst(t *testing.T) {
 
 			case "float_valid":
 				type Rate struct {
-					Rate float64 `json:"rate" pedantigo:"const=0.5"`
+					Rate float64 `json:"rate" pedantigo:"eq=0.5"`
 				}
 				validator := New[Rate]()
 				r, err := validator.Unmarshal([]byte(tt.json))
@@ -1386,7 +1386,7 @@ func TestConst(t *testing.T) {
 
 			case "pointer_valid":
 				type Event struct {
-					Kind *string `json:"kind" pedantigo:"const=event"`
+					Kind *string `json:"kind" pedantigo:"eq=event"`
 				}
 				validator := New[Event]()
 				ev, err := validator.Unmarshal([]byte(tt.json))
@@ -1396,7 +1396,7 @@ func TestConst(t *testing.T) {
 
 			case "pointer_nil":
 				type Event struct {
-					Kind *string `json:"kind" pedantigo:"const=event"`
+					Kind *string `json:"kind" pedantigo:"eq=event"`
 				}
 				validator := New[Event]()
 				ev, err := validator.Unmarshal([]byte(tt.json))
@@ -1407,12 +1407,12 @@ func TestConst(t *testing.T) {
 	}
 }
 
-// TestConstWithCombinedConstraints tests const with other constraints.
-func TestConstWithCombinedConstraints(t *testing.T) {
-	// const combined with required
-	t.Run("const with required", func(t *testing.T) {
+// TestEqWithCombinedConstraints tests eq with other constraints.
+func TestEqWithCombinedConstraints(t *testing.T) {
+	// eq combined with required
+	t.Run("eq with required", func(t *testing.T) {
 		type APIVersion struct {
-			Version string `json:"version" pedantigo:"required,const=v1"`
+			Version string `json:"version" pedantigo:"required,eq=v1"`
 		}
 		validator := New[APIVersion]()
 
@@ -1427,10 +1427,10 @@ func TestConstWithCombinedConstraints(t *testing.T) {
 	})
 }
 
-// TestConstBoolValue tests const constraint with boolean values.
-func TestConstBoolValue(t *testing.T) {
+// TestEqBoolValue tests eq constraint with boolean values.
+func TestEqBoolValue(t *testing.T) {
 	type Feature struct {
-		Enabled bool `json:"enabled" pedantigo:"const=true"`
+		Enabled bool `json:"enabled" pedantigo:"eq=true"`
 	}
 	validator := New[Feature]()
 
@@ -1439,17 +1439,185 @@ func TestConstBoolValue(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, result.Enabled)
 
-	// Invalid - false when const=true
+	// Invalid - false when eq=true
 	_, err = validator.Unmarshal([]byte(`{"enabled":false}`))
 	require.Error(t, err)
 	var ve *ValidationError
 	require.ErrorAs(t, err, &ve)
 	foundError := false
-	expectedMsg := fmt.Sprintf(ErrMsgConstMustEqual, "true")
+	expectedMsg := fmt.Sprintf(ErrMsgEqMustEqual, "true")
 	for _, fieldErr := range ve.Errors {
 		if fieldErr.Field == "Enabled" && fieldErr.Message == expectedMsg {
 			foundError = true
 		}
 	}
-	assert.True(t, foundError, "expected const error, got %v", ve.Errors)
+	assert.True(t, foundError, "expected eq error, got %v", ve.Errors)
+}
+
+// ==================== Ne Constraint ====================
+
+// ==================================================
+// ne constraint tests
+// ==================================================
+
+// ErrMsgNeMustNotEqual is the expected error message format for ne constraint violations.
+const ErrMsgNeMustNotEqual = "must not be equal to %s"
+
+// TestNe tests the ne constraint for "not equal" validation.
+func TestNe(t *testing.T) {
+	tests := []struct {
+		name       string
+		testType   string
+		json       string
+		expectErr  bool
+		errorField string
+		neValue    string
+	}{
+		// String ne tests - pass when NOT equal
+		{
+			name:      "valid string ne - not equal passes",
+			testType:  "string_valid",
+			json:      `{"status":"active"}`,
+			expectErr: false,
+		},
+		{
+			name:       "invalid string ne - equal fails",
+			testType:   "string_invalid",
+			json:       `{"status":"banned"}`,
+			expectErr:  true,
+			errorField: "Status",
+			neValue:    "banned",
+		},
+		// Integer ne tests
+		{
+			name:      "valid int ne - not equal passes",
+			testType:  "int_valid",
+			json:      `{"version":2}`,
+			expectErr: false,
+		},
+		{
+			name:       "invalid int ne - equal fails",
+			testType:   "int_invalid",
+			json:       `{"version":0}`,
+			expectErr:  true,
+			errorField: "Version",
+			neValue:    "0",
+		},
+		// Pointer tests
+		{
+			name:      "valid pointer ne - not equal passes",
+			testType:  "pointer_valid",
+			json:      `{"kind":"active"}`,
+			expectErr: false,
+		},
+		{
+			name:      "nil pointer skips validation",
+			testType:  "pointer_nil",
+			json:      `{"kind":null}`,
+			expectErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			switch tt.testType {
+			case "string_valid":
+				type Status struct {
+					Status string `json:"status" pedantigo:"ne=banned"`
+				}
+				validator := New[Status]()
+				s, err := validator.Unmarshal([]byte(tt.json))
+				require.NoError(t, err)
+				assert.Equal(t, "active", s.Status)
+
+			case "string_invalid":
+				type Status struct {
+					Status string `json:"status" pedantigo:"ne=banned"`
+				}
+				validator := New[Status]()
+				_, err := validator.Unmarshal([]byte(tt.json))
+				require.Error(t, err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
+				foundError := false
+				expectedMsg := fmt.Sprintf(ErrMsgNeMustNotEqual, tt.neValue)
+				for _, fieldErr := range ve.Errors {
+					if fieldErr.Field == tt.errorField && fieldErr.Message == expectedMsg {
+						foundError = true
+					}
+				}
+				assert.True(t, foundError, "expected error field=%s msg=%s, got %v", tt.errorField, expectedMsg, ve.Errors)
+
+			case "int_valid":
+				type Config struct {
+					Version int `json:"version" pedantigo:"ne=0"`
+				}
+				validator := New[Config]()
+				cfg, err := validator.Unmarshal([]byte(tt.json))
+				require.NoError(t, err)
+				assert.Equal(t, 2, cfg.Version)
+
+			case "int_invalid":
+				type Config struct {
+					Version int `json:"version" pedantigo:"ne=0"`
+				}
+				validator := New[Config]()
+				_, err := validator.Unmarshal([]byte(tt.json))
+				require.Error(t, err)
+				var ve *ValidationError
+				require.ErrorAs(t, err, &ve, "expected *ValidationError, got %T", err)
+				foundError := false
+				expectedMsg := fmt.Sprintf(ErrMsgNeMustNotEqual, tt.neValue)
+				for _, fieldErr := range ve.Errors {
+					if fieldErr.Field == tt.errorField && fieldErr.Message == expectedMsg {
+						foundError = true
+					}
+				}
+				assert.True(t, foundError, "expected error field=%s msg=%s, got %v", tt.errorField, expectedMsg, ve.Errors)
+
+			case "pointer_valid":
+				type Event struct {
+					Kind *string `json:"kind" pedantigo:"ne=banned"`
+				}
+				validator := New[Event]()
+				ev, err := validator.Unmarshal([]byte(tt.json))
+				require.NoError(t, err)
+				require.NotNil(t, ev.Kind)
+				assert.Equal(t, "active", *ev.Kind)
+
+			case "pointer_nil":
+				type Event struct {
+					Kind *string `json:"kind" pedantigo:"ne=banned"`
+				}
+				validator := New[Event]()
+				ev, err := validator.Unmarshal([]byte(tt.json))
+				require.NoError(t, err)
+				assert.Nil(t, ev.Kind)
+			}
+		})
+	}
+}
+
+// TestNeWithCombinedConstraints tests ne with other constraints.
+func TestNeWithCombinedConstraints(t *testing.T) {
+	// ne combined with required
+	t.Run("ne with required", func(t *testing.T) {
+		type UserStatus struct {
+			Status string `json:"status" pedantigo:"required,ne=deleted"`
+		}
+		validator := New[UserStatus]()
+
+		// Valid case - not equal to "deleted"
+		result, err := validator.Unmarshal([]byte(`{"status":"active"}`))
+		require.NoError(t, err)
+		assert.Equal(t, "active", result.Status)
+
+		// Invalid case - equal to "deleted"
+		_, err = validator.Unmarshal([]byte(`{"status":"deleted"}`))
+		require.Error(t, err)
+
+		// Missing field - should fail required
+		_, err = validator.Unmarshal([]byte(`{}`))
+		require.Error(t, err)
+	})
 }

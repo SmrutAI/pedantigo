@@ -599,16 +599,16 @@ type PriceInfo struct {
 
 **Invalid examples:** "USDA", "US", "999" (invalid numeric), "ZZZ"
 
-### `postcode`
+### `postcode` / `postcode_iso3166_alpha2`
 
-Validates that a string is a **valid postal code** for a specific country.
+Validates that a string is a **valid postal code** for a specific country. Both `postcode` and `postcode_iso3166_alpha2` work identically (the latter is an alias for better clarity that the parameter expects an ISO 3166-1 alpha-2 country code).
 
 ```go
 type InternationalAddress struct {
     // US zipcode (5 or 9 digits)
     ZipUS string `json:"zip" pedantigo:"required,postcode=US"`
-    // UK postcode format
-    PostcodeUK string `json:"postcode" pedantigo:"required,postcode=GB"`
+    // UK postcode format (using alias)
+    PostcodeUK string `json:"postcode" pedantigo:"required,postcode_iso3166_alpha2=GB"`
     // Canadian postal code format
     PostcodeCA string `json:"postal_code" pedantigo:"required,postcode=CA"`
 }
@@ -942,6 +942,7 @@ func main() {
 | `iso4217` | `iso4217` | ISO currency code |
 | `iso4217_numeric` | `iso4217_numeric` | ISO currency code (numeric) |
 | `postcode=CC` | `postcode=US` | Postal code for country |
+| `postcode_iso3166_alpha2=CC` | `postcode_iso3166_alpha2=GB` | Postal code (alias) |
 | `bcp47` | `bcp47` | BCP 47 language tag |
 | `latitude` | `latitude` | Valid latitude (-90 to 90) |
 | `longitude` | `longitude` | Valid longitude (-180 to 180) |
