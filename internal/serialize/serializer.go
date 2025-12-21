@@ -4,8 +4,8 @@ import (
 	"reflect"
 )
 
-// SerializeOptions internal options for serialization.
-type SerializeOptions struct {
+// Options holds internal options for serialization.
+type Options struct {
 	Context  string
 	OmitZero bool
 	TagName  string // The struct tag name to use (e.g., "pedantigo", "validate", "binding")
@@ -15,7 +15,7 @@ type SerializeOptions struct {
 func ShouldIncludeField(
 	meta FieldMetadata,
 	fieldValue reflect.Value,
-	opts SerializeOptions,
+	opts Options,
 	hasWhitelistContext bool,
 ) bool {
 	if opts.Context != "" {
@@ -83,7 +83,7 @@ func isZeroValue(v reflect.Value) bool {
 func ToFilteredMap(
 	val reflect.Value,
 	metadata map[string]FieldMetadata,
-	opts SerializeOptions,
+	opts Options,
 ) map[string]any {
 	result := make(map[string]any)
 

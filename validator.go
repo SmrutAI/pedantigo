@@ -842,7 +842,7 @@ func (v *Validator[T]) MarshalWithOptions(obj *T, opts MarshalOptions) ([]byte, 
 	metadata := serialize.BuildFieldMetadata(val.Type(), v.tagName)
 
 	// Convert options
-	serializeOpts := serialize.SerializeOptions{
+	serializeOpts := serialize.Options{
 		Context:  opts.Context,
 		OmitZero: opts.OmitZero,
 		TagName:  v.tagName,
