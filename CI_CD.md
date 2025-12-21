@@ -472,7 +472,64 @@ For local development, use `setup.sh` in pedantigo-docs which replicates the CI 
 # Clones pedantigo → pedantigo/
 # Clones pedantigo-benchmarks → pedantigo-benchmarks/
 # Copies BENCHMARK.md → pedantigo/docs/benchmarks.md
+# Copies changelog.md → pedantigo/docs/changelog.md
 
 npm start
 # Starts Docusaurus dev server
 ```
+
+---
+
+## Changelog Generation
+
+The changelog at https://pedantigo.dev/docs/changelog is auto-generated from GitHub releases.
+
+### How It Works
+
+1. **Source of truth**: GitHub releases on `pedantigo` repo
+2. **Generation**: `scripts/generate-changelog.sh` in `pedantigo-docs` uses `gh` CLI to fetch releases
+3. **Append-only**: New releases are inserted after the header, preserving existing content
+4. **Trigger**: Runs during every `pedantigo-docs` deploy (push, dispatch, or manual)
+
+### Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         CHANGELOG GENERATION                                 │
+│                                                                             │
+│  pedantigo-docs deploy.yml:                                                 │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ Step: Generate changelog                                            │   │
+│  │   - scripts/generate-changelog.sh fetches releases from pedantigo   │   │
+│  │   - Uses built-in GITHUB_TOKEN (no extra secrets needed)            │   │
+│  │   - Append-only: inserts new releases after header "---"            │   │
+│  │   - Preserves any manual edits to older releases                    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ Step: Commit changelog (if changed)                                 │   │
+│  │   - git add changelog.md                                            │   │
+│  │   - git commit -m "chore: update changelog"                         │   │
+│  │   - git push                                                        │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ Step: setup.sh                                                      │   │
+│  │   - Copies changelog.md → pedantigo/docs/changelog.md               │   │
+│  │   - Included in Docusaurus build                                    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Script Details
+
+The `generate-changelog.sh` script:
+- Fetches all releases from `SmrutAI/pedantigo` using `gh release list`
+- For each release, gets the body using `gh release view`
+- Inserts new releases after the first `---` marker in `changelog.md`
+- Skips releases that already exist in the file (matched by `## vX.Y.Z`)
+- Works on both Linux and macOS (handles `tac` vs `tail -r`)
