@@ -8,15 +8,17 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // String constraint types.
 type (
-	emailConstraint struct{}
-	urlConstraint   struct{}
-	uriConstraint   struct{}
-	uuidConstraint  struct{}
-	regexConstraint struct {
+	emailConstraint   struct{}
+	urlConstraint     struct{}
+	httpURLConstraint struct{}
+	uriConstraint     struct{}
+	uuidConstraint    struct{}
+	regexConstraint   struct {
 		pattern string
 		regex   *regexp.Regexp
 	}
@@ -24,11 +26,23 @@ type (
 	asciiConstraint           struct{}
 	alphaConstraint           struct{}
 	alphanumConstraint        struct{}
+	alphaspaceConstraint      struct{}
+	alphanumspaceConstraint   struct{}
+	printasciiConstraint      struct{}
 	numericConstraint         struct{}
+	numberConstraint          struct{}
+	hexadecimalConstraint     struct{}
+	alphaunicodeConstraint    struct{}
+	alphanumunicodeConstraint struct{}
 	containsConstraint        struct{ substring string }
 	excludesConstraint        struct{ substring string }
 	startswithConstraint      struct{ prefix string }
 	endswithConstraint        struct{ suffix string }
+	startsnotwithConstraint   struct{ prefix string }
+	endsnotwithConstraint     struct{ suffix string }
+	containsanyConstraint     struct{ chars string }
+	excludesallConstraint     struct{ chars string }
+	excludesruneConstraint    struct{ r rune }
 	lowercaseConstraint       struct{}
 	uppercaseConstraint       struct{}
 	stripWhitespaceConstraint struct{}
@@ -52,7 +66,7 @@ func (c emailConstraint) Validate(value any) error {
 	return nil
 }
 
-// urlConstraint validates that a string is a valid URL (http or https only).
+// urlConstraint validates that a string is a valid URL (any scheme).
 func (c urlConstraint) Validate(value any) error {
 	str, isValid, err := extractString(value)
 	if !isValid {
@@ -69,17 +83,50 @@ func (c urlConstraint) Validate(value any) error {
 	// Parse the URL
 	parsedURL, err := url.Parse(str)
 	if err != nil {
-		return NewConstraintError(CodeInvalidURL, "must be a valid URL (http or https)")
+		return NewConstraintError(CodeInvalidURL, "must be a valid URL")
+	}
+
+	// Changed: Accept ANY scheme, not just http/https
+	if parsedURL.Scheme == "" {
+		return NewConstraintError(CodeInvalidURL, "must be a valid URL")
+	}
+	// Allow URLs without host for schemes like file:// or mailto:
+	// Just require a scheme and either host or path
+	if parsedURL.Host == "" && parsedURL.Path == "" && parsedURL.Opaque == "" {
+		return NewConstraintError(CodeInvalidURL, "must be a valid URL")
+	}
+
+	return nil
+}
+
+// httpURLConstraint validates that a string is a valid HTTP/HTTPS URL.
+func (c httpURLConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("http_url constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Empty strings are handled by required constraint
+	}
+
+	// Parse the URL
+	parsedURL, err := url.Parse(str)
+	if err != nil {
+		return NewConstraintError(CodeInvalidHTTPURL, "must be a valid HTTP/HTTPS URL")
 	}
 
 	// Check scheme is http or https
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return NewConstraintError(CodeInvalidURL, "must be a valid URL (http or https)")
+		return NewConstraintError(CodeInvalidHTTPURL, "must be a valid HTTP/HTTPS URL")
 	}
 
 	// Check host is non-empty
 	if parsedURL.Host == "" {
-		return NewConstraintError(CodeInvalidURL, "must be a valid URL (http or https)")
+		return NewConstraintError(CodeInvalidHTTPURL, "must be a valid HTTP/HTTPS URL")
 	}
 
 	return nil
@@ -251,6 +298,81 @@ func (c alphanumConstraint) Validate(value any) error {
 	return nil
 }
 
+// alphaspaceConstraint validates that a string contains only ASCII letters and spaces.
+func (c alphaspaceConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("alphaspace constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check each rune is ASCII letter or space
+	for _, r := range str {
+		isLetter := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+		if !isLetter && r != ' ' {
+			return NewConstraintError(CodeMustBeAlphaSpace, "must contain only ASCII letters and spaces")
+		}
+	}
+
+	return nil
+}
+
+// alphanumspaceConstraint validates that a string contains only ASCII letters, numbers, and spaces.
+func (c alphanumspaceConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("alphanumspace constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check each rune is ASCII letter, digit, or space
+	for _, r := range str {
+		isLetter := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+		isDigit := r >= '0' && r <= '9'
+		if !isLetter && !isDigit && r != ' ' {
+			return NewConstraintError(CodeMustBeAlphanumSpace, "must contain only ASCII letters, numbers, and spaces")
+		}
+	}
+
+	return nil
+}
+
+// printasciiConstraint validates that a string contains only printable ASCII characters (0x20-0x7E).
+func (c printasciiConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("printascii constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check each rune is in printable ASCII range
+	for _, r := range str {
+		if r < 0x20 || r > 0x7E {
+			return NewConstraintError(CodeMustBePrintableASCII, "must contain only printable ASCII characters")
+		}
+	}
+
+	return nil
+}
+
 // numericConstraint validates that a string contains only numeric digits.
 func (c numericConstraint) Validate(value any) error {
 	str, isValid, err := extractString(value)
@@ -265,9 +387,9 @@ func (c numericConstraint) Validate(value any) error {
 		return nil // Skip empty strings
 	}
 
-	// Check if string matches numeric pattern
+	// Check if string matches numeric pattern (supports signed decimals)
 	if !numericRegex.MatchString(str) {
-		return NewConstraintError(CodeMustBeNumeric, "must contain only numeric digits")
+		return NewConstraintError(CodeMustBeNumeric, "must be a valid numeric value")
 	}
 
 	return nil
@@ -362,6 +484,116 @@ func (c endswithConstraint) Validate(value any) error {
 	return nil
 }
 
+// startsnotwithConstraint validates that a string does NOT start with a specific prefix.
+func (c startsnotwithConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("startsnotwith constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check if string DOES NOT start with prefix
+	if strings.HasPrefix(str, c.prefix) {
+		return NewConstraintErrorf(CodeMustNotStartWith, "must not start with '%s'", c.prefix)
+	}
+
+	return nil
+}
+
+// endsnotwithConstraint validates that a string does NOT end with a specific suffix.
+func (c endsnotwithConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("endsnotwith constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check if string DOES NOT end with suffix
+	if strings.HasSuffix(str, c.suffix) {
+		return NewConstraintErrorf(CodeMustNotEndWith, "must not end with '%s'", c.suffix)
+	}
+
+	return nil
+}
+
+// containsanyConstraint validates that a string contains at least one character from a set.
+func (c containsanyConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("containsany constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check if string contains at least one character from the set
+	if !strings.ContainsAny(str, c.chars) {
+		return NewConstraintErrorf(CodeMustContainAny, "must contain at least one of '%s'", c.chars)
+	}
+
+	return nil
+}
+
+// excludesallConstraint validates that a string does NOT contain any character from a set.
+func (c excludesallConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("excludesall constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check if string does NOT contain any character from the set
+	if strings.ContainsAny(str, c.chars) {
+		return NewConstraintErrorf(CodeMustExcludeAll, "must not contain any of '%s'", c.chars)
+	}
+
+	return nil
+}
+
+// excludesruneConstraint validates that a string does NOT contain a specific rune.
+func (c excludesruneConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("excludesrune constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check if string does NOT contain the specific rune
+	if strings.ContainsRune(str, c.r) {
+		return NewConstraintErrorf(CodeMustExcludeRune, "must not contain rune '%c'", c.r)
+	}
+
+	return nil
+}
+
 // lowercaseConstraint validates that a string is all lowercase.
 func (c lowercaseConstraint) Validate(value any) error {
 	str, isValid, err := extractString(value)
@@ -429,6 +661,118 @@ func (c stripWhitespaceConstraint) Validate(value any) error {
 	return nil
 }
 
+// numberConstraint validates that a string contains only unsigned integer digits (0-9).
+// Unlike numeric, this rejects signs, decimals, and scientific notation.
+func (c numberConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("number constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check all characters are digits (0-9)
+	for _, r := range str {
+		if r < '0' || r > '9' {
+			return NewConstraintError(CodeMustBeNumber, "must contain only digits (0-9)")
+		}
+	}
+
+	return nil
+}
+
+// hexadecimalConstraint validates that a string is a valid hexadecimal string.
+// Accepts optional 0x or 0X prefix.
+func (c hexadecimalConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("hexadecimal constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	s := str
+	// Remove optional 0x/0X prefix
+	if len(s) >= 2 && (s[:2] == "0x" || s[:2] == "0X") {
+		s = s[2:]
+	}
+
+	// After removing prefix, string must not be empty
+	if s == "" {
+		return NewConstraintError(CodeMustBeHexadecimal, "must be a valid hexadecimal string")
+	}
+
+	// Check all remaining characters are valid hex digits
+	for _, r := range s {
+		isDigit := r >= '0' && r <= '9'
+		isLowerHex := r >= 'a' && r <= 'f'
+		isUpperHex := r >= 'A' && r <= 'F'
+		if !isDigit && !isLowerHex && !isUpperHex {
+			return NewConstraintError(CodeMustBeHexadecimal, "must be a valid hexadecimal string")
+		}
+	}
+
+	return nil
+}
+
+// alphaunicodeConstraint validates that a string contains only Unicode letters.
+func (c alphaunicodeConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("alphaunicode constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check all characters are Unicode letters
+	for _, r := range str {
+		if !unicode.IsLetter(r) {
+			return NewConstraintError(CodeMustBeAlphaUnicode, "must contain only Unicode letters")
+		}
+	}
+
+	return nil
+}
+
+// alphanumunicodeConstraint validates that a string contains only Unicode letters and numbers.
+func (c alphanumunicodeConstraint) Validate(value any) error {
+	str, isValid, err := extractString(value)
+	if !isValid {
+		return nil // skip validation for nil/invalid values
+	}
+	if err != nil {
+		return fmt.Errorf("alphanumunicode constraint %w", err)
+	}
+
+	if str == "" {
+		return nil // Skip empty strings
+	}
+
+	// Check all characters are Unicode letters or numbers
+	for _, r := range str {
+		if !unicode.IsLetter(r) && !unicode.IsNumber(r) {
+			return NewConstraintError(CodeMustBeAlphanumUnicode, "must contain only Unicode letters and numbers")
+		}
+	}
+
+	return nil
+}
+
 // buildRegexConstraint compiles a regex pattern constraint.
 // Panics on invalid regex pattern (fail-fast approach).
 func buildRegexConstraint(pattern string) Constraint {
@@ -479,4 +823,45 @@ func buildEndswithConstraint(value string) (Constraint, bool) {
 		return nil, false // Empty suffix is invalid
 	}
 	return endswithConstraint{suffix: value}, true
+}
+
+// buildStartsnotwithConstraint creates a startsnotwith constraint with the specified prefix.
+func buildStartsnotwithConstraint(value string) (Constraint, bool) {
+	if value == "" {
+		return nil, false // Empty prefix is invalid
+	}
+	return startsnotwithConstraint{prefix: value}, true
+}
+
+// buildEndsnotwithConstraint creates an endsnotwith constraint with the specified suffix.
+func buildEndsnotwithConstraint(value string) (Constraint, bool) {
+	if value == "" {
+		return nil, false // Empty suffix is invalid
+	}
+	return endsnotwithConstraint{suffix: value}, true
+}
+
+// buildContainsanyConstraint creates a containsany constraint with the specified character set.
+func buildContainsanyConstraint(value string) (Constraint, bool) {
+	if value == "" {
+		return nil, false // Empty character set is invalid
+	}
+	return containsanyConstraint{chars: value}, true
+}
+
+// buildExcludesallConstraint creates an excludesall constraint with the specified character set.
+func buildExcludesallConstraint(value string) (Constraint, bool) {
+	if value == "" {
+		return nil, false // Empty character set is invalid
+	}
+	return excludesallConstraint{chars: value}, true
+}
+
+// buildExcludesruneConstraint creates an excludesrune constraint with the first rune from the value.
+func buildExcludesruneConstraint(value string) (Constraint, bool) {
+	if value == "" {
+		return nil, false // Empty string is invalid
+	}
+	runes := []rune(value)
+	return excludesruneConstraint{r: runes[0]}, true
 }

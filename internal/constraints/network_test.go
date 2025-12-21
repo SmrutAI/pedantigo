@@ -456,3 +456,60 @@ func TestTcp4AddrConstraint(t *testing.T) {
 		{"invalid type - bool", true, true},
 	})
 }
+
+// TestHostnamePortConstraint tests hostnamePortConstraint.Validate() for hostname:port format.
+func TestHostnamePortConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, hostnamePortConstraint{}, []simpleTestCase{
+		// Valid hostname:port - simple hostnames
+		{"valid hostname:port - localhost", "localhost:8080", false},
+		{"valid hostname:port - simple", "myhost:80", false},
+		{"valid hostname:port - with hyphen", "my-host:9000", false},
+		{"valid hostname:port - starts with digit", "123host:3000", false},
+		// Valid hostname:port - FQDNs
+		{"valid FQDN:port - simple", "example.com:80", false},
+		{"valid FQDN:port - subdomain", "api.example.com:443", false},
+		{"valid FQDN:port - multiple subdomains", "a.b.c.example.com:8080", false},
+		// Valid IP:port
+		{"valid IPv4:port", "192.168.1.1:443", false},
+		{"valid IPv4:port - localhost", "127.0.0.1:8080", false},
+		{"valid IPv6:port", "[::1]:8080", false},
+		{"valid IPv6:port - full", "[2001:db8::1]:443", false},
+		// Valid port ranges
+		{"valid port - minimum 1", "localhost:1", false},
+		{"valid port - common 80", "localhost:80", false},
+		{"valid port - common 443", "localhost:443", false},
+		{"valid port - high range", "localhost:9999", false},
+		{"valid port - maximum 65535", "localhost:65535", false},
+		// Empty string - should be skipped (handled by required)
+		{"empty string", "", false},
+		// Invalid - missing port
+		{"invalid - no port", "localhost", true},
+		{"invalid - no colon", "localhost8080", true},
+		// Invalid - empty host or port
+		{"invalid - empty port", "localhost:", true},
+		{"invalid - empty host", ":8080", true},
+		// Invalid - port 0
+		{"invalid - port 0", "localhost:0", true},
+		{"invalid - port 0 IP", "192.168.1.1:0", true},
+		// Invalid - port out of range
+		{"invalid - port too high", "localhost:65536", true},
+		{"invalid - port way too high", "localhost:99999", true},
+		{"invalid - negative port", "localhost:-1", true},
+		// Invalid - non-numeric port
+		{"invalid - alphabetic port", "localhost:abc", true},
+		{"invalid - mixed alphanumeric port", "localhost:80a", true},
+		// Invalid - invalid hostname
+		{"invalid - underscore in hostname", "my_host:8080", true},
+		{"invalid - starts with hyphen", "-myhost:8080", true},
+		{"invalid - ends with hyphen", "myhost-:8080", true},
+		{"invalid - double dot in FQDN", "example..com:80", true},
+		// Invalid - invalid IP
+		{"invalid - bad IPv4", "256.1.1.1:80", true},
+		{"invalid - IPv6 without brackets", "::1:8080", true},
+		// Nil pointer - should skip validation
+		{"nil pointer", (*string)(nil), false},
+		// Invalid types
+		{"invalid type - int", 123, true},
+		{"invalid type - bool", true, true},
+	})
+}
