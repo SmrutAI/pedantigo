@@ -28,8 +28,8 @@ Global functions with automatic caching. Uses [DefaultValidatorOptions()](#defau
 | `pedantigo.NewModel[T](input)` | Create from map/struct |
 | `pedantigo.Schema[T]()` | Get JSON Schema |
 | `pedantigo.SchemaJSON[T]()` | Get JSON Schema as bytes |
-| `pedantigo.SchemaOpenAPI[T]()` | Get OpenAPI-compatible schema |
-| `pedantigo.SchemaJSONOpenAPI[T]()` | OpenAPI schema as bytes |
+| `pedantigo.SchemaOpenAPI[T]()` | Get OpenAPI 3.1 component schema |
+| `pedantigo.SchemaJSONOpenAPI[T]()` | OpenAPI 3.1 schema as bytes |
 | `pedantigo.Marshal[T](obj)` | Marshal struct to JSON |
 | `pedantigo.MarshalWithOptions[T](obj, opts)` | Marshal with options |
 | `pedantigo.Dict[T](obj)` | Convert to map[string]any |
@@ -67,8 +67,8 @@ Explicit validator instances with [custom options](#validator-options).
 | `v.NewModel(input)` | Create from map/struct |
 | `v.Schema()` | Get JSON Schema |
 | `v.SchemaJSON()` | Schema as bytes |
-| `v.SchemaOpenAPI()` | OpenAPI schema |
-| `v.SchemaJSONOpenAPI()` | OpenAPI as bytes |
+| `v.SchemaOpenAPI()` | OpenAPI 3.1 schema |
+| `v.SchemaJSONOpenAPI()` | OpenAPI 3.1 as bytes |
 | `v.Marshal(obj)` | Marshal to JSON |
 | `v.MarshalWithOptions(obj, opts)` | Marshal with options |
 | `v.Dict(obj)` | Convert to map |

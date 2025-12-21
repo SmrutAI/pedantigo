@@ -1,3 +1,9 @@
+---
+sidebar_position: 2
+title: API Parity
+description: Feature comparison between Pedantigo, Pydantic, and go-playground/validator
+---
+
 # Feature Comparison
 
 How Pedantigo compares to Pydantic v2 and go-playground/validator v10.

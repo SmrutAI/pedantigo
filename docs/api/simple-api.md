@@ -201,15 +201,17 @@ os.WriteFile("user-schema.json", schemaBytes, 0644)
 
 ### SchemaOpenAPI
 
-Get an OpenAPI-compatible JSON Schema.
+Get an OpenAPI 3.1 compatible component schema.
 
 ```go
 func SchemaOpenAPI[T any]() *jsonschema.Schema
 ```
 
-Returns a schema with OpenAPI-specific enhancements:
+Returns a JSON Schema compatible with OpenAPI 3.1 specifications:
 - Support for nullable fields
-- Compatible with OpenAPI 3.0+ specifications
+- Uses `$defs` syntax (OpenAPI 3.1 / JSON Schema Draft 2020-12)
+
+**Note**: This generates a component schema (for `components/schemas`), not a complete OpenAPI document. Pedantigo is a validation library, not an API framework.
 
 **Example**:
 ```go
@@ -220,20 +222,20 @@ type APIResponse struct {
 }
 
 schema := pedantigo.SchemaOpenAPI[APIResponse]()
-// Use in OpenAPI specification
+// Embed in OpenAPI 3.1 specification's components/schemas
 ```
 
 ---
 
 ### SchemaJSONOpenAPI
 
-Get OpenAPI-compatible schema as JSON bytes.
+Get OpenAPI 3.1 compatible component schema as JSON bytes.
 
 ```go
 func SchemaJSONOpenAPI[T any]() ([]byte, error)
 ```
 
-OpenAPI-enhanced schema serialized as JSON bytes.
+Component schema serialized as JSON bytes, ready to embed in OpenAPI 3.1 specifications.
 
 **Example**:
 ```go
@@ -242,7 +244,7 @@ if err != nil {
     log.Fatal(err)
 }
 
-// Embed in OpenAPI YAML/JSON spec
+// Embed in OpenAPI 3.1 YAML/JSON spec under components/schemas
 ```
 
 ---

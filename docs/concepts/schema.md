@@ -171,17 +171,19 @@ w.Write(schemaBytes)
 
 ### SchemaOpenAPI()
 
-Get an OpenAPI 3.0+ compatible schema.
+Get an OpenAPI 3.1 compatible component schema.
 
 ```go
 func SchemaOpenAPI[T any]() *jsonschema.Schema
 ```
 
-**Returns**: A schema object with OpenAPI-specific enhancements.
+**Returns**: A JSON Schema compatible with OpenAPI 3.1 specifications.
+
+**Important**: This generates a **component schema** (for use in `components/schemas`), not a complete OpenAPI document. Pedantigo is a validation library, not an API framework like Huma. For benchmarks, we only measure component schema generation performance.
 
 **Features**:
 - Support for nullable fields (pointer types)
-- Compatible with OpenAPI 3.0+ specifications
+- Compatible with OpenAPI 3.1 specifications (uses `$defs` syntax)
 - Uses `$ref` and `$defs` for better composition
 
 **Example**:

@@ -127,9 +127,12 @@ func (v *Validator[T]) SchemaJSON() ([]byte, error) {
 	return jsonBytes, nil
 }
 
-// SchemaOpenAPI generates a JSON Schema with $ref support for OpenAPI/Swagger specs
-// Returns schema with $ref/$defs for type reusability and cleaner documentation
-// Use this for: OpenAPI 3.0 specs, Swagger documentation, API documentation tools
+// SchemaOpenAPI generates a JSON Schema compatible with OpenAPI 3.1 specifications.
+// Returns schema with $ref/$defs for type reusability and cleaner documentation.
+//
+// Note: This generates a component schema (for use in components/schemas), not a complete
+// OpenAPI document. Pedantigo is a validation library, not an API framework like Huma.
+// Use this for: OpenAPI 3.1 specs, API documentation tools, embedding in OpenAPI documents.
 // SchemaOpenAPI implements the method.
 func (v *Validator[T]) SchemaOpenAPI() *jsonschema.Schema {
 	// Fast path: read lock check for cached OpenAPI schema

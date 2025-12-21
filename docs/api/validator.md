@@ -177,22 +177,23 @@ fmt.Println(string(schemaBytes))
 
 #### SchemaOpenAPI
 
-Get OpenAPI-compatible JSON Schema.
+Get OpenAPI 3.1 compatible component schema.
 
 ```go
 schema := validator.SchemaOpenAPI()
-// Includes OpenAPI-specific enhancements like nullable support
+// Returns component schema with $defs (OpenAPI 3.1 / JSON Schema Draft 2020-12)
 ```
 
 #### SchemaJSONOpenAPI
 
-Get OpenAPI-compatible JSON Schema as JSON bytes.
+Get OpenAPI 3.1 compatible component schema as JSON bytes.
 
 ```go
 schemaBytes, err := validator.SchemaJSONOpenAPI()
 if err != nil {
     // Handle error
 }
+// Embed in OpenAPI 3.1 spec under components/schemas
 ```
 
 ### Marshal Methods
