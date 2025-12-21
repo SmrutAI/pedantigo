@@ -192,18 +192,18 @@ For agents that return different response types based on an action field, use di
 
 ```go
 type SearchAction struct {
-    Action string   `json:"action" pedantigo:"required,const=search"`
+    Action string   `json:"action" pedantigo:"required,eq=search"`
     Query  string   `json:"query" pedantigo:"required,min=1"`
     Limit  int      `json:"limit" pedantigo:"min=1,max=100"`
 }
 
 type CalculateAction struct {
-    Action     string `json:"action" pedantigo:"required,const=calculate"`
+    Action     string `json:"action" pedantigo:"required,eq=calculate"`
     Expression string `json:"expression" pedantigo:"required"`
 }
 
 type RespondAction struct {
-    Action   string `json:"action" pedantigo:"required,const=respond"`
+    Action   string `json:"action" pedantigo:"required,eq=respond"`
     Response string `json:"response" pedantigo:"required,min=1"`
 }
 

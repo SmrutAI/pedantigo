@@ -10,34 +10,35 @@ import (
 
 // ISO code constraint name constants.
 const (
-	CISO3166Alpha2   = "iso3166_alpha2"    // ISO 3166-1 alpha-2 country code
-	CISO3166Alpha2EU = "iso3166_alpha2_eu" // ISO 3166-1 alpha-2 EU country code
-	CISO3166Alpha3   = "iso3166_alpha3"    // ISO 3166-1 alpha-3 country code
-	CISO3166Alpha3EU = "iso3166_alpha3_eu" // ISO 3166-1 alpha-3 EU country code
-	CISO3166Numeric  = "iso3166_numeric"   // ISO 3166-1 numeric country code
-	CISO31662        = "iso3166_2"         // ISO 3166-2 subdivision code
-	CISO4217         = "iso4217"           // ISO 4217 currency code
-	CISO4217Numeric  = "iso4217_numeric"   // ISO 4217 numeric currency code
-	CPostcode        = "postcode"          // Postal code with country parameter
-	CBCP47           = "bcp47"             // BCP 47 language tag
+	CISO31661Alpha2        = "iso3166_1_alpha2"        // ISO 3166-1 alpha-2 country code
+	CISO3166Alpha2EU       = "iso3166_alpha2_eu"       // ISO 3166-1 alpha-2 EU country code
+	CISO31661Alpha3        = "iso3166_1_alpha3"        // ISO 3166-1 alpha-3 country code
+	CISO3166Alpha3EU       = "iso3166_alpha3_eu"       // ISO 3166-1 alpha-3 EU country code
+	CISO31661AlphaNumeric  = "iso3166_1_alpha_numeric" // ISO 3166-1 numeric country code
+	CISO31662              = "iso3166_2"               // ISO 3166-2 subdivision code
+	CISO4217               = "iso4217"                 // ISO 4217 currency code
+	CISO4217Numeric        = "iso4217_numeric"         // ISO 4217 numeric currency code
+	CPostcode              = "postcode"                // Postal code with country parameter
+	CPostcodeISO3166Alpha2 = "postcode_iso3166_alpha2" // Alias for postcode
+	CBCP47LanguageTag      = "bcp47_language_tag"      // BCP 47 language tag
 )
 
 // ISO code constraint types.
 type (
-	// iso3166Alpha2Constraint validates ISO 3166-1 alpha-2 country codes (e.g., "US", "GB").
-	iso3166Alpha2Constraint struct{}
+	// iso31661Alpha2Constraint validates ISO 3166-1 alpha-2 country codes (e.g., "US", "GB").
+	iso31661Alpha2Constraint struct{}
 
 	// iso3166Alpha2EUConstraint validates EU ISO 3166-1 alpha-2 country codes.
 	iso3166Alpha2EUConstraint struct{}
 
-	// iso3166Alpha3Constraint validates ISO 3166-1 alpha-3 country codes (e.g., "USA", "GBR").
-	iso3166Alpha3Constraint struct{}
+	// iso31661Alpha3Constraint validates ISO 3166-1 alpha-3 country codes (e.g., "USA", "GBR").
+	iso31661Alpha3Constraint struct{}
 
 	// iso3166Alpha3EUConstraint validates EU ISO 3166-1 alpha-3 country codes.
 	iso3166Alpha3EUConstraint struct{}
 
-	// iso3166NumericConstraint validates ISO 3166-1 numeric country codes.
-	iso3166NumericConstraint struct{}
+	// iso31661AlphaNumericConstraint validates ISO 3166-1 numeric country codes.
+	iso31661AlphaNumericConstraint struct{}
 
 	// iso31662Constraint validates ISO 3166-2 subdivision codes (e.g., "US-CA", "GB-ENG").
 	iso31662Constraint struct{}
@@ -54,18 +55,18 @@ type (
 		countryCode string
 	}
 
-	// bcp47Constraint validates BCP 47 language tags (e.g., "en", "en-US", "zh-Hans-CN").
-	bcp47Constraint struct{}
+	// bcp47LanguageTagConstraint validates BCP 47 language tags (e.g., "en", "en-US", "zh-Hans-CN").
+	bcp47LanguageTagConstraint struct{}
 )
 
 // Validate checks if the value is a valid ISO 3166-1 alpha-2 country code.
-func (c iso3166Alpha2Constraint) Validate(value any) error {
+func (c iso31661Alpha2Constraint) Validate(value any) error {
 	str, isValid, err := extractString(value)
 	if !isValid {
 		return nil // skip validation for nil/invalid values
 	}
 	if err != nil {
-		return fmt.Errorf("iso3166_alpha2 constraint %w", err)
+		return fmt.Errorf("iso3166_1_alpha2 constraint %w", err)
 	}
 
 	if str == "" {
@@ -99,13 +100,13 @@ func (c iso3166Alpha2EUConstraint) Validate(value any) error {
 }
 
 // Validate checks if the value is a valid ISO 3166-1 alpha-3 country code.
-func (c iso3166Alpha3Constraint) Validate(value any) error {
+func (c iso31661Alpha3Constraint) Validate(value any) error {
 	str, isValid, err := extractString(value)
 	if !isValid {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("iso3166_alpha3 constraint %w", err)
+		return fmt.Errorf("iso3166_1_alpha3 constraint %w", err)
 	}
 
 	if str == "" {
@@ -139,7 +140,7 @@ func (c iso3166Alpha3EUConstraint) Validate(value any) error {
 }
 
 // Validate checks if the value is a valid ISO 3166-1 numeric country code.
-func (c iso3166NumericConstraint) Validate(value any) error {
+func (c iso31661AlphaNumericConstraint) Validate(value any) error {
 	v, ok := derefValue(value)
 	if !ok {
 		return nil // skip validation for nil/invalid values
@@ -157,7 +158,7 @@ func (c iso3166NumericConstraint) Validate(value any) error {
 		}
 		code = int(u) //nolint:gosec // bounds checked above
 	default:
-		return fmt.Errorf("iso3166_numeric constraint requires integer value")
+		return fmt.Errorf("iso3166_1_alpha_numeric constraint requires integer value")
 	}
 
 	if !isocodes.IsISO3166Numeric(code) {
@@ -259,13 +260,13 @@ func (c postcodeConstraint) Validate(value any) error {
 }
 
 // Validate checks if the value is a valid BCP 47 language tag.
-func (c bcp47Constraint) Validate(value any) error {
+func (c bcp47LanguageTagConstraint) Validate(value any) error {
 	str, isValid, err := extractString(value)
 	if !isValid {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("bcp47 constraint %w", err)
+		return fmt.Errorf("bcp47_language_tag constraint %w", err)
 	}
 
 	if str == "" {
@@ -281,26 +282,26 @@ func (c bcp47Constraint) Validate(value any) error {
 // appendISOConstraint appends ISO code constraints based on constraint name.
 func appendISOConstraint(result []Constraint, name, value string) []Constraint {
 	switch name {
-	case CISO3166Alpha2:
-		return append(result, iso3166Alpha2Constraint{})
+	case CISO31661Alpha2:
+		return append(result, iso31661Alpha2Constraint{})
 	case CISO3166Alpha2EU:
 		return append(result, iso3166Alpha2EUConstraint{})
-	case CISO3166Alpha3:
-		return append(result, iso3166Alpha3Constraint{})
+	case CISO31661Alpha3:
+		return append(result, iso31661Alpha3Constraint{})
 	case CISO3166Alpha3EU:
 		return append(result, iso3166Alpha3EUConstraint{})
-	case CISO3166Numeric:
-		return append(result, iso3166NumericConstraint{})
+	case CISO31661AlphaNumeric:
+		return append(result, iso31661AlphaNumericConstraint{})
 	case CISO31662:
 		return append(result, iso31662Constraint{})
 	case CISO4217:
 		return append(result, iso4217Constraint{})
 	case CISO4217Numeric:
 		return append(result, iso4217NumericConstraint{})
-	case CPostcode:
+	case CPostcode, CPostcodeISO3166Alpha2:
 		return append(result, postcodeConstraint{countryCode: value})
-	case CBCP47:
-		return append(result, bcp47Constraint{})
+	case CBCP47LanguageTag:
+		return append(result, bcp47LanguageTagConstraint{})
 	}
 	return result
 }

@@ -83,16 +83,17 @@ const (
 	fmtULID   = "ulid"
 
 	// ISO code formats.
-	fmtISO3166Alpha2   = "iso3166_alpha2"
-	fmtISO3166Alpha2EU = "iso3166_alpha2_eu"
-	fmtISO3166Alpha3   = "iso3166_alpha3"
-	fmtISO3166Alpha3EU = "iso3166_alpha3_eu"
-	fmtISO3166Numeric  = "iso3166_numeric"
-	fmtISO31662        = "iso3166_2"
-	fmtISO4217         = "iso4217"
-	fmtISO4217Numeric  = "iso4217_numeric"
-	fmtPostcode        = "postcode"
-	fmtBCP47           = "bcp47"
+	fmtISO31661Alpha2        = "iso3166_1_alpha2"
+	fmtISO3166Alpha2EU       = "iso3166_alpha2_eu"
+	fmtISO31661Alpha3        = "iso3166_1_alpha3"
+	fmtISO3166Alpha3EU       = "iso3166_alpha3_eu"
+	fmtISO31661AlphaNumeric  = "iso3166_1_alpha_numeric"
+	fmtISO31662              = "iso3166_2"
+	fmtISO4217               = "iso4217"
+	fmtISO4217Numeric        = "iso4217_numeric"
+	fmtPostcode              = "postcode"
+	fmtPostcodeISO3166Alpha2 = "postcode_iso3166_alpha2"
+	fmtBCP47LanguageTag      = "bcp47_language_tag"
 
 	// Filesystem formats.
 	fmtFilepath = "filepath"
@@ -315,8 +316,8 @@ func ApplyConstraints(schema *jsonschema.Schema, constraintsMap map[string]strin
 			// Misc formats (Phase 10).
 			fmtHTML, fmtCron, fmtSemver, fmtULID,
 			// ISO code formats.
-			fmtISO3166Alpha2, fmtISO3166Alpha2EU, fmtISO3166Alpha3, fmtISO3166Alpha3EU,
-			fmtISO3166Numeric, fmtISO31662, fmtISO4217, fmtISO4217Numeric, fmtPostcode, fmtBCP47,
+			fmtISO31661Alpha2, fmtISO3166Alpha2EU, fmtISO31661Alpha3, fmtISO3166Alpha3EU,
+			fmtISO31661AlphaNumeric, fmtISO31662, fmtISO4217, fmtISO4217Numeric, fmtPostcode, fmtPostcodeISO3166Alpha2, fmtBCP47LanguageTag,
 			// Filesystem formats.
 			fmtFilepath, fmtDirpath, fmtFile, fmtDir:
 			applyFormatConstraint(schema, name)
@@ -333,6 +334,15 @@ func ApplyConstraints(schema *jsonschema.Schema, constraintsMap map[string]strin
 				enumValues[i] = v
 			}
 			schema.Enum = enumValues
+
+		case "eq":
+			// eq → const (JSON Schema keyword for exact value match)
+			schema.Const = value
+
+		case "ne":
+			// ne → not.const (JSON Schema keyword for "not equal")
+			// Note: JSON Schema uses "not" with nested schema for negation
+			schema.Not = &jsonschema.Schema{Const: value}
 
 		case "len":
 			// len → minLength + maxLength (exact length)
@@ -684,26 +694,26 @@ func applyFormatConstraint(schema *jsonschema.Schema, constraintName string) {
 		schema.Format = fmtULID
 
 	// ISO code formats.
-	case fmtISO3166Alpha2:
-		schema.Format = fmtISO3166Alpha2
+	case fmtISO31661Alpha2:
+		schema.Format = fmtISO31661Alpha2
 	case fmtISO3166Alpha2EU:
 		schema.Format = fmtISO3166Alpha2EU
-	case fmtISO3166Alpha3:
-		schema.Format = fmtISO3166Alpha3
+	case fmtISO31661Alpha3:
+		schema.Format = fmtISO31661Alpha3
 	case fmtISO3166Alpha3EU:
 		schema.Format = fmtISO3166Alpha3EU
-	case fmtISO3166Numeric:
-		schema.Format = fmtISO3166Numeric
+	case fmtISO31661AlphaNumeric:
+		schema.Format = fmtISO31661AlphaNumeric
 	case fmtISO31662:
 		schema.Format = fmtISO31662
 	case fmtISO4217:
 		schema.Format = fmtISO4217
 	case fmtISO4217Numeric:
 		schema.Format = fmtISO4217Numeric
-	case fmtPostcode:
+	case fmtPostcode, fmtPostcodeISO3166Alpha2:
 		schema.Format = fmtPostcode
-	case fmtBCP47:
-		schema.Format = fmtBCP47
+	case fmtBCP47LanguageTag:
+		schema.Format = fmtBCP47LanguageTag
 
 	// Filesystem formats.
 	case fmtFilepath:

@@ -29,13 +29,15 @@ const (
 	CIpv4   = "ipv4"
 	CIpv6   = "ipv6"
 	COneof  = "oneof"
-	CConst  = "const"
+	CEq     = "eq"
+	CNe     = "ne"
 	CLen    = "len"
 
 	// String constraints.
 	CAscii           = "ascii"
 	CAlpha           = "alpha"
 	CAlphanum        = "alphanum"
+	CNumeric         = "numeric"
 	CContains        = "contains"
 	CExcludes        = "excludes"
 	CStartswith      = "startswith"
@@ -115,10 +117,11 @@ const (
 	CMongodb = "mongodb"
 
 	// Misc constraints.
-	CHtml   = "html"
-	CCron   = "cron"
-	CSemver = "semver"
-	CUlid   = "ulid"
+	CHtml     = "html"
+	CCron     = "cron"
+	CSemver   = "semver"
+	CUlid     = "ulid"
+	CDatetime = "datetime"
 
 	// Special.
 	CRequired = "required"
@@ -130,6 +133,7 @@ var (
 	uuidRegex     = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 	alphaRegex    = regexp.MustCompile(`^[a-zA-Z]+$`)
 	alphanumRegex = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
+	numericRegex  = regexp.MustCompile(`^\d+$`)
 )
 
 // extractNumericValue converts a reflect.Value to a float64 for numeric comparisons.
@@ -185,6 +189,15 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 	var result []Constraint
 
 	for name, value := range constraints {
+		// Handle OR constraints specially
+		if len(name) > 6 && name[:6] == "__or__" {
+			orExpr := name[6:] // Strip the "__or__" prefix
+			if c := buildOrConstraint(orExpr, fieldType); c != nil {
+				result = append(result, c)
+			}
+			continue
+		}
+
 		switch name {
 		case CRequired:
 			// Skip: 'required' is only checked during Unmarshal (missing JSON keys).
@@ -192,11 +205,11 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			continue
 
 		// Core constraints.
-		case CMin, CMax, CGt, CGte, CLt, CLte, CEmail, CUrl, CUuid, CRegexp, CIpv4, CIpv6, COneof, CConst, CLen:
+		case CMin, CMax, CGt, CGte, CLt, CLte, CEmail, CUrl, CUuid, CRegexp, CIpv4, CIpv6, COneof, CEq, CNe, CLen:
 			result = appendCoreConstraint(result, name, value, fieldType)
 
 		// String constraints.
-		case CAscii, CAlpha, CAlphanum, CContains, CExcludes, CStartswith, CEndswith, CLowercase, CUppercase, CStripWhitespace, CToLower, CToUpper:
+		case CAscii, CAlpha, CAlphanum, CNumeric, CContains, CExcludes, CStartswith, CEndswith, CLowercase, CUppercase, CStripWhitespace, CToLower, CToUpper:
 			result = appendStringConstraint(result, name, value)
 
 		// Numeric constraints.
@@ -236,11 +249,11 @@ func BuildConstraints(constraints map[string]string, fieldType reflect.Type) []C
 			result = appendHashConstraint(result, name)
 
 		// Misc constraints.
-		case CHtml, CCron, CSemver, CUlid:
-			result = appendMiscConstraint(result, name)
+		case CHtml, CCron, CSemver, CUlid, CDatetime:
+			result = appendMiscConstraint(result, name, value)
 
 		// ISO code constraints.
-		case CISO3166Alpha2, CISO3166Alpha2EU, CISO3166Alpha3, CISO3166Alpha3EU, CISO3166Numeric, CISO31662, CISO4217, CISO4217Numeric, CPostcode, CBCP47:
+		case CISO31661Alpha2, CISO3166Alpha2EU, CISO31661Alpha3, CISO3166Alpha3EU, CISO31661AlphaNumeric, CISO31662, CISO4217, CISO4217Numeric, CPostcode, CPostcodeISO3166Alpha2, CBCP47LanguageTag:
 			result = appendISOConstraint(result, name, value)
 
 		// Filesystem constraints.
@@ -300,8 +313,12 @@ func appendCoreConstraint(result []Constraint, name, value string, fieldType ref
 		return append(result, ipv6Constraint{})
 	case "oneof":
 		return append(result, buildEnumConstraint(value))
-	case "const":
-		if c, ok := buildConstConstraint(value); ok {
+	case "eq":
+		if c, ok := buildEqConstraint(value); ok {
+			return append(result, c)
+		}
+	case "ne":
+		if c, ok := buildNeConstraint(value); ok {
 			return append(result, c)
 		}
 	case "len":
@@ -321,6 +338,8 @@ func appendStringConstraint(result []Constraint, name, value string) []Constrain
 		return append(result, alphaConstraint{})
 	case "alphanum":
 		return append(result, alphanumConstraint{})
+	case "numeric":
+		return append(result, numericConstraint{})
 	case "contains":
 		if c, ok := buildContainsConstraint(value); ok {
 			return append(result, c)
@@ -524,7 +543,7 @@ func appendHashConstraint(result []Constraint, name string) []Constraint {
 }
 
 // appendMiscConstraint appends miscellaneous format validators if name matches.
-func appendMiscConstraint(result []Constraint, name string) []Constraint {
+func appendMiscConstraint(result []Constraint, name, value string) []Constraint {
 	switch name {
 	case "html":
 		return append(result, htmlConstraint{})
@@ -534,6 +553,10 @@ func appendMiscConstraint(result []Constraint, name string) []Constraint {
 		return append(result, semverConstraint{})
 	case "ulid":
 		return append(result, ulidConstraint{})
+	case "datetime":
+		if c, ok := buildDatetimeConstraint(value); ok {
+			return append(result, c)
+		}
 	}
 	return result
 }

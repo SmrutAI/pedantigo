@@ -26,6 +26,7 @@ const (
 	CodeInvalidUDPAddr  = "INVALID_UDP_ADDR"
 	CodeInvalidFQDN     = "INVALID_FQDN"
 	CodePatternMismatch = "PATTERN_MISMATCH"
+	CodeInvalidDatetime = "INVALID_DATETIME"
 
 	// Identity/Publishing constraints.
 	CodeInvalidISBN   = "INVALID_ISBN"
@@ -109,6 +110,7 @@ const (
 	CodeMustBeASCII     = "MUST_BE_ASCII"
 	CodeMustBeAlpha     = "MUST_BE_ALPHA"
 	CodeMustBeAlphanum  = "MUST_BE_ALPHANUM"
+	CodeMustBeNumeric   = "MUST_BE_NUMERIC"
 	CodeMustContain     = "MUST_CONTAIN"
 	CodeMustNotContain  = "MUST_NOT_CONTAIN"
 	CodeMustStartWith   = "MUST_START_WITH"
@@ -125,16 +127,23 @@ const (
 	CodeNotUnique = "NOT_UNIQUE"
 
 	// Cross-field constraints.
-	CodeMustEqualField    = "MUST_EQUAL_FIELD"
-	CodeMustNotEqualField = "MUST_NOT_EQUAL_FIELD"
-	CodeMustBeGTField     = "MUST_BE_GT_FIELD"
-	CodeMustBeGTEField    = "MUST_BE_GTE_FIELD"
-	CodeMustBeLTField     = "MUST_BE_LT_FIELD"
-	CodeMustBeLTEField    = "MUST_BE_LTE_FIELD"
-	CodeExcludedIf        = "EXCLUDED_IF"
-	CodeExcludedUnless    = "EXCLUDED_UNLESS"
-	CodeExcludedWith      = "EXCLUDED_WITH"
-	CodeExcludedWithout   = "EXCLUDED_WITHOUT"
+	CodeMustEqualField     = "MUST_EQUAL_FIELD"
+	CodeMustNotEqualField  = "MUST_NOT_EQUAL_FIELD"
+	CodeMustBeGTField      = "MUST_BE_GT_FIELD"
+	CodeMustBeGTEField     = "MUST_BE_GTE_FIELD"
+	CodeMustBeLTField      = "MUST_BE_LT_FIELD"
+	CodeMustBeLTEField     = "MUST_BE_LTE_FIELD"
+	CodeExcludedIf         = "EXCLUDED_IF"
+	CodeExcludedUnless     = "EXCLUDED_UNLESS"
+	CodeExcludedWith       = "EXCLUDED_WITH"
+	CodeExcludedWithout    = "EXCLUDED_WITHOUT"
+	CodeRequiredWithAll    = "REQUIRED_WITH_ALL"
+	CodeRequiredWithoutAll = "REQUIRED_WITHOUT_ALL"
+	CodeExcludedWithAll    = "EXCLUDED_WITH_ALL"
+	CodeExcludedWithoutAll = "EXCLUDED_WITHOUT_ALL"
+
+	// OR constraints.
+	CodeOrConstraintFailed = "OR_CONSTRAINT_FAILED"
 
 	// Type errors.
 	CodeUnknownField    = "UNKNOWN_FIELD"

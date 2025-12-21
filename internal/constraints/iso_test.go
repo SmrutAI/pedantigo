@@ -1,10 +1,12 @@
 package constraints
 
-import "testing"
+import (
+	"testing"
+)
 
-// TestISO3166Alpha2Constraint tests iso3166Alpha2Constraint.Validate() for valid ISO 3166-1 alpha-2 codes.
-func TestISO3166Alpha2Constraint(t *testing.T) {
-	runSimpleConstraintTests(t, iso3166Alpha2Constraint{}, []simpleTestCase{
+// TestISO31661Alpha2Constraint tests iso31661Alpha2Constraint.Validate() for valid ISO 3166-1 alpha-2 codes.
+func TestISO31661Alpha2Constraint(t *testing.T) {
+	runSimpleConstraintTests(t, iso31661Alpha2Constraint{}, []simpleTestCase{
 		// Valid ISO 3166-1 alpha-2 country codes
 		{"valid US", "US", false},
 		{"valid GB", "GB", false},
@@ -87,9 +89,9 @@ func TestISO3166Alpha2EUConstraint(t *testing.T) {
 	})
 }
 
-// TestISO3166Alpha3Constraint tests iso3166Alpha3Constraint.Validate() for valid alpha-3 codes.
-func TestISO3166Alpha3Constraint(t *testing.T) {
-	runSimpleConstraintTests(t, iso3166Alpha3Constraint{}, []simpleTestCase{
+// TestISO31661Alpha3Constraint tests iso31661Alpha3Constraint.Validate() for valid alpha-3 codes.
+func TestISO31661Alpha3Constraint(t *testing.T) {
+	runSimpleConstraintTests(t, iso31661Alpha3Constraint{}, []simpleTestCase{
 		// Valid ISO 3166-1 alpha-3 country codes
 		{"valid USA", "USA", false},
 		{"valid GBR", "GBR", false},
@@ -150,9 +152,9 @@ func TestISO3166Alpha3EUConstraint(t *testing.T) {
 	})
 }
 
-// TestISO3166NumericConstraint tests iso3166NumericConstraint.Validate() for valid numeric codes.
-func TestISO3166NumericConstraint(t *testing.T) {
-	runSimpleConstraintTests(t, iso3166NumericConstraint{}, []simpleTestCase{
+// TestISO31661AlphaNumericConstraint tests iso31661AlphaNumericConstraint.Validate() for valid numeric codes.
+func TestISO31661AlphaNumericConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, iso31661AlphaNumericConstraint{}, []simpleTestCase{
 		// Valid ISO 3166-1 numeric country codes
 		{"valid 840 USA", 840, false},
 		{"valid 826 GBR", 826, false},
@@ -439,9 +441,9 @@ func TestPostcodeConstraint(t *testing.T) {
 	})
 }
 
-// TestBCP47Constraint tests bcp47Constraint.Validate() for valid BCP 47 language tags.
-func TestBCP47Constraint(t *testing.T) {
-	runSimpleConstraintTests(t, bcp47Constraint{}, []simpleTestCase{
+// TestBCP47LanguageTagConstraint tests bcp47LanguageTagConstraint.Validate() for valid BCP 47 language tags.
+func TestBCP47LanguageTagConstraint(t *testing.T) {
+	runSimpleConstraintTests(t, bcp47LanguageTagConstraint{}, []simpleTestCase{
 		// Valid BCP 47 language tags - simple language codes
 		{"valid en", "en", false},
 		{"valid de", "de", false},

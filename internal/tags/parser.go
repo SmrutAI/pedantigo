@@ -42,10 +42,14 @@ func ParseTagWithName(tag reflect.StructTag, tagName string) map[string]string {
 			value := strings.TrimSpace(part[idx+1:])
 			constraints[key] = value
 		} else if idx := strings.IndexByte(part, ':'); idx != -1 {
-			// Handle key:value syntax (e.g., exclude:response,log)
+			// Handle key:value syntax (e.g., exclude:response|log)
+			// Note: value may contain | for multiple contexts
 			key := strings.TrimSpace(part[:idx])
 			value := strings.TrimSpace(part[idx+1:])
 			constraints[key] = value
+		} else if strings.Contains(part, "|") {
+			// OR operator (e.g., "hexcolor|rgb|rgba") - only when no = or :
+			constraints["__or__"+part] = ""
 		} else {
 			// Simple constraint like "required" or "email"
 			constraints[part] = ""
@@ -134,11 +138,22 @@ func ParseTagWithDiveAndName(tag reflect.StructTag, tagName string) *ParsedTag {
 			continue
 		}
 
-		// Parse constraint (key=value or bare keyword)
+		// Parse constraint (key=value, key:value, OR expression, or bare keyword)
 		var constraintName, constraintValue string
+
 		if idx := strings.IndexByte(part, '='); idx != -1 {
+			// key=value constraint
 			constraintName = strings.TrimSpace(part[:idx])
 			constraintValue = strings.TrimSpace(part[idx+1:])
+		} else if idx := strings.IndexByte(part, ':'); idx != -1 {
+			// key:value syntax (e.g., exclude:response|log)
+			// Note: value may contain | for multiple contexts
+			constraintName = strings.TrimSpace(part[:idx])
+			constraintValue = strings.TrimSpace(part[idx+1:])
+		} else if strings.Contains(part, "|") {
+			// OR expression (e.g., "hexcolor|rgb|rgba") - only when no = or :
+			constraintName = "__or__" + part
+			constraintValue = ""
 		} else {
 			constraintName = part
 			constraintValue = ""
