@@ -178,7 +178,7 @@ func TestShouldIncludeField_NoExclusion(t *testing.T) {
 		OmitEmpty:       false,
 	}
 
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "",
 		OmitZero: false,
 	}
@@ -199,7 +199,7 @@ func TestShouldIncludeField_ExcludeContext_Matches(t *testing.T) {
 		OmitEmpty:       false,
 	}
 
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "response",
 		OmitZero: false,
 	}
@@ -220,7 +220,7 @@ func TestShouldIncludeField_ExcludeContext_NoMatch(t *testing.T) {
 		OmitEmpty:       false,
 	}
 
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "response",
 		OmitZero: false,
 	}
@@ -235,7 +235,7 @@ func TestShouldIncludeField_OmitZero_ZeroValue(t *testing.T) {
 	tests := []struct {
 		name       string
 		meta       FieldMetadata
-		opts       SerializeOptions
+		opts       Options
 		fieldValue interface{}
 		want       bool
 	}{
@@ -246,7 +246,7 @@ func TestShouldIncludeField_OmitZero_ZeroValue(t *testing.T) {
 				OmitZero:        true,
 				IncludeContexts: make(map[string]bool),
 			},
-			opts: SerializeOptions{
+			opts: Options{
 				OmitZero: true,
 			},
 			fieldValue: 0,
@@ -259,7 +259,7 @@ func TestShouldIncludeField_OmitZero_ZeroValue(t *testing.T) {
 				OmitZero:        true,
 				IncludeContexts: make(map[string]bool),
 			},
-			opts: SerializeOptions{
+			opts: Options{
 				OmitZero: true,
 			},
 			fieldValue: "",
@@ -272,7 +272,7 @@ func TestShouldIncludeField_OmitZero_ZeroValue(t *testing.T) {
 				OmitZero:        true,
 				IncludeContexts: make(map[string]bool),
 			},
-			opts: SerializeOptions{
+			opts: Options{
 				OmitZero: true,
 			},
 			fieldValue: false,
@@ -296,7 +296,7 @@ func TestShouldIncludeField_OmitZero_NonZeroValue(t *testing.T) {
 		IncludeContexts: make(map[string]bool),
 	}
 
-	opts := SerializeOptions{
+	opts := Options{
 		OmitZero: true,
 	}
 
@@ -313,7 +313,7 @@ func TestShouldIncludeField_OmitZero_NilPointer(t *testing.T) {
 		IncludeContexts: make(map[string]bool),
 	}
 
-	opts := SerializeOptions{
+	opts := Options{
 		OmitZero: true,
 	}
 
@@ -331,7 +331,7 @@ func TestShouldIncludeField_OmitZero_NonNilPointer(t *testing.T) {
 		IncludeContexts: make(map[string]bool),
 	}
 
-	opts := SerializeOptions{
+	opts := Options{
 		OmitZero: true,
 	}
 
@@ -349,7 +349,7 @@ func TestShouldIncludeField_OmitZero_Disabled(t *testing.T) {
 		IncludeContexts: make(map[string]bool),
 	}
 
-	opts := SerializeOptions{
+	opts := Options{
 		OmitZero: false, // OmitZero disabled in options
 	}
 
@@ -369,7 +369,7 @@ func TestShouldIncludeField_CombinedExcludeAndOmitZero(t *testing.T) {
 	}
 
 	// Test 1: Excluded by context (should exclude regardless of zero)
-	opts1 := SerializeOptions{
+	opts1 := Options{
 		Context:  "response",
 		OmitZero: true,
 	}
@@ -377,7 +377,7 @@ func TestShouldIncludeField_CombinedExcludeAndOmitZero(t *testing.T) {
 	assert.False(t, ShouldIncludeField(meta, fieldValue1, opts1, false), "should be excluded by context")
 
 	// Test 2: Not excluded by context, but zero value (should exclude by omitzero)
-	opts2 := SerializeOptions{
+	opts2 := Options{
 		Context:  "api",
 		OmitZero: true,
 	}
@@ -385,7 +385,7 @@ func TestShouldIncludeField_CombinedExcludeAndOmitZero(t *testing.T) {
 	assert.False(t, ShouldIncludeField(meta, fieldValue2, opts2, false), "should be excluded by omitzero")
 
 	// Test 3: Not excluded by context, non-zero value (should include)
-	opts3 := SerializeOptions{
+	opts3 := Options{
 		Context:  "api",
 		OmitZero: true,
 	}
@@ -404,7 +404,7 @@ func TestShouldIncludeField_IncludeContext_HasWhitelist_FieldIncluded(t *testing
 		IncludeContexts: map[string]bool{"summary": true},
 	}
 
-	opts := SerializeOptions{
+	opts := Options{
 		Context: "summary",
 	}
 
@@ -424,7 +424,7 @@ func TestShouldIncludeField_IncludeContext_HasWhitelist_FieldNotIncluded(t *test
 		IncludeContexts: make(map[string]bool), // No include tags
 	}
 
-	opts := SerializeOptions{
+	opts := Options{
 		Context: "summary",
 	}
 
@@ -444,7 +444,7 @@ func TestShouldIncludeField_IncludeContext_NoWhitelist(t *testing.T) {
 		IncludeContexts: make(map[string]bool),
 	}
 
-	opts := SerializeOptions{
+	opts := Options{
 		Context: "other",
 	}
 
@@ -465,7 +465,7 @@ func TestShouldIncludeField_ExcludeOverridesInclude(t *testing.T) {
 		IncludeContexts: map[string]bool{"api": true},
 	}
 
-	opts := SerializeOptions{
+	opts := Options{
 		Context: "api",
 	}
 
@@ -567,7 +567,7 @@ func TestToFilteredMap_IncludeWhitelist(t *testing.T) {
 	metadata := BuildFieldMetadata(reflect.TypeOf(user), "pedantigo")
 
 	// Test "summary" context - should only include ID and Email
-	optsSummary := SerializeOptions{
+	optsSummary := Options{
 		Context:  "summary",
 		OmitZero: false,
 		TagName:  "pedantigo",
@@ -580,7 +580,7 @@ func TestToFilteredMap_IncludeWhitelist(t *testing.T) {
 	assert.NotContains(t, resultSummary, "password")
 
 	// Test "contact" context - should only include Email and Phone
-	optsContact := SerializeOptions{
+	optsContact := Options{
 		Context:  "contact",
 		OmitZero: false,
 		TagName:  "pedantigo",
@@ -593,7 +593,7 @@ func TestToFilteredMap_IncludeWhitelist(t *testing.T) {
 	assert.NotContains(t, resultContact, "password")
 
 	// Test no context - should include all fields
-	optsNone := SerializeOptions{
+	optsNone := Options{
 		Context:  "",
 		OmitZero: false,
 		TagName:  "pedantigo",
@@ -622,7 +622,7 @@ func TestToFilteredMap_Basic(t *testing.T) {
 	}
 
 	metadata := BuildFieldMetadata(reflect.TypeOf(obj), "pedantigo")
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "",
 		OmitZero: false,
 		TagName:  "pedantigo",
@@ -646,7 +646,7 @@ func TestToFilteredMap_ExcludesPassword(t *testing.T) {
 	}
 
 	metadata := BuildFieldMetadata(reflect.TypeOf(user), "pedantigo")
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "response",
 		OmitZero: false,
 		TagName:  "pedantigo",
@@ -676,7 +676,7 @@ func TestToFilteredMap_OmitsZeroPort(t *testing.T) {
 	}
 
 	metadata := BuildFieldMetadata(reflect.TypeOf(user), "pedantigo")
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "",
 		OmitZero: true, // OmitZero enabled
 		TagName:  "pedantigo",
@@ -706,7 +706,7 @@ func TestToFilteredMap_NestedStruct(t *testing.T) {
 	}
 
 	metadata := BuildFieldMetadata(reflect.TypeOf(nested), "pedantigo")
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "response",
 		OmitZero: false,
 		TagName:  "pedantigo",
@@ -746,7 +746,7 @@ func TestToFilteredMap_NestedStructPointer(t *testing.T) {
 	}
 
 	metadata := BuildFieldMetadata(reflect.TypeOf(nested), "pedantigo")
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "response",
 		OmitZero: false,
 		TagName:  "pedantigo",
@@ -770,7 +770,7 @@ func TestToFilteredMap_NilPointer(t *testing.T) {
 	var user *TestUser
 
 	metadata := BuildFieldMetadata(reflect.TypeOf(TestUser{}), "pedantigo")
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "",
 		OmitZero: false,
 		TagName:  "pedantigo",
@@ -793,7 +793,7 @@ func TestToFilteredMap_PointerToStruct(t *testing.T) {
 	}
 
 	metadata := BuildFieldMetadata(reflect.TypeOf(*user), "pedantigo")
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "",
 		OmitZero: false,
 		TagName:  "pedantigo",
@@ -818,7 +818,7 @@ func TestToFilteredMap_MultipleContexts(t *testing.T) {
 	metadata := BuildFieldMetadata(reflect.TypeOf(config), "pedantigo")
 
 	// Test "response" context
-	optsResponse := SerializeOptions{
+	optsResponse := Options{
 		Context:  "response",
 		OmitZero: false,
 		TagName:  "pedantigo",
@@ -830,7 +830,7 @@ func TestToFilteredMap_MultipleContexts(t *testing.T) {
 	assert.NotContains(t, resultResponse, "internal") // Excluded in "response"
 
 	// Test "log" context
-	optsLog := SerializeOptions{
+	optsLog := Options{
 		Context:  "log",
 		OmitZero: false,
 		TagName:  "pedantigo",
@@ -842,7 +842,7 @@ func TestToFilteredMap_MultipleContexts(t *testing.T) {
 	assert.NotContains(t, resultLog, "internal") // Excluded in "log"
 
 	// Test no context
-	optsNone := SerializeOptions{
+	optsNone := Options{
 		Context:  "",
 		OmitZero: false,
 		TagName:  "pedantigo",
@@ -868,7 +868,7 @@ func TestToFilteredMap_PointerFields(t *testing.T) {
 	}
 
 	metadata := BuildFieldMetadata(reflect.TypeOf(config), "pedantigo")
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "",
 		OmitZero: true,
 		TagName:  "pedantigo",
@@ -897,7 +897,7 @@ func TestToFilteredMap_NilPointerFieldWithOmitZero(t *testing.T) {
 	}
 
 	metadata := BuildFieldMetadata(reflect.TypeOf(config), "pedantigo")
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "",
 		OmitZero: true,
 		TagName:  "pedantigo",
@@ -917,7 +917,7 @@ func TestToFilteredMap_EmptyStruct(t *testing.T) {
 
 	obj := EmptyStruct{}
 	metadata := BuildFieldMetadata(reflect.TypeOf(obj), "pedantigo")
-	opts := SerializeOptions{
+	opts := Options{
 		Context:  "",
 		OmitZero: false,
 		TagName:  "pedantigo",

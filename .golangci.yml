@@ -25,8 +25,8 @@ linters:
     - gosec
     # Style
     - goconst
-    - godot
     - godox
+    - revive
     - whitespace
     # Testing
     - testifylint
@@ -56,18 +56,44 @@ linters:
       keywords:
         - TODO
         - FIXME
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - checkPrivateReceivers
+            - sayRepetitiveInsteadOfStutters
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: increment-decrement
+        - name: var-declaration
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: indent-error-flow
+        - name: superfluous-else
+        - name: unreachable-code
+        - name: redefines-builtin-id
 
   exclusions:
     presets:
       - comments
       - std-error-handling
     rules:
+      # Allow TODOs with any issue reference format: TODO(tracking-ref):
+      - linters:
+          - godox
+        text: "TODO\\([^)]+\\):"
       # Allow TODO/FIXME and code duplication in test code
       - path: _test\.go
         linters:
           - godox
           - dupl
           - goconst
+          - revive
       # Allow long functions in generated code
       - path: (.*)?_gen\.go
         linters:
