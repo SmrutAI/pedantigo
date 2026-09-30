@@ -18,6 +18,10 @@ import (
 	"github.com/SmrutAI/pedantigo/v2/validator/internal/tags"
 )
 
+// validatableType is the reflect.Type of the Validatable interface, used at build time
+// to detect nested struct types that implement it.
+var validatableType = reflect.TypeOf((*Validatable)(nil)).Elem()
+
 // Validator validates structs of type T.
 type Validator[T any] struct {
 	typ     reflect.Type
@@ -119,6 +123,9 @@ func (v *Validator[T]) buildFieldConstraints(typ reflect.Type, tagName string, i
 	// get a back-edge to the in-progress cache rather than nil. This allows validation
 	// to follow recursive types to their full data depth.
 	return deserialize.BuildNode(typ, inProgress, constraints.NewFieldCache, func(cache *constraints.FieldCache) {
+		// Record once whether nested values of this type must have Validate() called.
+		cache.ImplementsValidatable = reflect.PointerTo(typ).Implements(validatableType)
+
 		for i := 0; i < typ.NumField(); i++ {
 			field := typ.Field(i)
 
@@ -367,10 +374,67 @@ func (v *Validator[T]) recurseNested(val reflect.Value, path []byte, ctx *valida
 		ctx.visited[ptr] = struct{}{}
 	}
 	v.validateWithCache(val, path, ctx, nested)
+	if nested.ImplementsValidatable {
+		v.validateNestedValidatable(val, path, ctx)
+	}
 	if ptr != 0 {
 		delete(ctx.visited, ptr)
 	}
 	ctx.depth[nested]--
+}
+
+// validateNestedValidatable calls Validate() on a nested struct whose type
+// implements Validatable, after its tag constraints ran. It applies the same
+// re-entrancy guard as the root call and prefixes each error with the nested path.
+func (v *Validator[T]) validateNestedValidatable(val reflect.Value, path []byte, ctx *validateContext) {
+	for val.Kind() == reflect.Pointer {
+		if val.IsNil() {
+			return
+		}
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
+		return
+	}
+
+	// Map values and other non-addressable values are copied so the pointer
+	// receiver can be called.
+	var target reflect.Value
+	if val.CanAddr() {
+		target = val.Addr()
+	} else {
+		target = reflect.New(val.Type())
+		target.Elem().Set(val)
+	}
+
+	validatable, ok := target.Interface().(Validatable)
+	if !ok {
+		return
+	}
+	key := target.Pointer()
+	if _, alreadyValidating := v.validating.LoadOrStore(key, true); alreadyValidating {
+		return
+	}
+	defer v.validating.Delete(key)
+
+	err := validatable.Validate()
+	if err == nil {
+		return
+	}
+	var ve *ValidationError
+	if !errors.As(err, &ve) {
+		ctx.errs = append(ctx.errs, FieldError{Field: string(path), Message: err.Error()})
+		return
+	}
+	for i := range ve.Errors {
+		fe := ve.Errors[i]
+		if fe.Field == "" || fe.Field == fieldNameRoot {
+			fe.Field = string(path)
+		} else {
+			fe.Field = string(path) + "." + fe.Field
+		}
+		ctx.errs = append(ctx.errs, fe)
+	}
 }
 
 // validateWithCache validates using pre-built cached constraints.

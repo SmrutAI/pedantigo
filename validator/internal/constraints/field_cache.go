@@ -44,6 +44,11 @@ type CachedField struct {
 // FieldCache holds cached validation data for all fields in a struct.
 type FieldCache struct {
 	Fields []CachedField // indexed by struct field order
+
+	// ImplementsValidatable is true when a pointer to this struct type implements
+	// the Validatable interface (Validate() error). Computed once at validator
+	// creation so nested validation pays no reflection cost per call.
+	ImplementsValidatable bool
 }
 
 // NewFieldCache creates a new instance of FieldCache.
