@@ -14,7 +14,7 @@ import (
 
 // uibBlock and uibLeaf are each Register()ed with no explicit Options, matching
 // how every real caller of this package actually registers a type (e.g.
-// smritea-cloud's `var _ = validator.Register(validator.New[T]())` package-level
+// `var _ = validator.Register(validator.New[T]())` package-level
 // declarations): relying on the default "validate" tag resolved via
 // GetTagName(). Passing an explicit TagName here would test a configuration
 // no real caller uses.
